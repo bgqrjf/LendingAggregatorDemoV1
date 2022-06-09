@@ -7,11 +7,14 @@ import "./interfaces/IPriceOracleGetter.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./libraries/TransferHelper.sol";
 import "./libraries/Utils.sol";
+import "./libraries/UserAssetBitMap.sol";
 
 import "./Types.sol";
 import "./Config.sol";
 import "./SToken.sol";
 import "./DToken.sol";
+import "./Treasury.sol";
+import "./Strategy.sol";
 
 contract Router is Ownable{
     // constant
@@ -22,21 +25,26 @@ contract Router is Ownable{
     Config public config;
     address[] public underlyings;
     address[] private providers;
+    Treasury private treasury;
+    Strategy public strategy;
 
     mapping(address => Types.Asset) public assets;
 
     // mapping(token address => asset Index)
     mapping(address => uint) public assetIndex;
 
-    constructor(address[] memory _providers, address _priceOracle){
-        config = new Config(msg.sender);
+    constructor(address[] memory _providers, address _priceOracle, address _strategy, uint _treasuryRatio){
+        config = new Config(msg.sender, _treasuryRatio);
         providers = _providers;
         priceOracle = IPriceOracleGetter(_priceOracle);
+        treasury = new Treasury();
+        strategy = Strategy(_strategy);
     }
 
     receive() external payable {}
 
     function addAsset(Types.NewAssetParams memory _newAsset) external onlyOwner returns (Types.Asset memory asset){
+        require(underlyings.length < UserAssetBitMap.MAX_RESERVES_COUNT, "Router: asset list full");
         underlyings.push(_newAsset.underlying);
 
         asset = Types.Asset(
@@ -52,32 +60,34 @@ contract Router is Ownable{
         config.setBorrowConfig(_newAsset.underlying, _newAsset.borrowConfig);
     }
 
-    function deposit(address _underlying, address _to, bool _colletralable) public returns (uint sTokenAmount){
+    // use reentry guard
+    function supply(address _underlying, address _to, bool _colletralable) public returns (uint sTokenAmount){
         Types.Asset memory asset = assets[_underlying];
         uint amount = TransferHelper.balanceOf(_underlying, address(this));
+        uint sTokenSupply = asset.sToken.totalSupply();
+        uint uTokenSupplied = totalSupplied(_underlying);
+
+        // update states
+        sTokenAmount = amount * sTokenSupply / uTokenSupplied;
+        asset.sToken.mint(_to, sTokenAmount);
+        assets[_underlying].sReserve += asset.sToken.totalSupply();
 
         // supply to provider
+        amount = supplyToTreasury(_underlying, amount, uTokenSupplied);
         uint[] memory amounts = getSupplyStrategy(_underlying, amount);
         address[] memory supplyTo = providers;
         for (uint i = 0; i < supplyTo.length - 1; i++){
-            Utils.delegateCall(supplyTo[i], abi.encodeWithSelector(IProvider.deposit.selector, _underlying, amounts[i]));
+            Utils.delegateCall(supplyTo[i], abi.encodeWithSelector(IProvider.supply.selector, _underlying, amounts[i]));
         }
 
         Utils.delegateCall(
             supplyTo[supplyTo.length - 1], 
             abi.encodeWithSelector(
-                IProvider.deposit.selector, 
+                IProvider.supply.selector, 
                 _underlying,
                 TransferHelper.balanceOf(_underlying, address(this))
             )
         );
-
-        // update states
-        uint sTokenSupply = asset.sToken.totalSupply();
-        uint uTokenSupplied = totalSupplied(_underlying);
-        sTokenAmount = amount * sTokenSupply / uTokenSupplied;
-        asset.sToken.mint(_to, sTokenAmount);
-        assets[_underlying].sReserve += asset.sToken.totalSupply();
 
         config.setUsingAsCollateral(_to, asset.index, _colletralable);
     }
@@ -91,7 +101,8 @@ contract Router is Ownable{
         // update states
         assets[_underlying].sReserve = sTokenSupply;
 
-        uint amount = (asset.sReserve - sTokenSupply) * uTokenSupplied / asset.sReserve;
+        uint amount = withdrawFromTreasury(_underlying, (asset.sReserve - sTokenSupply) * uTokenSupplied / asset.sReserve);
+
         (address[] memory withdrawFrom, uint[] memory amounts) = getWithdrawStrategy(_underlying, amount);
 
         for (uint i = 0; i < withdrawFrom.length - 1; i++){
@@ -209,14 +220,15 @@ contract Router is Ownable{
     function totalSupplied(address _underlying) public view returns (uint amount){
         address[] memory providersCopy = providers;
         for (uint i = 0; i < providersCopy.length; i++){
-            amount += IProvider(providersCopy[i]).balanceOf(_underlying, address(this));
+            amount += IProvider(providersCopy[i]).supplyOf(_underlying);
         }
+        amount += TransferHelper.balanceOf(_underlying, address(treasury));
     }
 
     function totalDebts(address _underlying) public view returns (uint amount){
         address[] memory providersCopy = providers;
         for (uint i = 0; i < providersCopy.length; i++){
-            amount += IProvider(providersCopy[i]).balanceOf(_underlying, address(this));
+            amount += IProvider(providersCopy[i]).debtOf(_underlying);
         }
     }
 
@@ -229,26 +241,43 @@ contract Router is Ownable{
     function valueOf(address _account, address _quote) public view returns (uint collateralValue, uint borrowingValue){
         uint userConfig = config.userDebtAndCollateral(_account);
         for (uint i = 0; i < underlyings.length; i++){
-            if (isUsingAsCollateralOrBorrowing(userConfig, i)){
-                if (isUsingAsCollateral(userConfig, i)){
+            if (UserAssetBitMap.isUsingAsCollateralOrBorrowing(userConfig, i)){
+                if (UserAssetBitMap.isUsingAsCollateral(userConfig, i)){
                     (SToken sToken,,,,) = getAssetByID(i);
                     collateralValue += priceOracle.valueOfAsset(
                         sToken.underlying(),
                         _quote, 
-                        sToken.underlyingBalanceOf(_account)
+                        sToken.scaledBalanceOf(_account)
                     );
                 }
 
-                if (isBorrowing(userConfig, i)){
+                if (UserAssetBitMap.isBorrowing(userConfig, i)){
                     (, DToken dToken,,,) = getAssetByID(i);
                     borrowingValue += priceOracle.valueOfAsset(
                         dToken.underlying(),
                         _quote, 
-                        dToken.underlyingDebtOf(_account)
+                        dToken.scaledDebtOf(_account)
                     );
                 }
             }
         }
+    }
+
+    // transfer to treasury
+    function supplyToTreasury(address _underlying, uint _amount, uint _totalSupplied) internal returns (uint amountLeft){
+        uint amountDesired = _totalSupplied * config.treasuryRatio() / Utils.million;
+        uint balance = TransferHelper.balanceOf(_underlying, address(treasury));
+        if (balance < amountDesired){
+            uint amountToTreasury = Utils.minOf(_amount,  amountDesired - balance);
+            TransferHelper.transferERC20(_underlying, address(treasury), amountToTreasury);
+            amountLeft = _amount - amountToTreasury;
+        }
+    }
+
+    function withdrawFromTreasury(address _underlying, uint _amount) internal returns (uint amountLeft){
+        uint amountFromTreasury = Utils.minOf(TransferHelper.balanceOf(_underlying, address(treasury)), _amount);
+        treasury.withdraw(_underlying, amountFromTreasury);
+        amountLeft = _amount - amountFromTreasury;
     }
 
     function getSupplyStrategy(
@@ -275,7 +304,7 @@ contract Router is Ownable{
         }
 
         if (_amount > minSupplyAmount){
-            uint[] memory strategyAmounts = calculateAmountsToSupply(_amount - minSupplyAmount, maxApy, minApy,usageParams);
+            uint[] memory strategyAmounts = strategy.calculateAmountsToSupply(_amount - minSupplyAmount, maxApy, usageParams);
 
             if (minSupplyAmount > 0){
                 for (uint i = 0; i < providerCount; i++){
@@ -289,33 +318,8 @@ contract Router is Ownable{
         address _underlying, 
         uint _amount
     ) internal view returns (address[] memory withdrawFrom, uint[] memory amounts){
-        uint providerCount = providers.length;
-        amounts = new uint[](providerCount);
-        Types.UsageParams[] memory usageParams = new Types.UsageParams[](providerCount);
-        uint maxApy = 0;
-        uint minApy = MAX_APY;
-        uint[] maxToWithdraw;
-        for (uint i = 0; i < providerCount && _amount > 0; i++){
-            IProvider provider = IProvider(providers[i]);
-            maxToWithdraw[i] = provider.maxToWithdraw(_underlying);
-
-            usageParams[i] = provider.getUsageParams(_underlying);
-            if (usageParams[i].apy > maxApy){
-                maxApy = usageParams[i].apy;
-            }
-
-            if (usageParams[i].apy < minApy){
-                minApy = usageParams[i].apy;
-            }
-        }
-
-        uint[] memory strategyAmounts = calculateAmountsToWithdraw(_amount, maxApy, minApy,usageParams, maxToWithdraw);
-
-        if (minSupplyAmount > 0){
-            for (uint i = 0; i < providerCount; i++){
-                amounts[i] += strategyAmounts[i];
-            }
-        }
+        
+        
     }
 
     function getBorrowStrategy(
@@ -332,69 +336,6 @@ contract Router is Ownable{
     ) internal view returns (address[] memory withdrawFrom, uint[] memory amounts){
         // if excced alarm LTV repay to the pool
         // select best interest after repay
-    }
-
-    function isUsingAsCollateralOrBorrowing(uint _userConfig, uint256 _reserveIndex) internal pure returns (bool) {
-        return (_userConfig >> (_reserveIndex << 1)) & 3 != 0;
-    }
-
-    function isBorrowing(uint _userConfig, uint _reserveIndex) internal pure returns (bool){
-        return (_userConfig >> (_reserveIndex << 1)) & 1 != 0;
-    }
-
-    function isUsingAsCollateral(uint _userConfig, uint256 _reserveIndex) internal pure returns (bool){
-        return (_userConfig >> ((_reserveIndex << 1) + 1)) & 1 != 0;
-    }
-
-    // move this logic to a sperate contract for better maintenance
-    function calculateAmountsToSupply(uint _targetAmount, uint _maxApy, Types.UsageParams[] memory _params) internal pure returns (uint[] memory amounts){
-        uint providerCount = _params.length;
-        amounts = new uint[](providerCount);
-        uint minApy;
-        while(_maxApy - minApy > 1){
-            uint delta = _maxApy - minApy;
-            uint targetRate = minApy + delta / 2;
-            uint totalAmountToSupply;
-            for (uint i = 0; i < providerCount; i++){
-                amounts[i]= calculateAmountToSupply(targetRate, _params[i]);
-                totalAmountToSupply += amounts[i];
-            }
-
-            if (totalAmountToSupply < _targetAmount){
-                _maxApy = targetRate;
-            }else if (totalAmountToSupply > _targetAmount){
-                minApy = targetRate;
-            }else{
-                break;
-            }
-        }
-    }
-
-    function calculateAmountsToWithdraw(uint _targetAmount, uint _maxApy, uint _minApy, Types.UsageParams[] memory _params, uint[] memory _maxToWithdraw) internal pure returns (uint[] memory amounts){
-        uint providerCount = _params.length;
-        amounts = new uint[](providerCount);
-        while(_maxApy - _minApy > 1){
-            uint delta = _maxApy - _minApy;
-            uint targetRate = _minApy + delta / 2;
-            uint totalAmountToWithdraw;
-            for (uint i = 0; i < providerCount; i++){
-                amounts[i]= calculateAmountToSupply(targetRate, _params[i]);
-                totalAmountToWithdraw += amounts[i];
-            }
-
-            if (totalAmountToSupply < _targetAmount){
-                _maxApy = targetRate;
-            }else if (totalAmountToSupply > _targetAmount){
-                _minApy = targetRate;
-            }else{
-                break;
-            }
-        }
-
-    }
-
-    function calculateAmountToSupply(uint _targetRate, Types.UsageParams memory _params) internal pure returns (uint amount){
-
     }
 
 }

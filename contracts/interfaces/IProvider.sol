@@ -4,9 +4,8 @@ pragma solidity ^0.8.14;
 import "../Types.sol";
 
 interface IProvider{
-
-    // deposit for msg.sender
-    function deposit (address _underlying, uint _amount) external;
+    // call by delegates public functions
+    function supply (address _underlying, uint _amount) external;
 
     function withdraw(address _underlying, uint _amount) external;
 
@@ -15,7 +14,10 @@ interface IProvider{
     function repay(address _underlying, uint _amount) external;
 
     // return underlying Token
-    function balanceOf(address _underlying, address _acount) external view returns (uint);
+    // return data for caller
+    function supplyOf(address _underlying) external view returns (uint);
+
+    function debtOf(address _underlying) external view returns (uint);
 
     function minSupplyNeeded(address _underlying) external view returns(uint);
 

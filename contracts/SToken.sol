@@ -44,7 +44,11 @@ contract SToken is ERC20{
         Router(router).withdraw(underlying, _to, _colletralable);
     }
 
-    function underlyingBalanceOf(address _account) public view returns (uint){
-        return balanceOf(_account) * Router(router).totalSupplied(underlying) / totalSupply();
+    function scaledBalanceOf(address _account) public view returns (uint){
+        return scaledAmount(balanceOf(_account));
+    }
+
+    function scaledAmount(uint _amount) public view returns (uint){
+        return _amount *  Router(router).totalSupplied(underlying) / totalSupply();
     }
 }

@@ -38,8 +38,11 @@ contract DToken is ERC20{
         _burn(_account, _amount);
     }
    
-    function underlyingDebtOf(address _account) public view returns (uint){
-        return balanceOf(_account) * Router(router).totalSupplied(underlying).divCeil(totalSupply());
+    function scaledDebtOf(address _account) public view returns (uint){
+        return scaledAmount(balanceOf(_account));
     }
 
+    function scaledAmount(uint _amount) public view returns (uint){
+        return _amount *  Router(router).totalSupplied(underlying).divCeil(totalSupply());
+    }
 }

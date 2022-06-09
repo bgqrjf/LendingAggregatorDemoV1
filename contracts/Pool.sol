@@ -38,7 +38,7 @@ contract Pool{
 
     function deposit(address _token, address _to, uint _amount, bool _colletralable) external returns (uint sTokenAmount) {
         TransferHelper.transferFrom(_token, msg.sender, router, _amount);
-        sTokenAmount = Router(router).deposit(_token, _to, _colletralable);
+        sTokenAmount = Router(router).supply(_token, _to, _colletralable);
     }
 
     function repay(address _token, address _for, uint _amount) public returns (uint actualAmount){

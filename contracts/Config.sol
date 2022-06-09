@@ -2,12 +2,13 @@
 pragma solidity ^0.8.14;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "./libraries/UserAssetBitMap.sol";
+
 import "./Types.sol";
 
 contract Config is Ownable{
-    uint public immutable MAX_RESERVES_COUNT = 128;
-
     address public router;
+    uint public treasuryRatio;
 
     // mapping underlyingToken to borrowConfig
     mapping(address => Types.BorrowConfig) public borrowConfigs;
@@ -26,13 +27,10 @@ contract Config is Ownable{
         _;
     }
 
-    modifier onyRouterAndUser(address _account){
-        _;
-    }
-
-    constructor(address _owner){
+    constructor(address _owner, uint _treasuryRatio){
         transferOwnership(_owner);
         router = msg.sender;
+        treasuryRatio = _treasuryRatio;
     }
 
     function setBorrowConfig(address _token, Types.BorrowConfig memory _config) external onlyRouterOrOwner{
@@ -45,7 +43,7 @@ contract Config is Ownable{
 
     function setUsingAsCollateral(address _account, uint256 _reserveIndex, bool _usingAsCollateral) external {
         require(msg.sender == router || msg.sender == _account, "Config: Only Router/User");
-        require(_reserveIndex < MAX_RESERVES_COUNT, "Config: ID out of range");
+        require(_reserveIndex < UserAssetBitMap.MAX_RESERVES_COUNT, "Config: ID out of range");
         uint256 bit = 1 << ((_reserveIndex << 1) + 1);
         if (_usingAsCollateral) {
             userDebtAndCollateral[_account] |= bit;
@@ -55,13 +53,17 @@ contract Config is Ownable{
     }
 
     function setBorrowing(address _account, uint256 _reserveIndex, bool _borrowing) external onlyRouter {
-        require(_reserveIndex < MAX_RESERVES_COUNT, "Config: ID out of range");
+        require(_reserveIndex < UserAssetBitMap.MAX_RESERVES_COUNT, "Config: ID out of range");
         uint256 bit = 1 << (_reserveIndex << 1);
         if (_borrowing) {
             userDebtAndCollateral[_account] |= bit;
         } else {
             userDebtAndCollateral[_account] &= ~bit;
         }
+    }
+
+    function setTreasuryRatio(uint _treasuryRatio) external onlyOwner{
+        treasuryRatio = _treasuryRatio;
     }
 
 }

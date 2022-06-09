@@ -1,0 +1,12 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.14;
+
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "./libraries/TransferHelper.sol";
+
+contract Treasury is Ownable{
+
+    function withdraw(address _underlying, uint _amount) external onlyOwner{
+        TransferHelper.transferERC20(_underlying, owner(), _amount);
+    }
+}
