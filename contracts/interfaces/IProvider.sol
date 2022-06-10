@@ -19,9 +19,5 @@ interface IProvider{
 
     function debtOf(address _underlying) external view returns (uint);
 
-    function minSupplyNeeded(address _underlying) external view returns(uint);
-
-    function maxToWithdraw(address _underlying) external view returns(uint);
-
     function getUsageParams(address _underlying) external view returns (Types.UsageParams memory);
 }

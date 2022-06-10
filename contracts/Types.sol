@@ -35,8 +35,10 @@ contract Types{
     struct UsageParams{
         uint slope1;
         uint slope2;
-        uint base;
+        uint base;  // actual base * 10^6
+        uint totalSupplied;
         uint totalBorrowed;
-        uint apy;
+        uint optimalLTV;
+        uint rate; // block percentange yield
     }
 }

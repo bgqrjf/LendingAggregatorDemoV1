@@ -63,6 +63,7 @@ contract Router is Ownable{
     // use reentry guard
     function supply(address _underlying, address _to, bool _colletralable) public returns (uint sTokenAmount){
         Types.Asset memory asset = assets[_underlying];
+        address[] memory supplyTo = providers;
         uint amount = TransferHelper.balanceOf(_underlying, address(this));
         uint sTokenSupply = asset.sToken.totalSupply();
         uint uTokenSupplied = totalSupplied(_underlying);
@@ -74,10 +75,13 @@ contract Router is Ownable{
 
         // supply to provider
         amount = supplyToTreasury(_underlying, amount, uTokenSupplied);
-        uint[] memory amounts = getSupplyStrategy(_underlying, amount);
-        address[] memory supplyTo = providers;
+        uint[] memory amounts = strategy.getSupplyStrategy(providers, _underlying, amount);
         for (uint i = 0; i < supplyTo.length - 1; i++){
-            Utils.delegateCall(supplyTo[i], abi.encodeWithSelector(IProvider.supply.selector, _underlying, amounts[i]));
+            uint amountToSupply = Utils.minOf(amounts[i], amount);
+            if (amountToSupply > 0){
+                Utils.delegateCall(supplyTo[i], abi.encodeWithSelector(IProvider.supply.selector, _underlying, amountToSupply));
+                amount -= amountToSupply;
+            }
         }
 
         Utils.delegateCall(
@@ -95,6 +99,7 @@ contract Router is Ownable{
     // only validated underlying tokens
     function withdraw(address _underlying, address _to, bool _colletralable) public{
         Types.Asset memory asset = assets[_underlying];
+        address[] memory withdrawFrom = providers;
         uint sTokenSupply = asset.sToken.totalSupply();
         uint uTokenSupplied = totalSupplied(_underlying);
 
@@ -102,9 +107,7 @@ contract Router is Ownable{
         assets[_underlying].sReserve = sTokenSupply;
 
         uint amount = withdrawFromTreasury(_underlying, (asset.sReserve - sTokenSupply) * uTokenSupplied / asset.sReserve);
-
-        (address[] memory withdrawFrom, uint[] memory amounts) = getWithdrawStrategy(_underlying, amount);
-
+        uint[] memory amounts = strategy.getWithdrawStrategy(withdrawFrom, _underlying, amount);
         for (uint i = 0; i < withdrawFrom.length - 1; i++){
             Utils.delegateCall(withdrawFrom[i], abi.encodeWithSelector(IProvider.withdraw.selector, _underlying, amounts[i]));
         }
@@ -125,6 +128,7 @@ contract Router is Ownable{
 
     function borrow(address _underlying, address _to) public returns (uint amount){
         Types.Asset memory asset = assets[_underlying];
+        address[] memory borrowFrom = providers;
         uint dTokenSupply = asset.dToken.totalSupply();
         uint debts = totalDebts(_underlying);
         assets[_underlying].dReserve = asset.dToken.totalSupply();
@@ -134,7 +138,7 @@ contract Router is Ownable{
         require(amount > 0, "Router: no borrow amount");
         config.setBorrowing(_to, asset.index, true);
 
-        (address[] memory borrowFrom, uint[] memory amounts) = getBorrowStrategy(_underlying, amount);
+        uint[] memory amounts = strategy.getBorrowStrategy(borrowFrom, _underlying, amount);
 
         for (uint i = 0; i < borrowFrom.length - 1; i++){
             Utils.delegateCall(borrowFrom[i], abi.encodeWithSelector(IProvider.borrow.selector, _underlying, amounts[i]));
@@ -154,7 +158,7 @@ contract Router is Ownable{
 
     function repay(address _underlying, address _for) public returns (uint amount){
         Types.Asset memory asset = assets[_underlying];
-
+        address[] memory repayTo = providers;
         uint dTokenSupply = asset.dToken.totalSupply();
         uint debts = totalDebts(_underlying);
 
@@ -164,7 +168,7 @@ contract Router is Ownable{
         );
 
         // supply to provider
-        (address[] memory repayTo, uint[] memory amounts) = getRepayStrategy(_underlying, amount * debts/ dTokenSupply);
+        uint[] memory amounts = strategy.getRepayStrategy(repayTo, _underlying, amount * debts/ dTokenSupply);
         for (uint i = 0; i < repayTo.length - 1; i++){
             Utils.delegateCall(repayTo[i], abi.encodeWithSelector(IProvider.repay.selector, _underlying, amounts[i]));
         }
@@ -196,13 +200,13 @@ contract Router is Ownable{
         (,uint liquidateLTV, uint maxLiquidateRatio, uint liquidateReward) = config.borrowConfigs(_debtToken);
         (uint collateralValue, uint debtsValue) = valueOf(_for, _debtToken);
 
-        require(debtsValue * Utils.million / collateralValue > liquidateLTV, "Router: sufficient collateral");
+        require(debtsValue * Utils.MILLION / collateralValue > liquidateLTV, "Router: sufficient collateral");
 
         liquidateAmount = repay(_debtToken, _for);
 
-        require(liquidateAmount <=  debtsValue * maxLiquidateRatio / Utils.million, "Router: Exceed Liquidate Cap");
+        require(liquidateAmount <=  debtsValue * maxLiquidateRatio / Utils.MILLION, "Router: Exceed Liquidate Cap");
 
-        burnAmount = priceOracle.valueOfAsset(_debtToken, _colletrallToken, liquidateAmount) * liquidateReward / Utils.million;
+        burnAmount = priceOracle.valueOfAsset(_debtToken, _colletrallToken, liquidateAmount) * liquidateReward / Utils.MILLION;
         assets[_colletrallToken].sToken.liquidate(_for, _to, burnAmount);
     }
 
@@ -235,7 +239,7 @@ contract Router is Ownable{
     function borrowCap(address _underlying, address _account) public view returns (uint){
         (uint maxLTV,,,) = config.borrowConfigs(_underlying);
         (uint collateralValue, uint debtsValue) = valueOf(_account, _underlying);
-        return collateralValue * maxLTV / Utils.million - debtsValue;
+        return collateralValue * maxLTV / Utils.MILLION - debtsValue;
     }
 
     function valueOf(address _account, address _quote) public view returns (uint collateralValue, uint borrowingValue){
@@ -265,7 +269,7 @@ contract Router is Ownable{
 
     // transfer to treasury
     function supplyToTreasury(address _underlying, uint _amount, uint _totalSupplied) internal returns (uint amountLeft){
-        uint amountDesired = _totalSupplied * config.treasuryRatio() / Utils.million;
+        uint amountDesired = _totalSupplied * config.treasuryRatio() / Utils.MILLION;
         uint balance = TransferHelper.balanceOf(_underlying, address(treasury));
         if (balance < amountDesired){
             uint amountToTreasury = Utils.minOf(_amount,  amountDesired - balance);
@@ -278,64 +282,6 @@ contract Router is Ownable{
         uint amountFromTreasury = Utils.minOf(TransferHelper.balanceOf(_underlying, address(treasury)), _amount);
         treasury.withdraw(_underlying, amountFromTreasury);
         amountLeft = _amount - amountFromTreasury;
-    }
-
-    function getSupplyStrategy(
-        address _underlying, 
-        uint _amount
-    ) internal view returns (uint[] memory amounts){
-        uint providerCount = providers.length;
-        amounts = new uint[](providerCount);
-        Types.UsageParams[] memory usageParams = new Types.UsageParams[](providerCount);
-        uint maxApy = 0;
-        uint minSupplyAmount;
-        for (uint i = 0; i < providerCount && _amount > 0; i++){
-            IProvider provider = IProvider(providers[i]);
-            amounts[i] = provider.minSupplyNeeded(_underlying);
-            if (amounts[i] > 0){
-                amounts[i] = Utils.minOf(_amount, amounts[i]);
-                minSupplyAmount += amounts[i];
-            }
-
-            usageParams[i] = provider.getUsageParams(_underlying);
-            if (usageParams[i].apy > maxApy){
-                maxApy = usageParams[i].apy;
-            }
-        }
-
-        if (_amount > minSupplyAmount){
-            uint[] memory strategyAmounts = strategy.calculateAmountsToSupply(_amount - minSupplyAmount, maxApy, usageParams);
-
-            if (minSupplyAmount > 0){
-                for (uint i = 0; i < providerCount; i++){
-                    amounts[i] += strategyAmounts[i];
-                }
-            }
-        }
-    }
-
-    function getWithdrawStrategy(
-        address _underlying, 
-        uint _amount
-    ) internal view returns (address[] memory withdrawFrom, uint[] memory amounts){
-        
-        
-    }
-
-    function getBorrowStrategy(
-        address _underlying, 
-        uint _amount
-    ) internal view returns (address[] memory withdrawFrom, uint[] memory amounts){
-        // should not exceed provider alarm LTV
-        // select best interest after borrow
-    }
-
-    function getRepayStrategy(
-        address _underlying, 
-        uint _amount
-    ) internal view returns (address[] memory withdrawFrom, uint[] memory amounts){
-        // if excced alarm LTV repay to the pool
-        // select best interest after repay
     }
 
 }
