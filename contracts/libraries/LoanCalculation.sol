@@ -157,7 +157,7 @@ library LoanCalculation{
     function supplyOfTargetRate(uint32 _targetRate, Types.UsageParams memory _params) public pure returns (uint amount){
         supplyToBorrowRate(_targetRate, _params.reserveFactor);
         uint a = _params.totalBorrowed * _params.base;
-        uint b = _params.totalBorrowed * Math.sqrt(_params.base ** 2 + 4 * _params.slope1 * _targetRate);
+        uint b = _params.totalBorrowed * Math.sqrt(_params.base * _params.base + 4 * _params.slope1 * _targetRate);
         amount = (a + b) / (2 * _targetRate);
 
         uint targetLTV = _params.totalBorrowed * Utils.MILLION / amount;
@@ -165,13 +165,24 @@ library LoanCalculation{
             uint base = _params.slope1 * _params.optimalLTV / Utils.MILLION + _params.base; 
             uint kbp =  _params.slope2 * _params.totalBorrowed * _params.optimalLTV / Utils.MILLION; 
             a = _params.totalBorrowed * base; 
-            b = Math.sqrt((kbp - _params.totalBorrowed * base) ** 2 + 4 * _params.slope2 * (_params.totalBorrowed ** 2) * _targetRate);
+            b = Math.sqrt((kbp - _params.totalBorrowed * base) ** 2 + 4 * _params.slope2 * _params.totalBorrowed * _params.totalBorrowed * _targetRate);
             amount = (a + b - kbp) / (2 * _targetRate);
         }
     }
 
     function loanOfTargetRate(uint32 _targetRate, Types.UsageParams memory _params) public pure returns (uint amount){
+        uint a = _params.totalSupplied * Math.sqrt(_params.base * _params.base + 4 * _params.slope1 * _targetRate);
+        uint b = _params.totalSupplied * _params.base;
+        amount = (a-b) / (2 * _params.slope1);
         
+        uint targetLTV = amount * Utils.MILLION / _params.totalSupplied;
+        if (targetLTV > _params.optimalLTV){
+            uint base = _params.slope1 * _params.optimalLTV / Utils.MILLION + _params.base; 
+            uint ksp =  _params.slope2 * _params.totalSupplied * _params.optimalLTV / Utils.MILLION; 
+            a = ksp + _params.totalSupplied * base;
+            b = Math.sqrt(a * a + 4 * _params.slope2 * _params.totalSupplied * _params.totalSupplied * _targetRate);
+            amount = (a + b ) / (2 * _params.slope1);
+        }
     }
 
     function supplyToBorrowRate(uint32 _supplyRate, uint32 _reserveFactor) public pure returns (uint32 _borrowRate){
