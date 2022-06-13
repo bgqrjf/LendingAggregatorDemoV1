@@ -43,7 +43,7 @@ contract Router is IRouter, Ownable{
 
     receive() external payable {}
 
-    function addAsset(Types.NewAssetParams memory _newAsset) external onlyOwner returns (Types.Asset memory asset){
+    function addAsset(Types.NewAssetParams memory _newAsset) external override onlyOwner returns (Types.Asset memory asset){
         require(underlyings.length < UserAssetBitMap.MAX_RESERVES_COUNT, "Router: asset list full");
         underlyings.push(_newAsset.underlying);
 
@@ -61,7 +61,7 @@ contract Router is IRouter, Ownable{
     }
 
     // use reentry guard
-    function supply(address _underlying, address _to, bool _colletralable) public returns (uint sTokenAmount){
+    function supply(address _underlying, address _to, bool _colletralable) public override returns (uint sTokenAmount){
         Types.Asset memory asset = _assets[_underlying];
         address[] memory supplyTo = providers;
         uint amount = TransferHelper.balanceOf(_underlying, address(this));
@@ -97,7 +97,7 @@ contract Router is IRouter, Ownable{
     }
 
     // only validated underlying tokens
-    function withdraw(address _underlying, address _to, bool _colletralable) public{
+    function withdraw(address _underlying, address _to, bool _colletralable) public override {
         Types.Asset memory asset = _assets[_underlying];
         address[] memory withdrawFrom = providers;
         uint sTokenSupply = asset.sToken.totalSupply();
@@ -126,7 +126,7 @@ contract Router is IRouter, Ownable{
         TransferHelper.transferERC20(_underlying, _to, amount);
     }
 
-    function borrow(address _underlying, address _to) public returns (uint amount){
+    function borrow(address _underlying, address _to) public override returns (uint amount){
         Types.Asset memory asset = _assets[_underlying];
         address[] memory borrowFrom = providers;
         uint dTokenSupply = asset.dToken.totalSupply();
@@ -156,7 +156,7 @@ contract Router is IRouter, Ownable{
         TransferHelper.transferERC20(_underlying, _to, amount);
     }
 
-    function repay(address _underlying, address _for) public returns (uint amount){
+    function repay(address _underlying, address _for) public override returns (uint amount){
         Types.Asset memory asset = _assets[_underlying];
         address[] memory repayTo = providers;
         uint dTokenSupply = asset.dToken.totalSupply();
@@ -199,7 +199,7 @@ contract Router is IRouter, Ownable{
         address _colletrallToken, 
         address _for, 
         address _to
-    ) external returns (uint liquidateAmount, uint burnAmount){
+    ) external override returns (uint liquidateAmount, uint burnAmount){
         Types.BorrowConfig memory bc = config.borrowConfigs(_debtToken);
         (uint collateralValue, uint debtsValue) = valueOf(_for, _debtToken);
 
@@ -213,7 +213,7 @@ contract Router is IRouter, Ownable{
         _assets[_colletrallToken].sToken.liquidate(_for, _to, burnAmount);
     }
 
-    function getAssetByID(uint id) public view returns (ISToken, IDToken, bool, uint, uint){
+    function getAssetByID(uint id) public view override returns (ISToken, IDToken, bool, uint, uint){
         Types.Asset memory asset = _assets[underlyings[id]];
         return(
             asset.sToken,
@@ -224,7 +224,7 @@ contract Router is IRouter, Ownable{
         );
     }
 
-    function totalSupplied(address _underlying) public view returns (uint amount){
+    function totalSupplied(address _underlying) public view override returns (uint amount){
         address[] memory providersCopy = providers;
         for (uint i = 0; i < providersCopy.length; i++){
             amount += IProvider(providersCopy[i]).supplyOf(_underlying);
@@ -232,20 +232,20 @@ contract Router is IRouter, Ownable{
         amount += TransferHelper.balanceOf(_underlying, address(treasury));
     }
 
-    function totalDebts(address _underlying) public view returns (uint amount){
+    function totalDebts(address _underlying) public view override returns (uint amount){
         address[] memory providersCopy = providers;
         for (uint i = 0; i < providersCopy.length; i++){
             amount += IProvider(providersCopy[i]).debtOf(_underlying);
         }
     }
 
-    function borrowCap(address _underlying, address _account) public view returns (uint){
+    function borrowCap(address _underlying, address _account) public view override returns (uint){
         Types.BorrowConfig memory bc = config.borrowConfigs(_underlying);
         (uint collateralValue, uint debtsValue) = valueOf(_account, _underlying);
         return collateralValue * bc.maxLTV / Utils.MILLION - debtsValue;
     }
 
-    function valueOf(address _account, address _quote) public view returns (uint collateralValue, uint borrowingValue){
+    function valueOf(address _account, address _quote) public view override returns (uint collateralValue, uint borrowingValue){
         uint userConfig = config.userDebtAndCollateral(_account);
         for (uint i = 0; i < underlyings.length; i++){
             if (UserAssetBitMap.isUsingAsCollateralOrBorrowing(userConfig, i)){
@@ -270,7 +270,7 @@ contract Router is IRouter, Ownable{
         }
     }
 
-    function assets(address _underlying) external view returns (Types.Asset memory){
+    function assets(address _underlying) external view override returns (Types.Asset memory){
         return _assets[_underlying];
     }
 

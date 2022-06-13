@@ -13,7 +13,7 @@ contract Strategy is IStrategy{
         maxLTV = _maxLTV;
     }
 
-    function getSupplyStrategy(address[] memory _providers, address _underlying, uint _amount) external view returns (uint[] memory amounts){
+    function getSupplyStrategy(address[] memory _providers, address _underlying, uint _amount) external view override returns (uint[] memory amounts){
         uint providerCount = _providers.length;
         amounts = new uint[](providerCount);
         Types.UsageParams[] memory usageParams = new Types.UsageParams[](providerCount);
@@ -43,7 +43,7 @@ contract Strategy is IStrategy{
         }
     }
 
-    function getWithdrawStrategy(address[] memory _providers, address _underlying, uint _amount) external view returns (uint[] memory amounts){
+    function getWithdrawStrategy(address[] memory _providers, address _underlying, uint _amount) external view override returns (uint[] memory amounts){
         uint providerCount = _providers.length;
         amounts = new uint[](providerCount);
         Types.UsageParams[] memory usageParams = new Types.UsageParams[](providerCount);
@@ -67,7 +67,7 @@ contract Strategy is IStrategy{
         amounts = LoanCalculation.calculateAmountsToWithdraw(_amount, minRate, usageParams, amounts);
     }
 
-    function getBorrowStrategy(address[] memory _providers, address _underlying, uint _amount) external view returns (uint[] memory amounts){
+    function getBorrowStrategy(address[] memory _providers, address _underlying, uint _amount) external view override returns (uint[] memory amounts){
         uint providerCount = _providers.length;
         amounts = new uint[](providerCount);
         Types.UsageParams[] memory usageParams = new Types.UsageParams[](providerCount);
@@ -91,7 +91,7 @@ contract Strategy is IStrategy{
         amounts = LoanCalculation.calculateAmountsToBorrow(_amount, minRate, usageParams, amounts);
     }
 
-    function getRepayStrategy(address[] memory _providers, address _underlying, uint _amount) external view returns (uint[] memory amounts){
+    function getRepayStrategy(address[] memory _providers, address _underlying, uint _amount) external view override returns (uint[] memory amounts){
         uint providerCount = _providers.length;
         amounts = new uint[](providerCount);
         Types.UsageParams[] memory usageParams = new Types.UsageParams[](providerCount);
@@ -121,25 +121,25 @@ contract Strategy is IStrategy{
         }
     }
 
-    function minSupplyNeeded(Types.UsageParams memory _params) public view returns (uint amount){
+    function minSupplyNeeded(Types.UsageParams memory _params) public view override returns (uint amount){
         if (_params.totalBorrowed * Utils.MILLION > maxLTV * _params.totalSupplied){
             amount = LoanCalculation.calculateSupplyAmountToReachLTV(_params, maxLTV);
         }
     }
 
-    function minRepayNeeded(Types.UsageParams memory _params) public view returns (uint amount){
+    function minRepayNeeded(Types.UsageParams memory _params) public view override returns (uint amount){
         if (_params.totalBorrowed * Utils.MILLION > maxLTV * _params.totalSupplied){
             amount = LoanCalculation.calculateRepayAmountToReachLTV(_params, maxLTV);
         }
     }
 
-    function maxWithdrawAllowed(Types.UsageParams memory _params) public view returns (uint amount){
+    function maxWithdrawAllowed(Types.UsageParams memory _params) public view override returns (uint amount){
         if (_params.totalBorrowed * Utils.MILLION > maxLTV * _params.totalSupplied){
             amount = LoanCalculation.calculateWithdrawToReachLTV(_params, maxLTV);
         }
     }
 
-    function maxBorrowAllowed(Types.UsageParams memory _params) public view returns (uint amount){
+    function maxBorrowAllowed(Types.UsageParams memory _params) public view override returns (uint amount){
         if (_params.totalBorrowed * Utils.MILLION > maxLTV * _params.totalSupplied){
             amount = LoanCalculation.calculateBorrowToReachLTV(_params, maxLTV);
         }
