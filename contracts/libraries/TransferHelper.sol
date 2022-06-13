@@ -19,7 +19,7 @@ library TransferHelper{
         require(success && abi.decode(returndata, (bool)), 'TransferHelper:Transfer Failed');
     }
 
-    // to restrict balanceOf to view
+    // to restrict function to view
     function balanceOf(address _token, address _account) internal view returns (uint balance){
         return IERC20(_token).balanceOf(_account);
 

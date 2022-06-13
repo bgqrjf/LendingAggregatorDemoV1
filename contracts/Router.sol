@@ -3,42 +3,42 @@ pragma solidity ^0.8.14;
 
 import "./interfaces/IProvider.sol";
 import "./interfaces/IPriceOracleGetter.sol";
+import "./interfaces/IStrategy.sol";
+
+import "./interfaces/IRouter.sol";
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./libraries/TransferHelper.sol";
 import "./libraries/Utils.sol";
 import "./libraries/UserAssetBitMap.sol";
 
-import "./Types.sol";
 import "./Config.sol";
 import "./SToken.sol";
 import "./DToken.sol";
 import "./Treasury.sol";
-import "./Strategy.sol";
 
-contract Router is Ownable{
+contract Router is IRouter, Ownable{
     // constant
-    address immutable public ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
-    uint immutable public MAX_APY = 100000;
+    address immutable public override ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
     
     IPriceOracleGetter public priceOracle;
     Config public config;
     address[] public underlyings;
-    address[] private providers;
-    Treasury private treasury;
-    Strategy public strategy;
+    address[] public providers;
+    Treasury public treasury;
+    IStrategy public strategy;
 
-    mapping(address => Types.Asset) public assets;
+    mapping(address => Types.Asset) private _assets;
 
     // mapping(token address => asset Index)
     mapping(address => uint) public assetIndex;
 
     constructor(address[] memory _providers, address _priceOracle, address _strategy, uint _treasuryRatio){
         config = new Config(msg.sender, _treasuryRatio);
+        treasury = new Treasury();
         providers = _providers;
         priceOracle = IPriceOracleGetter(_priceOracle);
-        treasury = new Treasury();
-        strategy = Strategy(_strategy);
+        strategy = IStrategy(_strategy);
     }
 
     receive() external payable {}
@@ -56,13 +56,13 @@ contract Router is Ownable{
             0
         );
 
-        assets[_newAsset.underlying] = asset;
+        _assets[_newAsset.underlying] = asset;
         config.setBorrowConfig(_newAsset.underlying, _newAsset.borrowConfig);
     }
 
     // use reentry guard
     function supply(address _underlying, address _to, bool _colletralable) public returns (uint sTokenAmount){
-        Types.Asset memory asset = assets[_underlying];
+        Types.Asset memory asset = _assets[_underlying];
         address[] memory supplyTo = providers;
         uint amount = TransferHelper.balanceOf(_underlying, address(this));
         uint sTokenSupply = asset.sToken.totalSupply();
@@ -71,7 +71,7 @@ contract Router is Ownable{
         // update states
         sTokenAmount = amount * sTokenSupply / uTokenSupplied;
         asset.sToken.mint(_to, sTokenAmount);
-        assets[_underlying].sReserve += asset.sToken.totalSupply();
+        _assets[_underlying].sReserve += asset.sToken.totalSupply();
 
         // supply to provider
         amount = supplyToTreasury(_underlying, amount, uTokenSupplied);
@@ -98,13 +98,13 @@ contract Router is Ownable{
 
     // only validated underlying tokens
     function withdraw(address _underlying, address _to, bool _colletralable) public{
-        Types.Asset memory asset = assets[_underlying];
+        Types.Asset memory asset = _assets[_underlying];
         address[] memory withdrawFrom = providers;
         uint sTokenSupply = asset.sToken.totalSupply();
         uint uTokenSupplied = totalSupplied(_underlying);
 
         // update states
-        assets[_underlying].sReserve = sTokenSupply;
+        _assets[_underlying].sReserve = sTokenSupply;
 
         uint amount = withdrawFromTreasury(_underlying, (asset.sReserve - sTokenSupply) * uTokenSupplied / asset.sReserve);
         uint[] memory amounts = strategy.getWithdrawStrategy(withdrawFrom, _underlying, amount);
@@ -127,11 +127,11 @@ contract Router is Ownable{
     }
 
     function borrow(address _underlying, address _to) public returns (uint amount){
-        Types.Asset memory asset = assets[_underlying];
+        Types.Asset memory asset = _assets[_underlying];
         address[] memory borrowFrom = providers;
         uint dTokenSupply = asset.dToken.totalSupply();
         uint debts = totalDebts(_underlying);
-        assets[_underlying].dReserve = asset.dToken.totalSupply();
+        _assets[_underlying].dReserve = asset.dToken.totalSupply();
 
         amount = (dTokenSupply - asset.dReserve) * debts / asset.dReserve;
 
@@ -157,7 +157,7 @@ contract Router is Ownable{
     }
 
     function repay(address _underlying, address _for) public returns (uint amount){
-        Types.Asset memory asset = assets[_underlying];
+        Types.Asset memory asset = _assets[_underlying];
         address[] memory repayTo = providers;
         uint dTokenSupply = asset.dToken.totalSupply();
         uint debts = totalDebts(_underlying);
@@ -167,10 +167,13 @@ contract Router is Ownable{
             asset.dToken.balanceOf(_for)
         );
 
-        // supply to provider
         uint[] memory amounts = strategy.getRepayStrategy(repayTo, _underlying, amount * debts/ dTokenSupply);
         for (uint i = 0; i < repayTo.length - 1; i++){
-            Utils.delegateCall(repayTo[i], abi.encodeWithSelector(IProvider.repay.selector, _underlying, amounts[i]));
+            uint amountToRepay = Utils.minOf(amounts[i], amount);
+            if (amountToRepay > 0){
+                Utils.delegateCall(repayTo[i], abi.encodeWithSelector(IProvider.repay.selector, _underlying, amountToRepay));
+                amount -= amountToRepay;
+            }
         }
 
         Utils.delegateCall(
@@ -184,7 +187,7 @@ contract Router is Ownable{
 
         // update states
         asset.dToken.burn(_for, amount);
-        assets[_underlying].sReserve = asset.sToken.totalSupply();
+        _assets[_underlying].sReserve = asset.sToken.totalSupply();
 
         if (asset.dToken.balanceOf(_for) == 0){
             config.setBorrowing(_for, asset.index, false);
@@ -197,21 +200,21 @@ contract Router is Ownable{
         address _for, 
         address _to
     ) external returns (uint liquidateAmount, uint burnAmount){
-        (,uint liquidateLTV, uint maxLiquidateRatio, uint liquidateReward) = config.borrowConfigs(_debtToken);
+        Types.BorrowConfig memory bc = config.borrowConfigs(_debtToken);
         (uint collateralValue, uint debtsValue) = valueOf(_for, _debtToken);
 
-        require(debtsValue * Utils.MILLION / collateralValue > liquidateLTV, "Router: sufficient collateral");
+        require(debtsValue * Utils.MILLION / collateralValue > bc.liquidateLTV, "Router: sufficient collateral");
 
         liquidateAmount = repay(_debtToken, _for);
 
-        require(liquidateAmount <=  debtsValue * maxLiquidateRatio / Utils.MILLION, "Router: Exceed Liquidate Cap");
+        require(liquidateAmount <=  debtsValue * bc.maxLiquidateRatio / Utils.MILLION, "Router: Exceed Liquidate Cap");
 
-        burnAmount = priceOracle.valueOfAsset(_debtToken, _colletrallToken, liquidateAmount) * liquidateReward / Utils.MILLION;
-        assets[_colletrallToken].sToken.liquidate(_for, _to, burnAmount);
+        burnAmount = priceOracle.valueOfAsset(_debtToken, _colletrallToken, liquidateAmount) * bc.liquidateRewardRatio / Utils.MILLION;
+        _assets[_colletrallToken].sToken.liquidate(_for, _to, burnAmount);
     }
 
-    function getAssetByID(uint id) public view returns (SToken, DToken, bool, uint, uint){
-        Types.Asset memory asset = assets[underlyings[id]];
+    function getAssetByID(uint id) public view returns (ISToken, IDToken, bool, uint, uint){
+        Types.Asset memory asset = _assets[underlyings[id]];
         return(
             asset.sToken,
             asset.dToken,
@@ -237,9 +240,9 @@ contract Router is Ownable{
     }
 
     function borrowCap(address _underlying, address _account) public view returns (uint){
-        (uint maxLTV,,,) = config.borrowConfigs(_underlying);
+        Types.BorrowConfig memory bc = config.borrowConfigs(_underlying);
         (uint collateralValue, uint debtsValue) = valueOf(_account, _underlying);
-        return collateralValue * maxLTV / Utils.MILLION - debtsValue;
+        return collateralValue * bc.maxLTV / Utils.MILLION - debtsValue;
     }
 
     function valueOf(address _account, address _quote) public view returns (uint collateralValue, uint borrowingValue){
@@ -247,7 +250,7 @@ contract Router is Ownable{
         for (uint i = 0; i < underlyings.length; i++){
             if (UserAssetBitMap.isUsingAsCollateralOrBorrowing(userConfig, i)){
                 if (UserAssetBitMap.isUsingAsCollateral(userConfig, i)){
-                    (SToken sToken,,,,) = getAssetByID(i);
+                    (ISToken sToken,,,,) = getAssetByID(i);
                     collateralValue += priceOracle.valueOfAsset(
                         sToken.underlying(),
                         _quote, 
@@ -256,7 +259,7 @@ contract Router is Ownable{
                 }
 
                 if (UserAssetBitMap.isBorrowing(userConfig, i)){
-                    (, DToken dToken,,,) = getAssetByID(i);
+                    (, IDToken dToken,,,) = getAssetByID(i);
                     borrowingValue += priceOracle.valueOfAsset(
                         dToken.underlying(),
                         _quote, 
@@ -266,6 +269,11 @@ contract Router is Ownable{
             }
         }
     }
+
+    function assets(address _underlying) external view returns (Types.Asset memory){
+        return _assets[_underlying];
+    }
+
 
     // transfer to treasury
     function supplyToTreasury(address _underlying, uint _amount, uint _totalSupplied) internal returns (uint amountLeft){

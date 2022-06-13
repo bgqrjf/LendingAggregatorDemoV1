@@ -1,36 +1,37 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.14;
 
+import "./interfaces/ISToken.sol";
+import "./interfaces/IRouter.sol";
+
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./libraries/TransferHelper.sol";
 
-import "./Router.sol";
-
 // Supply Token
-contract SToken is ERC20{
-    address payable public router;
-    address public underlying;
+contract SToken is ISToken, ERC20{
+    IRouter public router;
+    address public override underlying;
 
     modifier onlyRouter{
-        require(msg.sender == router, "SToken: OnlyRouter");
+        require(msg.sender == address(router), "SToken: OnlyRouter");
         _;
     }
 
     constructor(address _underlying, string memory name, string memory symbol) ERC20 (name, symbol){
-        router = payable(msg.sender);
+        router = IRouter(payable(msg.sender));
         underlying = _underlying;
     }
 
-    function mint(address _account, uint amount) external onlyRouter{
+    function mint(address _account, uint amount) external override onlyRouter{
         _mint(_account, amount);
     }
 
-    function withdraw(address _to, uint _amount, bool _colletralable) external{
+    function withdraw(address _to, uint _amount, bool _colletralable) external override{
         _withdraw(msg.sender, _to, _amount, _colletralable);
     }
 
-    function liquidate(address _for, address _to, uint _amount) external onlyRouter{
+    function liquidate(address _for, address _to, uint _amount) external override onlyRouter{
         uint balance = balanceOf(_for);
         if (_amount > balance){
             _amount = balance;
@@ -39,16 +40,16 @@ contract SToken is ERC20{
         _withdraw(_for, _to, _amount, true);
     }
 
-    function _withdraw(address _from, address _to, uint _amount, bool _colletralable) internal {
-        _burn(_from, _amount);
-        Router(router).withdraw(underlying, _to, _colletralable);
-    }
-
-    function scaledBalanceOf(address _account) public view returns (uint){
+    function scaledBalanceOf(address _account) public view override returns (uint){
         return scaledAmount(balanceOf(_account));
     }
 
-    function scaledAmount(uint _amount) public view returns (uint){
-        return _amount *  Router(router).totalSupplied(underlying) / totalSupply();
+    function scaledAmount(uint _amount) public view override returns (uint){
+        return _amount *  router.totalSupplied(underlying) / totalSupply();
+    }
+
+    function _withdraw(address _from, address _to, uint _amount, bool _colletralable) internal {
+        _burn(_from, _amount);
+        router.withdraw(underlying, _to, _colletralable);
     }
 }

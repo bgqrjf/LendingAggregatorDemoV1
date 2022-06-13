@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.14;
 
+import "./interfaces/IConfig.sol";
+
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./libraries/UserAssetBitMap.sol";
 
-import "./Types.sol";
-
-contract Config is Ownable{
+contract Config is IConfig, Ownable{
     address public router;
     uint public treasuryRatio;
 
     // mapping underlyingToken to borrowConfig
-    mapping(address => Types.BorrowConfig) public borrowConfigs;
+    mapping(address => Types.BorrowConfig) private _borrowConfigs;
 
     // mapping (user address => collateral/debt assets)
     // using asset ID as bit map key of the value
@@ -33,15 +33,15 @@ contract Config is Ownable{
         treasuryRatio = _treasuryRatio;
     }
 
-    function setBorrowConfig(address _token, Types.BorrowConfig memory _config) external onlyRouterOrOwner{
-        borrowConfigs[_token] = _config;
+    function setBorrowConfig(address _token, Types.BorrowConfig memory _config) external override onlyRouterOrOwner{
+        _borrowConfigs[_token] = _config;
     }
 
     function setUserColletral(address _user, uint _config) external onlyRouter{
         userDebtAndCollateral[_user] = _config;
     }
 
-    function setUsingAsCollateral(address _account, uint256 _reserveIndex, bool _usingAsCollateral) external {
+    function setUsingAsCollateral(address _account, uint256 _reserveIndex, bool _usingAsCollateral) external override {
         require(msg.sender == router || msg.sender == _account, "Config: Only Router/User");
         require(_reserveIndex < UserAssetBitMap.MAX_RESERVES_COUNT, "Config: ID out of range");
         uint256 bit = 1 << ((_reserveIndex << 1) + 1);
@@ -52,7 +52,7 @@ contract Config is Ownable{
         }
     }
 
-    function setBorrowing(address _account, uint256 _reserveIndex, bool _borrowing) external onlyRouter {
+    function setBorrowing(address _account, uint256 _reserveIndex, bool _borrowing) external override onlyRouter {
         require(_reserveIndex < UserAssetBitMap.MAX_RESERVES_COUNT, "Config: ID out of range");
         uint256 bit = 1 << (_reserveIndex << 1);
         if (_borrowing) {
@@ -62,8 +62,12 @@ contract Config is Ownable{
         }
     }
 
-    function setTreasuryRatio(uint _treasuryRatio) external onlyOwner{
+    function setTreasuryRatio(uint _treasuryRatio) external override onlyOwner{
         treasuryRatio = _treasuryRatio;
+    }
+
+    function borrowConfigs(address _token) public view override returns(Types.BorrowConfig memory){
+        return _borrowConfigs[_token];
     }
 
 }

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.14;
 
-import "./SToken.sol";
-import "./DToken.sol";
+import "../interfaces/ISToken.sol";
+import "../interfaces/IDToken.sol";
 
-contract Types{
+library Types{
     struct BorrowConfig{
         uint maxLTV;
         uint liquidateLTV;
@@ -14,8 +14,8 @@ contract Types{
 
     struct Asset{
         uint8 index;
-        SToken sToken; // supply token address
-        DToken dToken; // debt token address
+        ISToken sToken; // supply token address
+        IDToken dToken; // debt token address
         bool collateralable; 
         uint sReserve;
         uint dReserve;
@@ -33,12 +33,13 @@ contract Types{
     }
 
     struct UsageParams{
-        uint slope1;
-        uint slope2;
-        uint base;  // actual base * 10^6
-        uint totalSupplied;
+        uint totalSupplied; // not balance
         uint totalBorrowed;
-        uint optimalLTV;
-        uint rate; // block percentange yield
+        uint32 slope1;
+        uint32 slope2;
+        uint32 base;  // actual base * 10^6
+        uint32 reserveFactor;
+        uint32 optimalLTV;
+        uint32 rate; // block percentange yield
     }
 }

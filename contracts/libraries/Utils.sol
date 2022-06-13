@@ -9,8 +9,12 @@ library Utils{
     uint constant QUINTILLION   = 1000000000000000000;      // 10 ** 18
     uint constant NONILLION     = 1000000000000000000000;   // 10 ** 21
 
-    uint constant MAX_UINT = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
-
+    uint8 constant MAC_UINT8        = 0xff;
+    uint16 constant MAX_UINT16      = 0xffff;
+    uint32 constant MAX_UINT32      = 0xffffffff;
+    uint64 constant MAX_UINT64      = 0xffffffffffffffff;
+    uint128 constant MAX_UINT128    = 0xffffffffffffffffffffffffffffffff;
+    uint256 constant MAX_UINT       = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
 
     function minOf(uint a, uint b) internal pure returns (uint){
         return a < b ? a : b;
