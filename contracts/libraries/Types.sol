@@ -38,8 +38,8 @@ library Types{
         uint32 slope1;
         uint32 slope2;
         uint32 base;  // actual base * 10^6
-        uint32 reserveFactor;
         uint32 optimalLTV;
         uint32 rate; // block percentange yield
+        uint32 reserveFactor;
     }
 }
