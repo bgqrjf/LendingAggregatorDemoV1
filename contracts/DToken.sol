@@ -11,7 +11,7 @@ import "./libraries/Math.sol";
 contract DToken is IDToken, ERC20{
     using Math for uint;
     
-    IRouter public router;
+    IRouter public immutable router;
     address public override underlying;
 
     modifier onlyRouter{

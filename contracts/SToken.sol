@@ -10,7 +10,7 @@ import "./libraries/TransferHelper.sol";
 
 // Supply Token
 contract SToken is ISToken, ERC20{
-    IRouter public router;
+    IRouter public immutable router;
     address public override underlying;
 
     modifier onlyRouter{

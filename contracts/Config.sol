@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "./libraries/UserAssetBitMap.sol";
 
 contract Config is IConfig, Ownable{
-    address public router;
+    address public immutable router;
     uint public treasuryRatio;
 
     // mapping underlyingToken to borrowConfig

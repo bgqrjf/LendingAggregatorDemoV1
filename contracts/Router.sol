@@ -18,7 +18,6 @@ import "./DToken.sol";
 import "./Treasury.sol";
 
 contract Router is IRouter, Ownable{
-    // constant
     address immutable public override ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
     
     IPriceOracleGetter public priceOracle;
@@ -60,6 +59,40 @@ contract Router is IRouter, Ownable{
         config.setBorrowConfig(_newAsset.underlying, _newAsset.borrowConfig);
     }
 
+    function updateConfig(address _config) external override onlyOwner{
+        config = Config(_config);
+    }
+
+    function updateTreasury(address _treasury) external override onlyOwner{
+        treasury = Treasury(_treasury);
+    }
+
+    function addProvider(address _provider) external override onlyOwner{
+        providers.push(_provider);
+    }
+
+    function removeProvider(uint _providerIndex, address _provider) external override onlyOwner{
+        address[] memory providersCached = providers;
+        require(providersCached[_providerIndex] == _provider, "Router: wrong index");
+        require(providersCached.length > 1, "Router: at least 1 provider is required");
+        providers[_providerIndex] = providersCached[providersCached.length - 1];
+        providers.pop();
+
+        address[] memory underlyingCached = underlyings;
+        for (uint i = 0; i < underlyingCached.length; i++){
+            IProvider(_provider).withdrawAll(underlyingCached[i]);
+            supply(underlyingCached[i], address(0), false);
+        }
+    } 
+
+    function updatePriceOracle(address _priceOracle) external override onlyOwner{
+        priceOracle = IPriceOracleGetter(_priceOracle); 
+    }
+
+    function updateStrategy(address _strategy) external override onlyOwner{
+        strategy = IStrategy(_strategy);
+    }
+
     // use reentry guard
     function supply(address _underlying, address _to, bool _colletralable) public override returns (uint sTokenAmount){
         Types.Asset memory asset = _assets[_underlying];
@@ -68,10 +101,14 @@ contract Router is IRouter, Ownable{
         uint sTokenSupply = asset.sToken.totalSupply();
         uint uTokenSupplied = totalSupplied(_underlying);
 
-        // update states
-        sTokenAmount = amount * sTokenSupply / uTokenSupplied;
-        asset.sToken.mint(_to, sTokenAmount);
-        _assets[_underlying].sReserve += asset.sToken.totalSupply();
+        // not mint sToken if _to == address(0)
+        if (_to != address(0)){
+            // update states
+            sTokenAmount = amount * sTokenSupply / uTokenSupplied;
+            asset.sToken.mint(_to, sTokenAmount);
+            _assets[_underlying].sReserve = asset.sToken.totalSupply();
+            config.setUsingAsCollateral(_to, asset.index, _colletralable);
+        }
 
         // supply to provider
         amount = supplyToTreasury(_underlying, amount, uTokenSupplied);
@@ -92,8 +129,6 @@ contract Router is IRouter, Ownable{
                 TransferHelper.balanceOf(_underlying, address(this))
             )
         );
-
-        config.setUsingAsCollateral(_to, asset.index, _colletralable);
     }
 
     // only validated underlying tokens
@@ -239,7 +274,7 @@ contract Router is IRouter, Ownable{
         }
     }
 
-    function borrowCap(address _underlying, address _account) public view override returns (uint){
+    function borrowCap(address _underlying, address _account) external view override returns (uint){
         Types.BorrowConfig memory bc = config.borrowConfigs(_underlying);
         (uint collateralValue, uint debtsValue) = valueOf(_account, _underlying);
         return collateralValue * bc.maxLTV / Utils.MILLION - debtsValue;
@@ -273,7 +308,6 @@ contract Router is IRouter, Ownable{
     function assets(address _underlying) external view override returns (Types.Asset memory){
         return _assets[_underlying];
     }
-
 
     // transfer to treasury
     function supplyToTreasury(address _underlying, uint _amount, uint _totalSupplied) internal returns (uint amountLeft){

@@ -7,6 +7,7 @@ interface IProvider{
     // call by delegates public functions
     function supply (address _underlying, uint _amount) external;
     function withdraw(address _underlying, uint _amount) external;
+    function withdrawAll(address _underlying) external;
     function borrow (address _underlying, uint _amount) external;
     function repay(address _underlying, uint _amount) external;
 

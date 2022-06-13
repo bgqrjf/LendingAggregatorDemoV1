@@ -4,9 +4,14 @@ pragma solidity ^0.8.14;
 import "../libraries/Types.sol";
 
 interface IRouter{
-    receive() external payable;
-
     function addAsset(Types.NewAssetParams memory _newAsset) external returns (Types.Asset memory asset);
+    function updateConfig(address _config) external;
+    function updateTreasury(address _treasury) external;
+    function addProvider(address _provider) external;
+    function removeProvider(uint _providerIndex, address _provider) external;
+    function updatePriceOracle(address _priceOracle) external;
+    function updateStrategy(address _strategy) external;
+
     function supply(address _underlying, address _to, bool _colletralable) external returns (uint sTokenAmount);
     function withdraw(address _underlying, address _to, bool _colletralable) external;
     function borrow(address _underlying, address _to) external returns (uint amount);

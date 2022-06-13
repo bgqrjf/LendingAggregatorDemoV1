@@ -20,7 +20,7 @@ contract Pool{
 
     address immutable public ETH;
 
-    address payable public router;
+    address payable immutable public router;
 
     constructor(
         address payable _router
