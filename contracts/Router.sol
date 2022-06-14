@@ -4,7 +4,9 @@ pragma solidity ^0.8.14;
 import "./interfaces/IProvider.sol";
 import "./interfaces/IPriceOracleGetter.sol";
 import "./interfaces/IStrategy.sol";
-
+import "./interfaces/IFactory.sol";
+import "./interfaces/IConfig.sol";
+import "./interfaces/ITreasury.sol";
 import "./interfaces/IRouter.sol";
 
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -12,59 +14,55 @@ import "./libraries/TransferHelper.sol";
 import "./libraries/Utils.sol";
 import "./libraries/UserAssetBitMap.sol";
 
-import "./Config.sol";
-import "./SToken.sol";
-import "./DToken.sol";
-import "./Treasury.sol";
-
 contract Router is IRouter, Ownable{
     address immutable public override ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
-    
+
+    IFactory public factory;
+    IConfig public config;
     IPriceOracleGetter public priceOracle;
-    Config public config;
+    IStrategy public strategy;
+    ITreasury public treasury;
+
     address[] public underlyings;
     address[] public providers;
-    Treasury public treasury;
-    IStrategy public strategy;
 
     mapping(address => Types.Asset) private _assets;
 
     // mapping(token address => asset Index)
     mapping(address => uint) public assetIndex;
 
-    constructor(address[] memory _providers, address _priceOracle, address _strategy, uint _treasuryRatio){
-        config = new Config(msg.sender, _treasuryRatio);
-        treasury = new Treasury();
-        providers = _providers;
+    constructor(address[] memory _providers, address _priceOracle, address _strategy, address _factory, uint _treasuryRatio){
+        factory = IFactory(_factory);
         priceOracle = IPriceOracleGetter(_priceOracle);
         strategy = IStrategy(_strategy);
+
+        config = IConfig(factory.newConfig(_treasuryRatio));
+        treasury = ITreasury(factory.newTreasury());
+        providers = _providers;
     }
 
     receive() external payable {}
 
     function addAsset(Types.NewAssetParams memory _newAsset) external override onlyOwner returns (Types.Asset memory asset){
-        require(underlyings.length < UserAssetBitMap.MAX_RESERVES_COUNT, "Router: asset list full");
+        uint8 underlyingCount = uint8(underlyings.length);
+        require(underlyingCount < UserAssetBitMap.MAX_RESERVES_COUNT, "Router: asset list full");
         underlyings.push(_newAsset.underlying);
 
-        asset = Types.Asset(
-            uint8(underlyings.length),
-            new SToken(_newAsset.underlying, _newAsset.sTokenName, _newAsset.sTokenSymbol),
-            new DToken(_newAsset.underlying, _newAsset.dTokenName, _newAsset.dTokenSymbol),
-            _newAsset.collateralable,
-            0,
-            0
-        );
-
+        asset = factory.newAsset(_newAsset, underlyingCount);
         _assets[_newAsset.underlying] = asset;
         config.setBorrowConfig(_newAsset.underlying, _newAsset.borrowConfig);
     }
 
     function updateConfig(address _config) external override onlyOwner{
-        config = Config(_config);
+        config = IConfig(_config);
+    }
+    
+    function updateFactory(address _factory) external override onlyOwner{
+        factory = IFactory(_factory);
     }
 
     function updateTreasury(address _treasury) external override onlyOwner{
-        treasury = Treasury(_treasury);
+        treasury = ITreasury(_treasury);
     }
 
     function addProvider(address _provider) external override onlyOwner{

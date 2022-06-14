@@ -51,16 +51,18 @@ contract AAVELogic is IProvider{
     }
 
     // ray to Million
-    function getUsageParams(address _underlying) external view override returns (Types.UsageParams memory _params){
+    function getUsageParams(address _underlying) external view override returns (Types.UsageParams memory params){
         AAVEDataTypes.ReserveData memory reserve = pool.getReserveData(_underlying);
-        _params.totalSupplied = TransferHelper.balanceOf(reserve.aTokenAddress, msg.sender);
-        _params.totalBorrowed = TransferHelper.balanceOf(reserve.variableDebtTokenAddress, msg.sender);
-        _params.slope1 = truncateRay(IAAVEInterestRateStrategy(reserve.interestRateStrategyAddress).getVariableRateSlope1(), 6);
-        _params.slope2 =  truncateRay(IAAVEInterestRateStrategy(reserve.interestRateStrategyAddress).getVariableRateSlope2(), 6);
-        _params.base =  truncateRay(IAAVEInterestRateStrategy(reserve.interestRateStrategyAddress).getBaseVariableBorrowRate(), 6);
-        _params.optimalLTV =  truncateRay(IAAVEInterestRateStrategy(reserve.interestRateStrategyAddress).OPTIMAL_USAGE_RATIO(), 6);
-        _params.rate =  truncateRay(IAAVEInterestRateStrategy(reserve.interestRateStrategyAddress).getBaseVariableBorrowRate(), 6);
-        _params.reserveFactor = uint32(AAVEReserveConfigurationGetter.getReserveFactor(reserve.configuration) * 100);
+        params = Types.UsageParams(
+            TransferHelper.balanceOf(reserve.aTokenAddress, msg.sender),
+            TransferHelper.balanceOf(reserve.variableDebtTokenAddress, msg.sender),
+            truncateRay(IAAVEInterestRateStrategy(reserve.interestRateStrategyAddress).getVariableRateSlope1(), 6),
+            truncateRay(IAAVEInterestRateStrategy(reserve.interestRateStrategyAddress).getVariableRateSlope2(), 6),
+            truncateRay(IAAVEInterestRateStrategy(reserve.interestRateStrategyAddress).getBaseVariableBorrowRate(), 6),
+            truncateRay(IAAVEInterestRateStrategy(reserve.interestRateStrategyAddress).OPTIMAL_USAGE_RATIO(), 6),
+            truncateRay(IAAVEInterestRateStrategy(reserve.interestRateStrategyAddress).getBaseVariableBorrowRate(), 6),
+            uint32(AAVEReserveConfigurationGetter.getReserveFactor(reserve.configuration) * 100)
+        );
     }
 
     function truncateRay(uint x, uint l) internal pure returns (uint32 y){
