@@ -54,8 +54,8 @@ contract AAVELogic is IProvider{
     function getUsageParams(address _underlying) external view override returns (Types.UsageParams memory params){
         AAVEDataTypes.ReserveData memory reserve = pool.getReserveData(_underlying);
         params = Types.UsageParams(
-            TransferHelper.balanceOf(reserve.aTokenAddress, msg.sender),
-            TransferHelper.balanceOf(reserve.variableDebtTokenAddress, msg.sender),
+            TransferHelper.totalSupply(reserve.aTokenAddress),
+            TransferHelper.totalSupply(reserve.variableDebtTokenAddress) + TransferHelper.totalSupply(reserve.stableDebtTokenAddress),
             truncateRay(IAAVEInterestRateStrategy(reserve.interestRateStrategyAddress).getVariableRateSlope1(), 6),
             truncateRay(IAAVEInterestRateStrategy(reserve.interestRateStrategyAddress).getVariableRateSlope2(), 6),
             truncateRay(IAAVEInterestRateStrategy(reserve.interestRateStrategyAddress).getBaseVariableBorrowRate(), 6),
