@@ -12,6 +12,9 @@ import "../libraries/TransferHelper.sol";
 import "../libraries/Types.sol";
 
 contract AAVELogic is IProvider{
+    // ray = 1e27 truncate to 1e6
+    uint constant public base = 1e21;
+
     IAAVEPool public pool;
 
     constructor(address _pool){
@@ -56,16 +59,16 @@ contract AAVELogic is IProvider{
         params = Types.UsageParams(
             TransferHelper.totalSupply(reserve.aTokenAddress),
             TransferHelper.totalSupply(reserve.variableDebtTokenAddress) + TransferHelper.totalSupply(reserve.stableDebtTokenAddress),
-            truncateRay(IAAVEInterestRateStrategy(reserve.interestRateStrategyAddress).getVariableRateSlope1(), 6),
-            truncateRay(IAAVEInterestRateStrategy(reserve.interestRateStrategyAddress).getVariableRateSlope2(), 6),
-            truncateRay(IAAVEInterestRateStrategy(reserve.interestRateStrategyAddress).getBaseVariableBorrowRate(), 6),
-            truncateRay(IAAVEInterestRateStrategy(reserve.interestRateStrategyAddress).OPTIMAL_USAGE_RATIO(), 6),
-            truncateRay(IAAVEInterestRateStrategy(reserve.interestRateStrategyAddress).getBaseVariableBorrowRate(), 6),
+            truncateBase(IAAVEInterestRateStrategy(reserve.interestRateStrategyAddress).getVariableRateSlope1()),
+            truncateBase(IAAVEInterestRateStrategy(reserve.interestRateStrategyAddress).getVariableRateSlope2()),
+            truncateBase(IAAVEInterestRateStrategy(reserve.interestRateStrategyAddress).getBaseVariableBorrowRate()),
+            truncateBase(IAAVEInterestRateStrategy(reserve.interestRateStrategyAddress).OPTIMAL_USAGE_RATIO()),
+            truncateBase(IAAVEInterestRateStrategy(reserve.interestRateStrategyAddress).getBaseVariableBorrowRate()),
             uint32(AAVEReserveConfigurationGetter.getReserveFactor(reserve.configuration) * 100)
         );
     }
 
-    function truncateRay(uint x, uint l) internal pure returns (uint32 y){
-        return uint32(x / 10 ** (27- l));
+    function truncateBase(uint x) internal pure returns (uint32 y){
+        return uint32(x / base);
     }
 }

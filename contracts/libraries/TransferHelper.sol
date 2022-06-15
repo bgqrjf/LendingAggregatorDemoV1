@@ -22,6 +22,9 @@ library TransferHelper{
     // to restrict function to view
     function balanceOf(address _token, address _account) internal view returns (uint balance){
         return IERC20(_token).balanceOf(_account);
+    }
 
+    function totalSupply(address _token) internal view returns (uint balance){
+        return IERC20(_token).totalSupply();
     }
 }

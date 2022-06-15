@@ -186,7 +186,7 @@ library LoanCalculation{
     }
 
     function supplyToBorrowRate(uint32 _supplyRate, uint32 _reserveFactor) public pure returns (uint32 _borrowRate){
-        return _supplyRate * uint32(Utils.MILLION) /  _reserveFactor;
+        return _supplyRate * uint32(Utils.MILLION) /  (uint32(Utils.MILLION) - _reserveFactor);
     }
 
     function borrowToSupplyRate(uint32 _borrowRate, uint32 _reserveFactor) public pure returns (uint32 _supplyRate){
