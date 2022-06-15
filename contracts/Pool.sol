@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.14;
 
+import "./interfaces/IPool.sol";
+
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./libraries/TransferHelper.sol";
 import "./libraries/Utils.sol";
@@ -8,16 +10,7 @@ import "./libraries/Types.sol";
 
 import "./Router.sol";
 
-contract Pool{
-    /// @param amount is amount of underlying tokens to liquidate
-    struct LiquidateArgs{
-        address debtAsset;
-        address collateralAsset;
-        address borrower;
-        address to;
-        uint amount;
-    }
-
+contract Pool is IPool{
     address immutable public ETH;
 
     address payable immutable public router;
@@ -30,7 +23,7 @@ contract Pool{
     }
 
     receive() external payable{
-        // depositETH(msg.sender);
+        // depositNative(msg.sender);
     }
 
     function deposit(address _token, address _to, uint _amount, bool _colletralable) external returns (uint sTokenAmount) {
@@ -38,7 +31,7 @@ contract Pool{
         sTokenAmount = Router(router).supply(_token, _to, _colletralable);
     }
 
-    function repay(address _token, address _for, uint _amount) public returns (uint actualAmount){
+    function repay(address _token, address _for, uint _amount) external returns (uint actualAmount){
        Types.Asset memory asset = Router(router).assets(_token);
         uint amount = _amount * asset.dToken.totalSupply() / Router(router).totalDebts(_token);
         TransferHelper.transferFrom(_token, msg.sender, router, amount);
