@@ -30,6 +30,5 @@ interface IRouter{
     function valueOf(address _account, address _quote) external view returns (uint collateralValue, uint borrowingValue);
 
     // external state-getters
-    function ETH() external view returns(address);
     function assets(address) external view returns(Types.Asset memory);
 }

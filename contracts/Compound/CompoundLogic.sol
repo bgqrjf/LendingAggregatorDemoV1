@@ -2,7 +2,8 @@
 pragma solidity ^0.8.14;
 
 import "../interfaces/IProvider.sol";
-import "./CTokenInterface.sol";
+import "./CERC20Interface.sol";
+import "./CETHInterface.sol";
 import "./ComptrollerLensInterface.sol";
 
 import "../libraries/Utils.sol";
@@ -13,46 +14,80 @@ contract CompoundLogic is IProvider{
     
     ComptrollerLensInterface public comptroller;
 
-    mapping(address => CTokenInterface) cTokens;
+    mapping(address => address) cTokens;
 
     constructor(address _comptroller){
         comptroller = ComptrollerLensInterface(_comptroller);
     }
 
+    receive() external payable {}
+
     // call by delegates public functions
-    function supply (address _underlying, uint _amount) external override{
-        cTokens[_underlying].mint(_amount);
+    function supply (address _underlying, uint _amount) external payable override{
+        if (_underlying == TransferHelper.ETH){
+            CETHInterface(payable(cTokens[_underlying])).mint{value: _amount}();
+        }else{
+            CERC20Interface(cTokens[_underlying]).mint(_amount);
+        } 
     }
 
     function withdraw(address _underlying, uint _amount) external override{
-        cTokens[_underlying].redeem(_amount);
+        CERC20Interface(cTokens[_underlying]).redeem(_amount);
     }
 
     function withdrawAll(address _underlying) external override{
-        CTokenInterface cToken = CTokenInterface(cTokens[_underlying]);
+        CERC20Interface cToken = CERC20Interface(cTokens[_underlying]);
         cToken.redeem(cToken.balanceOf(address(this)));
     }
 
     function borrow (address _underlying, uint _amount) external override{
-        cTokens[_underlying].borrow(_amount);
+       CERC20Interface(cTokens[_underlying]).borrow(_amount);
     }
 
-    function repay(address _underlying, uint _amount) external override{
-        cTokens[_underlying].repayBorrow(_amount);
+    function repay(address _underlying, uint _amount) external payable override{
+        if (_underlying == TransferHelper.ETH){
+            CETHInterface(payable(cTokens[_underlying])).repayBorrow{value: _amount}();
+        }else{
+            CERC20Interface(cTokens[_underlying]).repayBorrow(_amount);
+        } 
     } 
 
     // return underlying Token
     // return data for caller
-    function supplyOf(address _underlying) external view override returns (uint) {
+    function supplyOf(address _underlying, address _account) external view override returns (uint) {
         CTokenInterface cToken = CTokenInterface(cTokens[_underlying]);
         (uint totalCash, uint totalBorrows, uint totalReserves, ) = accrueInterest(_underlying, cToken);
-        return (totalCash + totalBorrows - totalReserves) * cToken.balanceOf(msg.sender) / cToken.totalSupply();
+        return (totalCash + totalBorrows - totalReserves) * cToken.balanceOf(_account) / cToken.totalSupply();
     }
 
-    function debtOf(address _underlying) external view override returns (uint) {
+    function debtOf(address _underlying, address _account) external view override returns (uint) {
         CTokenInterface cToken = CTokenInterface(cTokens[_underlying]);
         (,,, uint borrowIndex) = accrueInterest(_underlying, cToken);
-        return cToken.borrowBalanceStore() * borrowIndex /  cToken.borrowIndex();
+        return cToken.borrowBalanceStore(_account) * borrowIndex  /  cToken.borrowIndex();
+    }
+
+    function totalColletralAndBorrow(address _account, address _quote) external view returns (uint collateralValue, uint borrowValue){
+        // For each asset the account is in
+        CTokenInterface[] memory assets = comptroller.accountAssets(_account);
+        for (uint i = 0; i < assets.length; i++) {
+            CTokenInterface asset = assets[i];
+
+            // Read the balances and exchange rate from the cToken
+            (, uint cTokenBalance, uint borrowBalance, uint exchangeRate) = asset.getAccountSnapshot(_account);
+
+            uint oraclePrice = comptroller.oracle().getUnderlyingPrice(asset);
+            require(oraclePrice > 0, "Compound Logic: Price Not found");
+
+            uint underlyingAmount = cTokenBalance * exchangeRate / Utils.QUINTILLION;
+            collateralValue += underlyingAmount * oraclePrice / Utils.QUINTILLION ;
+            borrowValue += oraclePrice * borrowBalance;
+        }
+
+        uint oraclePriceQuote = comptroller.oracle().getUnderlyingPrice(CTokenInterface(cTokens[_quote]));
+        require(oraclePriceQuote > 0, "Compound Logic: Price Not found");
+
+        collateralValue = collateralValue * oraclePriceQuote / Utils.QUINTILLION;
+        borrowValue = collateralValue * oraclePriceQuote / Utils.QUINTILLION;
     }
 
     function getUsageParams(address _underlying) external view override returns (Types.UsageParams memory params){
@@ -74,8 +109,7 @@ contract CompoundLogic is IProvider{
     function updateCTokenList(address _cToken) external {
         (bool isListed,,) = comptroller.markets(address(_cToken));
         require(isListed, "CompoundLogic: cToken Not Listed");
-        CTokenInterface cToken = CTokenInterface(_cToken);
-        cTokens[cToken.underlying()] = cToken;
+        cTokens[CTokenInterface(_cToken).underlying()] = _cToken;
     }
 
     function truncateBase(uint x) internal pure returns (uint32 y){
@@ -92,7 +126,6 @@ contract CompoundLogic is IProvider{
         uint blockDelta =  block.number - cToken.accrualBlockNumber();
 
         if (blockDelta > 0) {
-            /* Calculate the number of blocks elapsed since the last accrual */
             uint borrowRateMantissa = cToken.interestRateModel().getBorrowRate(totalCash, totalBorrows, totalReserves);
             uint simpleInterestFactor = borrowRateMantissa * blockDelta;
             uint interestAccumulated = simpleInterestFactor * totalBorrows / Utils.QUINTILLION;

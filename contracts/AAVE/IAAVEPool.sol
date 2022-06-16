@@ -2,8 +2,10 @@
 pragma solidity 0.8.14;
 
 import {AAVEDataTypes} from './AAVEDataTypes.sol';
+import {IPoolAddressesProvider} from './IPoolAddressesProvider.sol';
 
 interface IAAVEPool {
+  function ADDRESSES_PROVIDER() external view returns(IPoolAddressesProvider);
   /**
    * @dev Mints an `amount` of aTokens to the `onBehalfOf`
    * @param asset The address of the underlying asset to mint

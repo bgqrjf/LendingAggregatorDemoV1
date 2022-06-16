@@ -5,7 +5,7 @@ import "./Types.sol";
 import "./Utils.sol";
 import "./Math.sol";
 
-library LoanCalculation{
+library StrategyCalculations{
     function calculateSupplyAmountToReachLTV(Types.UsageParams memory _params, uint _ltv) public pure returns (uint amount){
         uint supplyOfLTV = _params.totalBorrowed / _ltv;
         amount = supplyOfLTV - _params.totalSupplied;
@@ -29,12 +29,15 @@ library LoanCalculation{
     function calculateAmountsToSupply(uint _targetAmount, uint32 _maxRate, Types.UsageParams[] memory _params) public pure returns (uint[] memory amounts){
         amounts = new uint[](_params.length);
         uint32 minRate;
+        uint totalAmountToSupply;
+        
         while(_maxRate - minRate > 1){
+            totalAmountToSupply = 0;
             uint32 targetRate = (_maxRate + minRate) / 2;
-            uint totalAmountToSupply;
             for (uint i = 0; i < _params.length; i++){
-                amounts[i]= calculateAmountToSupply(targetRate, _params[i]);
-                totalAmountToSupply += amounts[i];
+                uint amount = calculateAmountToSupply(targetRate, _params[i]);
+                amounts[i] = totalAmountToSupply < _targetAmount ? Utils.minOf(amount, _targetAmount - totalAmountToSupply) : 0;
+                totalAmountToSupply += amount;
             }
 
             if (totalAmountToSupply < _targetAmount){
@@ -44,6 +47,10 @@ library LoanCalculation{
             }else{
                 break;
             }
+        }
+
+        if (totalAmountToSupply < _targetAmount){
+            amounts[0] += _targetAmount - totalAmountToSupply;
         }
     }
 
@@ -58,11 +65,13 @@ library LoanCalculation{
         uint totalAmountToWithdraw;
 
         while(maxRate - _minRate > 1){
+            totalAmountToWithdraw = 0;
             uint32 targetRate = maxRate == 0 ? _minRate + _minRate : (maxRate + _minRate) / 2;
 
             for (uint i = 0; i < _params.length; i++){
-                amounts[i]= Utils.minOf(calculateAmountToWithdraw(targetRate, _params[i]), _maxToWithdraw[i]);
-                totalAmountToWithdraw += amounts[i];
+                uint amount = Utils.minOf(calculateAmountToWithdraw(targetRate, _params[i]), _maxToWithdraw[i]);
+                amounts[i] = totalAmountToWithdraw < _targetAmount ? Utils.minOf(amount, _targetAmount - totalAmountToWithdraw) : 0;
+                totalAmountToWithdraw += amount;
             }
 
             if (totalAmountToWithdraw < _targetAmount){
@@ -73,7 +82,6 @@ library LoanCalculation{
                 break;
             }
         }
-        
     }
 
     function calculateAmountsToBorrow(
@@ -87,11 +95,13 @@ library LoanCalculation{
         uint totalAmountToBorrow;
 
         while(maxRate - _minRate > 1){
+            totalAmountToBorrow = 0;
             uint32 targetRate = maxRate == 0 ? _minRate + _minRate : (maxRate + _minRate) / 2;
 
             for (uint i = 0; i < _params.length; i++){
-                amounts[i]= Utils.minOf(calculateAmountToBorrow(targetRate, _params[i]), _maxToBorrow[i]);
-                totalAmountToBorrow += amounts[i];
+                uint amount = Utils.minOf(calculateAmountToBorrow(targetRate, _params[i]), _maxToBorrow[i]);
+                amounts[i] = totalAmountToBorrow < _targetAmount ? Utils.minOf(amount, _targetAmount - totalAmountToBorrow) : 0;
+                totalAmountToBorrow += amount;
             }
 
             if (totalAmountToBorrow < _targetAmount){
@@ -102,18 +112,19 @@ library LoanCalculation{
                 break;
             }
         }
-        
     }
 
     function calculateAmountsToRepay(uint _targetAmount, uint32 _maxRate, Types.UsageParams[] memory _params) public pure returns (uint[] memory amounts){
         amounts = new uint[](_params.length);
         uint32 minRate;
+        uint totalAmountToRepay;
         while(_maxRate - minRate > 1){
+            totalAmountToRepay = 0;
             uint32 targetRate = (_maxRate + minRate) / 2;
-            uint totalAmountToRepay;
             for (uint i = 0; i < _params.length; i++){
-                amounts[i]= calculateAmountToRepay(targetRate, _params[i]);
-                totalAmountToRepay += amounts[i];
+                uint amount = calculateAmountToRepay(targetRate, _params[i]);
+                amounts[i] = totalAmountToRepay < _targetAmount ? Utils.minOf(amount, _targetAmount - totalAmountToRepay) : 0;
+                totalAmountToRepay += amount;
             }
 
             if (totalAmountToRepay < _targetAmount){
@@ -123,6 +134,10 @@ library LoanCalculation{
             }else{
                 break;
             }
+        }
+
+        if (totalAmountToRepay < _targetAmount){
+            amounts[0] += _targetAmount - totalAmountToRepay;
         }
     }
 

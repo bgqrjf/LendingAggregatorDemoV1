@@ -11,10 +11,12 @@ interface IPool{
         uint amount;
     }
 
-
     receive() external payable;
 
-    function deposit(address _token, address _to, uint _amount, bool _colletralable) external returns (uint sTokenAmount);
+    function router() external view returns (address payable);
+
+    function supply(address _token, address _to, uint _amount, bool _colletralable) external returns (uint sTokenAmount);
+    function supplyETH(address _to, bool _colletralable) external payable returns (uint sTokenAmount);
     function repay(address _token, address _for, uint _amount) external returns (uint actualAmount);
     function liquidate(LiquidateArgs memory _param) external returns (uint actualAmount, uint burnedAmount);
 }

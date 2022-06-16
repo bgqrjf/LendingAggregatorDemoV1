@@ -15,8 +15,6 @@ import "./libraries/Utils.sol";
 import "./libraries/UserAssetBitMap.sol";
 
 contract Router is IRouter, Ownable{
-    address immutable public override ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
-
     IFactory public factory;
     IConfig public config;
     IPriceOracleGetter public priceOracle;
@@ -111,22 +109,13 @@ contract Router is IRouter, Ownable{
         // supply to provider
         amount = supplyToTreasury(_underlying, amount, uTokenSupplied);
         uint[] memory amounts = strategy.getSupplyStrategy(providers, _underlying, amount);
-        for (uint i = 0; i < supplyTo.length - 1; i++){
+        for (uint i = 0; i < supplyTo.length; i++){
             uint amountToSupply = Utils.minOf(amounts[i], amount);
             if (amountToSupply > 0){
                 Utils.delegateCall(supplyTo[i], abi.encodeWithSelector(IProvider.supply.selector, _underlying, amountToSupply));
                 amount -= amountToSupply;
             }
         }
-
-        Utils.delegateCall(
-            supplyTo[supplyTo.length - 1], 
-            abi.encodeWithSelector(
-                IProvider.supply.selector, 
-                _underlying,
-                TransferHelper.balanceOf(_underlying, address(this))
-            )
-        );
     }
 
     // only validated underlying tokens
@@ -141,22 +130,13 @@ contract Router is IRouter, Ownable{
 
         uint amount = withdrawFromTreasury(_underlying, (asset.sReserve - sTokenSupply) * uTokenSupplied / asset.sReserve);
         uint[] memory amounts = strategy.getWithdrawStrategy(withdrawFrom, _underlying, amount);
-        for (uint i = 0; i < withdrawFrom.length - 1; i++){
+        for (uint i = 0; i < withdrawFrom.length; i++){
             Utils.delegateCall(withdrawFrom[i], abi.encodeWithSelector(IProvider.withdraw.selector, _underlying, amounts[i]));
         }
 
-        Utils.delegateCall(
-            withdrawFrom[withdrawFrom.length - 1], 
-            abi.encodeWithSelector(
-                IProvider.withdraw.selector, 
-                _underlying,
-                amount - TransferHelper.balanceOf(_underlying, address(this))
-            )
-        );
-
         config.setUsingAsCollateral(_to, asset.index, _colletralable);
 
-        TransferHelper.transferERC20(_underlying, _to, amount);
+        TransferHelper.transfer(_underlying, _to, amount);
     }
 
     function borrow(address _underlying, address _to) public override returns (uint amount){
@@ -173,20 +153,11 @@ contract Router is IRouter, Ownable{
 
         uint[] memory amounts = strategy.getBorrowStrategy(borrowFrom, _underlying, amount);
 
-        for (uint i = 0; i < borrowFrom.length - 1; i++){
+        for (uint i = 0; i < borrowFrom.length; i++){
             Utils.delegateCall(borrowFrom[i], abi.encodeWithSelector(IProvider.borrow.selector, _underlying, amounts[i]));
         }
 
-        Utils.delegateCall(
-            borrowFrom[borrowFrom.length - 1],
-            abi.encodeWithSelector(
-                IProvider.borrow.selector, 
-                _underlying,
-                amount - TransferHelper.balanceOf(_underlying, address(this))
-            )
-        );
-
-        TransferHelper.transferERC20(_underlying, _to, amount);
+        TransferHelper.transfer(_underlying, _to, amount);
     }
 
     function repay(address _underlying, address _for) public override returns (uint amount){
@@ -201,22 +172,13 @@ contract Router is IRouter, Ownable{
         );
 
         uint[] memory amounts = strategy.getRepayStrategy(repayTo, _underlying, amount * debts/ dTokenSupply);
-        for (uint i = 0; i < repayTo.length - 1; i++){
+        for (uint i = 0; i < repayTo.length; i++){
             uint amountToRepay = Utils.minOf(amounts[i], amount);
             if (amountToRepay > 0){
                 Utils.delegateCall(repayTo[i], abi.encodeWithSelector(IProvider.repay.selector, _underlying, amountToRepay));
                 amount -= amountToRepay;
             }
         }
-
-        Utils.delegateCall(
-            repayTo[repayTo.length - 1], 
-            abi.encodeWithSelector(
-                IProvider.repay.selector, 
-                _underlying,
-                TransferHelper.balanceOf(_underlying, address(this))
-            )
-        );
 
         // update states
         asset.dToken.burn(_for, amount);
@@ -260,7 +222,7 @@ contract Router is IRouter, Ownable{
     function totalSupplied(address _underlying) public view override returns (uint amount){
         address[] memory providersCopy = providers;
         for (uint i = 0; i < providersCopy.length; i++){
-            amount += IProvider(providersCopy[i]).supplyOf(_underlying);
+            amount += IProvider(providersCopy[i]).supplyOf(_underlying, address(this));
         }
         amount += TransferHelper.balanceOf(_underlying, address(treasury));
     }
@@ -268,7 +230,7 @@ contract Router is IRouter, Ownable{
     function totalDebts(address _underlying) public view override returns (uint amount){
         address[] memory providersCopy = providers;
         for (uint i = 0; i < providersCopy.length; i++){
-            amount += IProvider(providersCopy[i]).debtOf(_underlying);
+            amount += IProvider(providersCopy[i]).debtOf(_underlying, address(this));
         }
     }
 
@@ -313,7 +275,7 @@ contract Router is IRouter, Ownable{
         uint balance = TransferHelper.balanceOf(_underlying, address(treasury));
         if (balance < amountDesired){
             uint amountToTreasury = Utils.minOf(_amount,  amountDesired - balance);
-            TransferHelper.transferERC20(_underlying, address(treasury), amountToTreasury);
+            TransferHelper.transfer(_underlying, address(treasury), amountToTreasury);
             amountLeft = _amount - amountToTreasury;
         }
     }

@@ -11,24 +11,24 @@ import "./libraries/Types.sol";
 import "./Router.sol";
 
 contract Pool is IPool{
-    address immutable public ETH;
+    address payable immutable public override router;
 
-    address payable immutable public router;
-
-    constructor(
-        address payable _router
-    ){
+    constructor(address payable _router){
         router = _router;
-        ETH = Router(router).ETH();
     }
 
     receive() external payable{
-        // depositNative(msg.sender);
+        supplyETH(msg.sender, true);
     }
 
-    function deposit(address _token, address _to, uint _amount, bool _colletralable) external returns (uint sTokenAmount) {
+    function supply(address _token, address _to, uint _amount, bool _colletralable) external override returns (uint sTokenAmount) {
         TransferHelper.transferFrom(_token, msg.sender, router, _amount);
         sTokenAmount = Router(router).supply(_token, _to, _colletralable);
+    }
+
+    function supplyETH(address _to, bool _colletralable) public payable override returns (uint sTokenAmount) {
+        TransferHelper.transferETH(router, msg.value);
+        sTokenAmount = Router(router).supply(TransferHelper.ETH, _to, _colletralable);
     }
 
     function repay(address _token, address _for, uint _amount) external returns (uint actualAmount){
@@ -36,6 +36,16 @@ contract Pool is IPool{
         uint amount = _amount * asset.dToken.totalSupply() / Router(router).totalDebts(_token);
         TransferHelper.transferFrom(_token, msg.sender, router, amount);
         actualAmount = Router(router).repay(_token, _for);
+    }
+
+    function repayETH(address _for, uint _amount) external payable returns (uint actualAmount){
+        Types.Asset memory asset = Router(router).assets(TransferHelper.ETH);
+        uint amount = _amount * asset.dToken.totalSupply() / Router(router).totalDebts(TransferHelper.ETH);
+        TransferHelper.transferETH(router, amount);
+        if (msg.value > amount){
+            TransferHelper.transferETH(msg.sender, msg.value - amount);
+        }
+        actualAmount = Router(router).repay(TransferHelper.ETH, _for);
     }
 
     function liquidate(LiquidateArgs memory _param) external returns (uint actualAmount, uint burnedAmount){

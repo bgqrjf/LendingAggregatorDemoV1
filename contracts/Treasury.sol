@@ -8,6 +8,6 @@ import "./libraries/TransferHelper.sol";
 contract Treasury is ITreasury, Ownable{
 
     function withdraw(address _underlying, uint _amount) external override onlyOwner{
-        TransferHelper.transferERC20(_underlying, owner(), _amount);
+        TransferHelper.transfer(_underlying, owner(), _amount);
     }
 }

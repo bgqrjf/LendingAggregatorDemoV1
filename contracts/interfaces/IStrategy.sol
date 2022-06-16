@@ -8,8 +8,8 @@ interface IStrategy{
     function getWithdrawStrategy(address[] memory _providers, address _underlying, uint _amount) external view returns (uint[] memory amounts);
     function getBorrowStrategy(address[] memory _providers, address _underlying, uint _amount) external view returns (uint[] memory amounts);
     function getRepayStrategy(address[] memory _providers, address _underlying, uint _amount) external view returns (uint[] memory amounts);
-    function minSupplyNeeded(Types.UsageParams memory _params) external view returns (uint amount);
-    function minRepayNeeded(Types.UsageParams memory _params) external view returns (uint amount);
-    function maxWithdrawAllowed(Types.UsageParams memory _params) external view returns (uint amount);
-    function maxBorrowAllowed(Types.UsageParams memory _params) external view returns (uint amount);
+    function minSupplyNeeded(address _provider, address _underlying) external view returns (uint amount);
+    function minRepayNeeded(address _provider, address _underlying) external view returns (uint amount);
+    function maxWithdrawAllowed(address _provider, address _underlying) external view returns (uint amount);
+    function maxBorrowAllowed(address _provider, address _underlying) external view returns (uint amount);
 }
