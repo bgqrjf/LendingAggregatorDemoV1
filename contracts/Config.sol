@@ -27,9 +27,9 @@ contract Config is IConfig, Ownable{
         _;
     }
 
-    constructor(address _owner, uint _treasuryRatio){
+    constructor(address _owner, address _router, uint _treasuryRatio){
         transferOwnership(_owner);
-        router = msg.sender;
+        router = _router;
         treasuryRatio = _treasuryRatio;
     }
 

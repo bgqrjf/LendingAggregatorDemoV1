@@ -4,15 +4,12 @@ pragma solidity ^0.8.14;
 import "../libraries/Types.sol";
 
 interface IProvider{
-    // call by delegates public functions
-    function supply (address _underlying, uint _amount) external payable;
-    function withdraw(address _underlying, uint _amount) external;
-    function withdrawAll(address _underlying) external;
-    function borrow (address _underlying, uint _amount) external;
-    function repay(address _underlying, uint _amount) external payable;
+    function getSupplyData(address _underlying, uint _amount) external view returns(address target, bytes memory encodedData, address payable weth);
+    function getWithdrawData(address _underlying, uint _amount) external view returns(address target, bytes memory encodedData, address payable weth);
+    function getWithdrawAllData(address _underlying) external view returns(address target, bytes memory encodedData, address payable weth);
+    function getBorrowData(address _underlying, uint _amount) external view returns(address target, bytes memory encodedData, address payable weth);
+    function getRepayData(address _underlying, uint _amount) external view returns(address target, bytes memory encodedData, address payable weth);
 
-    // return underlying Token
-    // return data for caller
     function supplyOf(address _underlying, address _account) external view returns (uint);
     function debtOf(address _underlying, address _account) external view returns (uint);
     function getUsageParams(address _underlying) external view returns (Types.UsageParams memory);

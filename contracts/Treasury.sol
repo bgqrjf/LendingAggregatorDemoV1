@@ -7,6 +7,10 @@ import "./libraries/TransferHelper.sol";
 
 contract Treasury is ITreasury, Ownable{
 
+    constructor(address _owner){
+        _transferOwnership(_owner);
+    }
+
     function withdraw(address _underlying, uint _amount) external override onlyOwner{
         TransferHelper.transfer(_underlying, owner(), _amount);
     }

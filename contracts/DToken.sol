@@ -19,8 +19,8 @@ contract DToken is IDToken, ERC20{
         _;
     }
 
-    constructor(address _underlying, string memory name, string memory symbol) ERC20 (name, symbol){
-        router = IRouter(payable(msg.sender));
+    constructor(address _router, address _underlying, string memory name, string memory symbol) ERC20 (name, symbol){
+        router = IRouter(payable(_router));
         underlying = _underlying;
     }
 

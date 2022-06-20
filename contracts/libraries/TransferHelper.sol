@@ -17,25 +17,22 @@ library TransferHelper{
     }
 
     function transfer(address _token, address _to, uint _amount) internal{
-        if (_token != ETH){
-            transferERC20(_token, _to, _amount);
-        }else{
-            transferETH(_to, _amount);
-        }
+        _token == ETH ? transferETH(_to, _amount) : transferERC20(_token, _to, _amount);
     }
 
     function transferFrom(address _token, address _from, address _to, uint _amount) internal{
         (bool success, bytes memory returndata) = _token.call(abi.encodeWithSelector(IERC20.transferFrom.selector, _from, _to, _amount));
-        require(success && abi.decode(returndata, (bool)), 'TransferHelper:Transfer Failed');
+        require(success && abi.decode(returndata, (bool)), 'TransferHelper:Transfer From Failed');
+    }
+
+    function approve(address _token, address _spender, uint _amount) internal{
+        (bool success, bytes memory returndata) = _token.call(abi.encodeWithSelector(IERC20.approve.selector, _spender, _amount));
+        require(success && abi.decode(returndata, (bool)), 'TransferHelper:Approve Failed');
     }
 
     // to restrict function to view
     function balanceOf(address _token, address _account) internal view returns (uint balance){
-        if (_token != ETH){
-            return IERC20(_token).balanceOf(_account);
-        }else{
-            return _account.balance;
-        }
+        return _token == ETH ? _account.balance : IERC20(_token).balanceOf(_account);
     }
 
     function totalSupply(address _token) internal view returns (uint balance){

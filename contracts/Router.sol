@@ -2,12 +2,13 @@
 pragma solidity ^0.8.14;
 
 import "./interfaces/IProvider.sol";
-import "./interfaces/IPriceOracleGetter.sol";
+import "./interfaces/IPriceOracle.sol";
 import "./interfaces/IStrategy.sol";
 import "./interfaces/IFactory.sol";
 import "./interfaces/IConfig.sol";
 import "./interfaces/ITreasury.sol";
 import "./interfaces/IRouter.sol";
+import "./interfaces/IWETH.sol";
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./libraries/TransferHelper.sol";
@@ -15,27 +16,28 @@ import "./libraries/Utils.sol";
 import "./libraries/UserAssetBitMap.sol";
 
 contract Router is IRouter, Ownable{
-    IFactory public factory;
     IConfig public config;
-    IPriceOracleGetter public priceOracle;
+    IPriceOracle public priceOracle;
     IStrategy public strategy;
     ITreasury public treasury;
+    IFactory public factory;
 
     address[] public underlyings;
     address[] public providers;
 
     mapping(address => Types.Asset) private _assets;
-
-    // mapping(token address => asset Index)
     mapping(address => uint) public assetIndex;
+
+    event AmountsSupplied(address[] suppliedTo, uint[] amounts);
 
     constructor(address[] memory _providers, address _priceOracle, address _strategy, address _factory, uint _treasuryRatio){
         factory = IFactory(_factory);
-        priceOracle = IPriceOracleGetter(_priceOracle);
+        priceOracle = IPriceOracle(_priceOracle);
         strategy = IStrategy(_strategy);
 
-        config = IConfig(factory.newConfig(_treasuryRatio));
-        treasury = ITreasury(factory.newTreasury());
+        config = IConfig(IFactory(_factory).newConfig(msg.sender, _treasuryRatio));
+        treasury = ITreasury(IFactory(_factory).newTreasury());
+
         providers = _providers;
     }
 
@@ -46,7 +48,7 @@ contract Router is IRouter, Ownable{
         require(underlyingCount < UserAssetBitMap.MAX_RESERVES_COUNT, "Router: asset list full");
         underlyings.push(_newAsset.underlying);
 
-        asset = factory.newAsset(_newAsset, underlyingCount);
+        asset =  factory.newAsset(_newAsset, underlyingCount);
         _assets[_newAsset.underlying] = asset;
         config.setBorrowConfig(_newAsset.underlying, _newAsset.borrowConfig);
     }
@@ -72,17 +74,49 @@ contract Router is IRouter, Ownable{
         require(providersCached[_providerIndex] == _provider, "Router: wrong index");
         require(providersCached.length > 1, "Router: at least 1 provider is required");
         providers[_providerIndex] = providersCached[providersCached.length - 1];
+        providersCached[_providerIndex] = providersCached[providersCached.length - 1];
         providers.pop();
 
         address[] memory underlyingCached = underlyings;
         for (uint i = 0; i < underlyingCached.length; i++){
-            IProvider(_provider).withdrawAll(underlyingCached[i]);
+            // borrow from other pools
+            uint amount = IProvider(_provider).debtOf(underlyingCached[i], address(this));
+            if (amount > 0) {
+                uint[] memory amounts = strategy.getBorrowStrategy(providers, underlyingCached[i], amount);
+                for (uint j = 0; j < amounts.length; i++){
+                    (address target, bytes memory encodedData, address payable weth) = IProvider(providersCached[i]).getBorrowData(underlyingCached[i], amounts[i]);
+                    Utils.lowLevelCall(target, encodedData, 0);
+                    if (weth != address(0)){
+                        IWETH(weth).withdraw(amounts[i]);
+                    }
+                }
+
+                // repay Debts
+                {
+                    (address target, bytes memory encodedData, address payable weth) = IProvider(_provider).getRepayData(underlyingCached[i], amount);
+                    if (weth != address(0)){
+                        IWETH(weth).deposit{value: amounts[i]}();
+                        Utils.lowLevelCall(target, encodedData, 0);
+                    }else{
+                        Utils.lowLevelCall(target, encodedData, amounts[i]);
+                    }
+                }
+            }
+        }
+        
+        for (uint i = 0; i < underlyingCached.length; i++){
+            (address target, bytes memory encodedData, address payable weth) = IProvider(_provider).getWithdrawAllData(underlyingCached[i]);
+            Utils.lowLevelCall(target, encodedData, 0);
+            if (weth != address(0)){
+                IWETH(weth).withdraw(TransferHelper.balanceOf(weth, address(this)));
+            }
+
             supply(underlyingCached[i], address(0), false);
         }
     } 
 
     function updatePriceOracle(address _priceOracle) external override onlyOwner{
-        priceOracle = IPriceOracleGetter(_priceOracle); 
+        priceOracle = IPriceOracle(_priceOracle); 
     }
 
     function updateStrategy(address _strategy) external override onlyOwner{
@@ -100,7 +134,7 @@ contract Router is IRouter, Ownable{
         // not mint sToken if _to == address(0)
         if (_to != address(0)){
             // update states
-            sTokenAmount = amount * sTokenSupply / uTokenSupplied;
+            sTokenAmount = uTokenSupplied > 0 ? amount * sTokenSupply / uTokenSupplied : amount;
             asset.sToken.mint(_to, sTokenAmount);
             _assets[_underlying].sReserve = asset.sToken.totalSupply();
             config.setUsingAsCollateral(_to, asset.index, _colletralable);
@@ -108,14 +142,25 @@ contract Router is IRouter, Ownable{
 
         // supply to provider
         amount = supplyToTreasury(_underlying, amount, uTokenSupplied);
-        uint[] memory amounts = strategy.getSupplyStrategy(providers, _underlying, amount);
+        uint[] memory amounts = strategy.getSupplyStrategy(supplyTo, _underlying, amount);
+
         for (uint i = 0; i < supplyTo.length; i++){
-            uint amountToSupply = Utils.minOf(amounts[i], amount);
-            if (amountToSupply > 0){
-                Utils.delegateCall(supplyTo[i], abi.encodeWithSelector(IProvider.supply.selector, _underlying, amountToSupply));
-                amount -= amountToSupply;
+            (address target, bytes memory encodedData, address payable weth) = IProvider(supplyTo[i]).getSupplyData(_underlying, amounts[i]);
+            if (_underlying == TransferHelper.ETH){
+                if (weth != address(0)){
+                    IWETH(weth).deposit{value: amounts[i]}();
+                    TransferHelper.approve(weth, target, amounts[i]);
+                    Utils.lowLevelCall(target, encodedData, 0);
+                }else{
+                    Utils.lowLevelCall(target, encodedData, amounts[i]);
+                }
+            }else{
+                TransferHelper.approve(_underlying, target, amounts[i]);
+                Utils.lowLevelCall(target, encodedData, 0);
             }
         }
+
+        emit AmountsSupplied(supplyTo, amounts);
     }
 
     // only validated underlying tokens
@@ -131,7 +176,11 @@ contract Router is IRouter, Ownable{
         uint amount = withdrawFromTreasury(_underlying, (asset.sReserve - sTokenSupply) * uTokenSupplied / asset.sReserve);
         uint[] memory amounts = strategy.getWithdrawStrategy(withdrawFrom, _underlying, amount);
         for (uint i = 0; i < withdrawFrom.length; i++){
-            Utils.delegateCall(withdrawFrom[i], abi.encodeWithSelector(IProvider.withdraw.selector, _underlying, amounts[i]));
+            (address target, bytes memory encodedData, address payable weth) = IProvider(withdrawFrom[i]).getWithdrawData(_underlying, amounts[i]);
+            Utils.lowLevelCall(target, encodedData, 0);
+            if (weth != address(0)){
+                IWETH(weth).withdraw(amounts[i]);
+            }
         }
 
         config.setUsingAsCollateral(_to, asset.index, _colletralable);
@@ -152,9 +201,12 @@ contract Router is IRouter, Ownable{
         config.setBorrowing(_to, asset.index, true);
 
         uint[] memory amounts = strategy.getBorrowStrategy(borrowFrom, _underlying, amount);
-
         for (uint i = 0; i < borrowFrom.length; i++){
-            Utils.delegateCall(borrowFrom[i], abi.encodeWithSelector(IProvider.borrow.selector, _underlying, amounts[i]));
+            (address target, bytes memory encodedData, address payable weth) = IProvider(borrowFrom[i]).getBorrowData(_underlying, amounts[i]);
+            Utils.lowLevelCall(target, encodedData, 0);
+            if (weth != address(0)){
+                IWETH(weth).withdraw(amounts[i]);
+            }
         }
 
         TransferHelper.transfer(_underlying, _to, amount);
@@ -173,10 +225,12 @@ contract Router is IRouter, Ownable{
 
         uint[] memory amounts = strategy.getRepayStrategy(repayTo, _underlying, amount * debts/ dTokenSupply);
         for (uint i = 0; i < repayTo.length; i++){
-            uint amountToRepay = Utils.minOf(amounts[i], amount);
-            if (amountToRepay > 0){
-                Utils.delegateCall(repayTo[i], abi.encodeWithSelector(IProvider.repay.selector, _underlying, amountToRepay));
-                amount -= amountToRepay;
+            (address target, bytes memory encodedData, address payable weth) = IProvider(repayTo[i]).getRepayData(_underlying, amounts[i]);
+            if (weth != address(0)){
+                IWETH(weth).deposit{value: amounts[i]}();
+                Utils.lowLevelCall(target, encodedData, 0);
+            }else{
+                Utils.lowLevelCall(target, encodedData, amounts[i]);
             }
         }
 
@@ -271,7 +325,7 @@ contract Router is IRouter, Ownable{
 
     // transfer to treasury
     function supplyToTreasury(address _underlying, uint _amount, uint _totalSupplied) internal returns (uint amountLeft){
-        uint amountDesired = _totalSupplied * config.treasuryRatio() / Utils.MILLION;
+        uint amountDesired = (_totalSupplied + _amount) * config.treasuryRatio() / Utils.MILLION;
         uint balance = TransferHelper.balanceOf(_underlying, address(treasury));
         if (balance < amountDesired){
             uint amountToTreasury = Utils.minOf(_amount,  amountDesired - balance);
@@ -285,5 +339,4 @@ contract Router is IRouter, Ownable{
         treasury.withdraw(_underlying, amountFromTreasury);
         amountLeft = _amount - amountFromTreasury;
     }
-
 }

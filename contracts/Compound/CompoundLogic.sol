@@ -22,33 +22,43 @@ contract CompoundLogic is IProvider{
 
     receive() external payable {}
 
+    // function getSupplyData(address _underlying, uint _amount) external view returns(address target, uint encodedData, address weth);
+    // function getWithdrawData(address _underlying, uint _amount) external view returns(address target, uint encodedData, address weth);
+    // function getWithdrawAllData(address _underlying) external view returns(address target, uint encodedData, address weth);
+    // function getBorrowData(address _underlying, uint _amount) external view returns(address target, uint encodedData, address weth);
+    // function getRepayData(address _underlying, uint _amount) external view returns(address target, uint encodedData, address weth);
+
     // call by delegates public functions
-    function supply (address _underlying, uint _amount) external payable override{
+    function getSupplyData(address _underlying, uint _amount) external view override returns(address target, bytes memory encodedData, address payable weth){
+        target = cTokens[_underlying];
         if (_underlying == TransferHelper.ETH){
-            CETHInterface(payable(cTokens[_underlying])).mint{value: _amount}();
+            encodedData = abi.encodeWithSelector(CETHInterface.mint.selector);
         }else{
-            CERC20Interface(cTokens[_underlying]).mint(_amount);
+            encodedData = abi.encodeWithSelector(CERC20Interface.mint.selector, _amount);
         } 
     }
 
-    function withdraw(address _underlying, uint _amount) external override{
-        CERC20Interface(cTokens[_underlying]).redeem(_amount);
+    function getWithdrawData(address _underlying, uint _amount) external view override returns(address target, bytes memory encodedData, address payable weth){
+        target = cTokens[_underlying];
+        encodedData = abi.encodeWithSelector(CERC20Interface.redeem.selector, _amount);
     }
 
-    function withdrawAll(address _underlying) external override{
-        CERC20Interface cToken = CERC20Interface(cTokens[_underlying]);
-        cToken.redeem(cToken.balanceOf(address(this)));
+    function getWithdrawAllData(address _underlying) external view override returns(address target, bytes memory encodedData, address payable weth){
+        target = cTokens[_underlying];
+        encodedData = abi.encodeWithSelector(CERC20Interface.redeem.selector, CERC20Interface(target).balanceOf(address(this)));
     }
 
-    function borrow (address _underlying, uint _amount) external override{
-       CERC20Interface(cTokens[_underlying]).borrow(_amount);
+    function getBorrowData(address _underlying, uint _amount)external view override returns(address target, bytes memory encodedData, address payable weth){
+        target = cTokens[_underlying];
+        encodedData = abi.encodeWithSelector(CERC20Interface.borrow.selector, _amount);
     }
 
-    function repay(address _underlying, uint _amount) external payable override{
+    function getRepayData(address _underlying, uint _amount) external view override returns(address target, bytes memory encodedData, address payable weth){
+        target = cTokens[_underlying];
         if (_underlying == TransferHelper.ETH){
-            CETHInterface(payable(cTokens[_underlying])).repayBorrow{value: _amount}();
+            encodedData = abi.encodeWithSelector(CETHInterface.repayBorrow.selector);
         }else{
-            CERC20Interface(cTokens[_underlying]).repayBorrow(_amount);
+            encodedData = abi.encodeWithSelector(CERC20Interface.repayBorrow.selector, _amount);
         } 
     } 
 
