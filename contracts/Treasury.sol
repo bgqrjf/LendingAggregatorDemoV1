@@ -11,6 +11,8 @@ contract Treasury is ITreasury, Ownable{
         _transferOwnership(_owner);
     }
 
+    receive() external payable{}
+
     function withdraw(address _underlying, uint _amount) external override onlyOwner{
         TransferHelper.transfer(_underlying, owner(), _amount);
     }

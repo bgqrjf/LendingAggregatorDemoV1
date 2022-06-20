@@ -106,6 +106,9 @@ exports.deployContracts = async () => {
 
   const token0 = await ERC20Token.deploy("Mock token0", "Token0", 18);
   const usdt = await ERC20Token.deploy("Mock USDT", "USDT", 6);
+
+  const WETH = await ethers.getContractFactory(`MockWETH`);
+  const wETH = await WETH.deploy();
   await priceOracle.setAssetPrice(token0.address, 10000000000); // set price to 100.00
   await priceOracle.setAssetPrice(usdt.address, 100000000); // set price to 1.00
 
@@ -158,7 +161,24 @@ exports.deployContracts = async () => {
       stableDebtTokenName: "sUSDT",
       stableDebtTokenSymbol: "sUSDT",
       params: "0x",
-    }
+    },
+    {
+      aTokenImpl: aTokenImplementation.address,
+      stableDebtTokenImpl: stableDebtTokenImplementation.address,
+      variableDebtTokenImpl: variableDebtTokenImplementation.address,
+      underlyingAssetDecimals: 18,
+      interestRateStrategyAddress: defaultReserveInterestRateStrategy.address,
+      underlyingAsset: wETH.address,
+      treasury: "0x0ADf66Db5FCBa819c4360187C1c14C04a20ec7d4",  
+      incentivesController: "0x0000000000000000000000000000000000000000",
+      aTokenName: "AAVE-V3 WETH",
+      aTokenSymbol: "aWETH",
+      variableDebtTokenName: "vWETH",
+      variableDebtTokenSymbol: "vWETH",
+      stableDebtTokenName: "sWETH",
+      stableDebtTokenSymbol: "sWETH",
+      params: "0x",
+    },
   ])
 
   return {
@@ -166,6 +186,7 @@ exports.deployContracts = async () => {
     queryHelper: aaveProtocolDataProvider,
     token0: token0,
     usdt: usdt,
+    wETH: wETH,
     poolAddress: pool.address, 
     priceOracle: priceOracle
   }
