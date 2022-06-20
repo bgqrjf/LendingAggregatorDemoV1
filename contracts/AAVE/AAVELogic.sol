@@ -28,58 +28,58 @@ contract AAVELogic is IProvider{
         wrappedNative = _wrappedNative;
     }
 
-    function getSupplyData(address _underlying, uint _amount) external view override returns(address target, bytes memory encodedData, address payable weth){
-        target = address(pool);
+    function getSupplyData(address _underlying, uint _amount) external view override returns(Types.ProviderData memory data){
+        data.target = address(pool);
+        data.approveTo = data.target;
         if (_underlying != TransferHelper.ETH){
-            encodedData = abi.encodeWithSelector(pool.supply.selector, _underlying, _amount, msg.sender, 0);
+            data.encodedData = abi.encodeWithSelector(pool.supply.selector, _underlying, _amount, msg.sender, 0);
         }else{
-            weth = wrappedNative;
-            encodedData = abi.encodeWithSelector(pool.supply.selector, weth, _amount, msg.sender, 0);
+            data.weth = wrappedNative;
+            data.encodedData = abi.encodeWithSelector(pool.supply.selector, data.weth, _amount, msg.sender, 0);
         }
     }
 
-    function getWithdrawData(address _underlying, uint _amount) external view override returns(address target, bytes memory encodedData, address payable weth){
-        target = address(pool);
+    function getWithdrawData(address _underlying, uint _amount) external view override returns(Types.ProviderData memory data){
+        data.target = address(pool);
         if (_underlying != TransferHelper.ETH){
-            encodedData = abi.encodeWithSelector(pool.withdraw.selector, _underlying, _amount, msg.sender);
+            data.encodedData = abi.encodeWithSelector(pool.withdraw.selector, _underlying, _amount, msg.sender);
         }else{
-            weth = wrappedNative;
-            encodedData = abi.encodeWithSelector(pool.withdraw.selector, weth, _amount, msg.sender);
+            data.weth = wrappedNative;
+            data.encodedData = abi.encodeWithSelector(pool.withdraw.selector, data.weth, _amount, msg.sender);
         }
     }
 
-    function getWithdrawAllData(address _underlying) external view override returns(address target, bytes memory encodedData, address payable weth){
-        target = address(pool);
+    function getWithdrawAllData(address _underlying) external view override returns(Types.ProviderData memory data){
+        data.target = address(pool);
         if (_underlying != TransferHelper.ETH){
-            encodedData = abi.encodeWithSelector(pool.withdraw.selector, _underlying, Utils.MAX_UINT, msg.sender);
+            data.encodedData = abi.encodeWithSelector(pool.withdraw.selector, _underlying, Utils.MAX_UINT, msg.sender);
         }else{
-            weth = wrappedNative;
-            encodedData = abi.encodeWithSelector(pool.withdraw.selector, weth, Utils.MAX_UINT, msg.sender);
+            data.weth = wrappedNative;
+            data.encodedData = abi.encodeWithSelector(pool.withdraw.selector, data.weth, Utils.MAX_UINT, msg.sender);
         }
     }
 
-    function getBorrowData(address _underlying, uint _amount) external view override returns(address target, bytes memory encodedData, address payable weth){
-        target = address(pool);
+    function getBorrowData(address _underlying, uint _amount) external view override returns(Types.ProviderData memory data){
+        data.target = address(pool);
         if (_underlying != TransferHelper.ETH){
-            encodedData = abi.encodeWithSelector(pool.borrow.selector, _underlying, _amount, uint(AAVEDataTypes.InterestRateMode.VARIABLE), 0, msg.sender);
+            data.encodedData = abi.encodeWithSelector(pool.borrow.selector, _underlying, _amount, uint(AAVEDataTypes.InterestRateMode.VARIABLE), 0, msg.sender);
         }else{
-            weth = wrappedNative;
-            encodedData = abi.encodeWithSelector(pool.borrow.selector, weth, _amount, uint(AAVEDataTypes.InterestRateMode.VARIABLE), 0, msg.sender);
+            data.weth = wrappedNative;
+            data.encodedData = abi.encodeWithSelector(pool.borrow.selector, data.weth, _amount, uint(AAVEDataTypes.InterestRateMode.VARIABLE), 0, msg.sender);
         }
     }
  
-    function getRepayData(address _underlying, uint _amount) external view override returns(address target, bytes memory encodedData, address payable weth){
-        target = address(pool);
+    function getRepayData(address _underlying, uint _amount) external view override returns(Types.ProviderData memory data){
+        data.target = address(pool);
+        data.approveTo = data.target;
         if (_underlying != TransferHelper.ETH){
-            encodedData = abi.encodeWithSelector(pool.borrow.selector, _underlying, _amount, uint(AAVEDataTypes.InterestRateMode.VARIABLE), msg.sender);
+            data.encodedData = abi.encodeWithSelector(pool.borrow.selector, _underlying, _amount, uint(AAVEDataTypes.InterestRateMode.VARIABLE), msg.sender);
         }else{
-            weth = wrappedNative;
-            encodedData = abi.encodeWithSelector(pool.borrow.selector, weth, _amount, uint(AAVEDataTypes.InterestRateMode.VARIABLE), msg.sender);
+            data.weth = wrappedNative;
+            data.encodedData = abi.encodeWithSelector(pool.borrow.selector, data.weth, _amount, uint(AAVEDataTypes.InterestRateMode.VARIABLE), msg.sender);
         }
     } 
 
-    // return underlying Token
-    // return data for caller
     function supplyOf(address _underlying, address _account) external view override returns (uint) {
         _underlying = replaceNative(_underlying);
         AAVEDataTypes.ReserveData memory reserve = pool.getReserveData(_underlying);

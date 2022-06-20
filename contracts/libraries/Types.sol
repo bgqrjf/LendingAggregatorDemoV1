@@ -42,4 +42,11 @@ library Types{
         uint32 rate; // block percentange yield
         uint32 reserveFactor;
     }
+
+    struct ProviderData{
+        address target;
+        address approveTo;
+        address payable weth;
+        bytes encodedData;
+    }
 }
