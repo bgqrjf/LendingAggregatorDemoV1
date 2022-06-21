@@ -22,6 +22,12 @@ contract CompoundLogic is IProvider{
 
     receive() external payable {}
 
+    function setInitialized(address _underlying) external override {
+    }
+
+    function getAddAssetData(address _underlying) external view returns(Types.ProviderData memory data){
+    }
+
     // call by delegates public functions
     function getSupplyData(address _underlying, uint _amount) external view override returns(Types.ProviderData memory data){
         data.target = cTokens[_underlying];

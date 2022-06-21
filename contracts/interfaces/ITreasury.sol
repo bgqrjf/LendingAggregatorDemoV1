@@ -2,5 +2,5 @@
 pragma solidity ^0.8.14;
 
 interface ITreasury{
-    function withdraw(address _underlying, uint _amount) external;
+    function withdraw(address _underlying, address _to, uint _amount) external;
 }

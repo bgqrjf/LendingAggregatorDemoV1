@@ -19,6 +19,9 @@ contract AAVELogic is IProvider{
     uint constant public base = 1e21;
     address payable public wrappedNative;
 
+    // mapping underlying to msg.sender;
+    mapping(address => address) initialized;
+
     IAAVEPool public pool;
 
     receive() external payable {}
@@ -26,6 +29,16 @@ contract AAVELogic is IProvider{
     constructor(address _pool, address payable _wrappedNative){
         pool = IAAVEPool(_pool);
         wrappedNative = _wrappedNative;
+    }
+
+    function setInitialized(address _underlying) external override {
+        initialized[_underlying] = msg.sender;
+    }
+
+    function getAddAssetData(address _underlying) external view returns(Types.ProviderData memory data){
+        _underlying = replaceNative(_underlying);
+        data.target = address(pool);
+        data.encodedData = abi.encodeWithSelector(pool.setUserUseReserveAsCollateral.selector, _underlying, true);
     }
 
     function getSupplyData(address _underlying, uint _amount) external view override returns(Types.ProviderData memory data){
@@ -37,6 +50,8 @@ contract AAVELogic is IProvider{
             data.weth = wrappedNative;
             data.encodedData = abi.encodeWithSelector(pool.supply.selector, data.weth, _amount, msg.sender, 0);
         }
+
+        data.initialized = initialized[_underlying] == msg.sender;
     }
 
     function getWithdrawData(address _underlying, uint _amount) external view override returns(Types.ProviderData memory data){
@@ -97,9 +112,13 @@ contract AAVELogic is IProvider{
         (collateralValue, borrowedValue,,,,) = pool.getUserAccountData(_account);
         IAAVEPriceOracleGetter priceOracle = IAAVEPriceOracleGetter(pool.ADDRESSES_PROVIDER().getPriceOracle());
         uint priceQuote = priceOracle.getAssetPrice(_quote);
-        uint unit = priceOracle.BASE_CURRENCY_UNIT();
-        collateralValue *= priceQuote / unit;
-        borrowedValue *= priceQuote / unit;
+
+        AAVEDataTypes.ReserveConfigurationMap memory configuration = pool.getConfiguration(_quote);
+        (,,,uint decimals,,) = AAVEReserveConfigurationGetter.getParams(configuration);
+        uint unit = 10 ** (decimals);
+
+        collateralValue *= unit / priceQuote;
+        borrowedValue *= unit / priceQuote;
     }
 
     // ray to Million
@@ -129,6 +148,4 @@ contract AAVELogic is IProvider{
     function truncateBase(uint x) internal pure returns (uint32 y){
         return uint32(x / base);
     }
-
-    
 } 

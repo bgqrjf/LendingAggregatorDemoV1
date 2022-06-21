@@ -8,7 +8,7 @@ contract PriceOracle is IPriceOracle {
     mapping (address => uint256) public price;
     uint constant public unit = 100000000;
 
-    function getAssetPrice(address asset) external view override  returns (uint256) {
+    function getAssetPrice(address asset) external view override returns (uint256) {
         return price[asset]; 
     }
 

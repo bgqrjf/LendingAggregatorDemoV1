@@ -4,6 +4,9 @@ pragma solidity ^0.8.14;
 import "../libraries/Types.sol";
 
 interface IProvider{
+    function setInitialized(address _underlying) external;
+    function getAddAssetData(address _underlying) external view returns(Types.ProviderData memory data);
+
     function getSupplyData(address _underlying, uint _amount) external view returns(Types.ProviderData memory data);
     function getWithdrawData(address _underlying, uint _amount) external view returns(Types.ProviderData memory data);
     function getWithdrawAllData(address _underlying) external view returns(Types.ProviderData memory data);

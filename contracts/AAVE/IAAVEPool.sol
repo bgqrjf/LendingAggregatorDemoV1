@@ -115,4 +115,6 @@ interface IAAVEPool {
 
   function getReserveNormalizedIncome(address asset) external view returns (uint256);
   function getReserveNormalizedVariableDebt(address asset) external view returns(uint256);
+  function setUserUseReserveAsCollateral(address asset, bool useAsCollateral) external;
+  function getConfiguration(address asset) external view returns (AAVEDataTypes.ReserveConfigurationMap memory);
 }

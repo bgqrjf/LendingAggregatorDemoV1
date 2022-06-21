@@ -6,6 +6,7 @@
   "dependencies": {
     "@nomiclabs/hardhat-waffle": "^2.0.3",
     "@openzeppelin/contracts": "^4.6.0",
-    "hardhat-contract-sizer": "^2.5.1"
+    "hardhat-contract-sizer": "^2.5.1",
+    "mocha-logger": "^1.0.8"
   }
 }

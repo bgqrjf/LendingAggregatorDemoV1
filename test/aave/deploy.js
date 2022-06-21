@@ -111,6 +111,7 @@ exports.deployContracts = async () => {
   const wETH = await WETH.deploy();
   await priceOracle.setAssetPrice(token0.address, 10000000000); // set price to 100.00
   await priceOracle.setAssetPrice(usdt.address, 100000000); // set price to 1.00
+  await priceOracle.setAssetPrice(wETH.address, 200000000000); // set price to 2000.00
 
   const DefaultReserveInterestRateStrategy = await ethers.getContractFactory(`DefaultReserveInterestRateStrategy`);
   const defaultReserveInterestRateStrategy = await DefaultReserveInterestRateStrategy.deploy(
@@ -180,6 +181,10 @@ exports.deployContracts = async () => {
       params: "0x",
     },
   ])
+  
+  await poolConfigurator.configureReserveAsCollateral(token0.address, 7500, 8000, 10500);
+  await poolConfigurator.configureReserveAsCollateral(wETH.address, 7500, 8000, 10500);
+  await poolConfigurator.configureReserveAsCollateral(usdt.address, 7500, 8000, 10500);
 
   return {
     signer: deployer,
@@ -187,7 +192,7 @@ exports.deployContracts = async () => {
     token0: token0,
     usdt: usdt,
     wETH: wETH,
-    poolAddress: pool.address, 
+    pool: pool, 
     priceOracle: priceOracle
   }
 }

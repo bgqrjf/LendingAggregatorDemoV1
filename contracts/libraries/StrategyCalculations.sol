@@ -82,6 +82,10 @@ library StrategyCalculations{
                 break;
             }
         }
+
+        if (totalAmountToWithdraw < _targetAmount){
+            amounts[0] += _targetAmount - totalAmountToWithdraw;
+        }
     }
 
     function calculateAmountsToBorrow(

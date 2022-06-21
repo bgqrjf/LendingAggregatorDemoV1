@@ -44,6 +44,7 @@ library Types{
     }
 
     struct ProviderData{
+        bool initialized;
         address target;
         address approveTo;
         address payable weth;

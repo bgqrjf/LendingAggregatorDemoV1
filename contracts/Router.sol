@@ -28,7 +28,7 @@ contract Router is IRouter, Ownable{
     mapping(address => Types.Asset) private _assets;
     mapping(address => uint) public assetIndex;
 
-    event AmountsSupplied(address[] suppliedTo, uint[] amounts);
+    event AmountsSupplied(address indexed supplier, uint indexed amount, address[] suppliedTo, uint[] amounts);
 
     constructor(address[] memory _providers, address _priceOracle, address _strategy, address _factory, uint _treasuryRatio){
         factory = IFactory(_factory);
@@ -145,28 +145,37 @@ contract Router is IRouter, Ownable{
         }
 
         // supply to provider
-        amount = supplyToTreasury(_underlying, amount, uTokenSupplied);
-        uint[] memory amounts = strategy.getSupplyStrategy(supplyTo, _underlying, amount);
-
+        uint amountLeft = supplyToTreasury(_underlying, amount, uTokenSupplied);
+        uint[] memory amounts = strategy.getSupplyStrategy(supplyTo, _underlying, amountLeft);
         for (uint i = 0; i < supplyTo.length; i++){
-            Types.ProviderData memory data = IProvider(supplyTo[i]).getSupplyData(_underlying, amounts[i]);
-            
-            // if supply with ETH
-            if (data.approveTo == address(0)){
-                Utils.lowLevelCall(data.target, data.encodedData, amounts[i]);
-            }else{
-                if (_underlying == TransferHelper.ETH){
-                    IWETH(data.weth).deposit{value: amounts[i]}();
-                    TransferHelper.approve(data.weth, data.approveTo, amounts[i]);
+            if (amounts[i] > 0){
+                Types.ProviderData memory data = IProvider(supplyTo[i]).getSupplyData(_underlying, amounts[i]);
+                
+                // if supply with ETH
+                if (data.approveTo == address(0)){
+                    Utils.lowLevelCall(data.target, data.encodedData, amounts[i]);
                 }else{
-                    TransferHelper.approve(_underlying, data.approveTo, amounts[i]);
+                    if (_underlying == TransferHelper.ETH){
+                        IWETH(data.weth).deposit{value: amounts[i]}();
+                        TransferHelper.approve(data.weth, data.approveTo, amounts[i]);
+                    }else{
+                        TransferHelper.approve(_underlying, data.approveTo, amounts[i]);
+                    }
+
+                    Utils.lowLevelCall(data.target, data.encodedData, 0);
                 }
 
-                Utils.lowLevelCall(data.target, data.encodedData, 0);
+                if (!data.initialized){
+                    Types.ProviderData memory initData = IProvider(supplyTo[i]).getAddAssetData(_underlying);
+                    if (initData.target != address(0)){
+                        Utils.lowLevelCall(initData.target, initData.encodedData, 0);
+                    }
+                    IProvider(supplyTo[i]).setInitialized(_underlying);
+                 }
             }
         }
 
-        emit AmountsSupplied(supplyTo, amounts);
+        emit AmountsSupplied(_to, amount, supplyTo, amounts);
     }
 
     function withdraw(address _underlying, address _to, bool _colletralable) public override {
@@ -178,19 +187,23 @@ contract Router is IRouter, Ownable{
         // update states
         _assets[_underlying].sReserve = sTokenSupply;
 
-        uint amount = withdrawFromTreasury(_underlying, (asset.sReserve - sTokenSupply) * uTokenSupplied / asset.sReserve);
-        uint[] memory amounts = strategy.getWithdrawStrategy(withdrawFrom, _underlying, amount);
-        for (uint i = 0; i < withdrawFrom.length; i++){
-            Types.ProviderData memory data = IProvider(withdrawFrom[i]).getWithdrawData(_underlying, amounts[i]);
-            Utils.lowLevelCall(data.target, data.encodedData, 0);
-            if (_underlying == TransferHelper.ETH){
-                IWETH(data.weth).withdraw(amounts[i]);
+        uint amount = (asset.sReserve - sTokenSupply) * uTokenSupplied / asset.sReserve;
+        uint amountLeft = withdrawFromTreasury(_underlying, _to, amount);
+        if (amountLeft > 0){
+            uint[] memory amounts = strategy.getWithdrawStrategy(withdrawFrom, _underlying, amountLeft);
+            for (uint i = 0; i < withdrawFrom.length; i++){
+                if (amounts[i] > 0){
+                    Types.ProviderData memory data = IProvider(withdrawFrom[i]).getWithdrawData(_underlying, amounts[i]);
+                    Utils.lowLevelCall(data.target, data.encodedData, 0);
+                    if (_underlying == TransferHelper.ETH){
+                        IWETH(data.weth).withdraw(amounts[i]);
+                    }
+                }
             }
+            TransferHelper.transfer(_underlying, _to, amountLeft);
         }
 
         config.setUsingAsCollateral(_to, asset.index, _colletralable);
-
-        TransferHelper.transfer(_underlying, _to, amount);
     }
 
     function borrow(address _underlying, address _to) public override returns (uint amount){
@@ -344,9 +357,9 @@ contract Router is IRouter, Ownable{
         }
     }
 
-    function withdrawFromTreasury(address _underlying, uint _amount) internal returns (uint amountLeft){
+    function withdrawFromTreasury(address _underlying, address _to, uint _amount) internal returns (uint amountLeft){
         uint amountFromTreasury = Utils.minOf(TransferHelper.balanceOf(_underlying, address(treasury)), _amount);
-        treasury.withdraw(_underlying, amountFromTreasury);
+        treasury.withdraw(_underlying, _to, amountFromTreasury);
         amountLeft = _amount - amountFromTreasury;
     }
 }
