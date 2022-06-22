@@ -116,6 +116,10 @@ library StrategyCalculations{
                 break;
             }
         }
+
+        if (totalAmountToBorrow < _targetAmount){
+            amounts[0] += _targetAmount - totalAmountToBorrow;
+        }
     }
 
     function calculateAmountsToRepay(uint _targetAmount, uint32 _maxRate, Types.UsageParams[] memory _params) internal pure returns (uint[] memory amounts){

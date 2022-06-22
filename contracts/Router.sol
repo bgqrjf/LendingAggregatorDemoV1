@@ -206,24 +206,28 @@ contract Router is IRouter, Ownable{
         config.setUsingAsCollateral(_to, asset.index, _colletralable);
     }
 
-    function borrow(address _underlying, address _to) public override returns (uint amount){
+    function borrow(address _underlying, address _by, address _to) public override returns (uint amount){
         Types.Asset memory asset = _assets[_underlying];
+        require(address(asset.dToken) == msg.sender, "Router: only DToken");
+
         address[] memory borrowFrom = providers;
         uint dTokenSupply = asset.dToken.totalSupply();
         uint debts = totalDebts(_underlying);
         _assets[_underlying].dReserve = asset.dToken.totalSupply();
 
-        amount = (dTokenSupply - asset.dReserve) * debts / asset.dReserve;
+        amount = asset.dReserve > 0 ? (dTokenSupply - asset.dReserve) * debts / asset.dReserve : dTokenSupply;
 
         require(amount > 0, "Router: no borrow amount");
-        config.setBorrowing(_to, asset.index, true);
+        config.setBorrowing(_by, asset.index, true);
 
         uint[] memory amounts = strategy.getBorrowStrategy(borrowFrom, _underlying, amount);
         for (uint i = 0; i < borrowFrom.length; i++){
-            Types.ProviderData memory data = IProvider(borrowFrom[i]).getBorrowData(_underlying, amounts[i]);
-            Utils.lowLevelCall(data.target, data.encodedData, 0);
-            if (_underlying == TransferHelper.ETH){
-                IWETH(data.weth).withdraw(amounts[i]);
+            if (amounts[i] > 0){
+                Types.ProviderData memory data = IProvider(borrowFrom[i]).getBorrowData(_underlying, amounts[i]);
+                Utils.lowLevelCall(data.target, data.encodedData, 0);
+                if (_underlying == TransferHelper.ETH){
+                    IWETH(data.weth).withdraw(amounts[i]);
+                }
             }
         }
 

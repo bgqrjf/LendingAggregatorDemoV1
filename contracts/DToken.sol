@@ -26,10 +26,10 @@ contract DToken is IDToken, ERC20{
 
     function borrow(address _to, uint _amount) external override{
         require(_amount < router.borrowCap(underlying, msg.sender), "DToken: insufficient collateral");
-        uint dTokenAmount = _amount * totalSupply().divCeil(router.totalDebts(underlying));
+        uint dTokenAmount = totalSupply() > 0 ? (_amount * totalSupply()).divCeil(router.totalDebts(underlying)) : _amount;
 
         _mint(msg.sender, dTokenAmount);
-        router.borrow(underlying, _to);
+        router.borrow(underlying, msg.sender, _to);
     }
 
     function burn(address _account, uint _amount) external override onlyRouter {

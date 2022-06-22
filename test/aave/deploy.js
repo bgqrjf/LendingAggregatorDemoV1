@@ -185,6 +185,9 @@ exports.deployContracts = async () => {
   await poolConfigurator.configureReserveAsCollateral(token0.address, 7500, 8000, 10500);
   await poolConfigurator.configureReserveAsCollateral(wETH.address, 7500, 8000, 10500);
   await poolConfigurator.configureReserveAsCollateral(usdt.address, 7500, 8000, 10500);
+  await poolConfigurator.setReserveBorrowing(token0.address, true);
+  await poolConfigurator.setReserveBorrowing(wETH.address, true);
+  await poolConfigurator.setReserveBorrowing(usdt.address, true);
 
   return {
     signer: deployer,

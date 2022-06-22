@@ -15,7 +15,7 @@ interface IRouter{
 
     function supply(address _underlying, address _to, bool _colletralable) external returns (uint sTokenAmount);
     function withdraw(address _underlying, address _to, bool _colletralable) external;
-    function borrow(address _underlying, address _to) external returns (uint amount);
+    function borrow(address _underlying, address _by, address _to) external returns (uint amount);
     function repay(address _underlying, address _for) external returns (uint amount);
     function liquidate(
         address _debtToken, 
