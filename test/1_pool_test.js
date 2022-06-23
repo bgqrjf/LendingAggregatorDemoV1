@@ -24,11 +24,13 @@ describe("DepositLogic Tests", function () {
   let priceOracle;
 
   beforeEach(async () =>{
+    const ERC20Token = await ethers.getContractFactory(`MockERC20`);
+    token0 = await ERC20Token.deploy("Mock token0", "Token0", 18);
+    usdt = await ERC20Token.deploy("Mock USDT", "USDT", 6);
+
     // deploy AAVE contracts
-    let aaveContracts = await aave.deployContracts();
+    let aaveContracts = await aave.deployContracts({token0: token0, usdt: usdt});
     deployer = aaveContracts.signer;
-    token0 = aaveContracts.token0;
-    usdt = aaveContracts.usdt;
     aPool = aaveContracts.pool;
     wETH = aaveContracts.wETH;
     aOracle = aaveContracts.priceOracle;

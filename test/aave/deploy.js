@@ -1,6 +1,6 @@
 const { ethers } = require("hardhat");
 
-exports.deployContracts = async () => {
+exports.deployContracts = async ({token0, usdt}) => {
   const [deployer] = await ethers.getSigners();
 
   // deploy libraries
@@ -102,10 +102,7 @@ exports.deployContracts = async () => {
   const variableDebtTokenImplementation = await VariableDebtToken.deploy(pool.address);
   
   // deploy ERC20
-  const ERC20Token = await ethers.getContractFactory(`MockERC20`);
 
-  const token0 = await ERC20Token.deploy("Mock token0", "Token0", 18);
-  const usdt = await ERC20Token.deploy("Mock USDT", "USDT", 6);
 
   const WETH = await ethers.getContractFactory(`MockWETH`);
   const wETH = await WETH.deploy();
