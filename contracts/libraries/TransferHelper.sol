@@ -30,12 +30,8 @@ library TransferHelper{
         require(success && abi.decode(returndata, (bool)), 'TransferHelper:Approve Failed');
     }
 
-    // to restrict function to view
     function balanceOf(address _token, address _account) internal view returns (uint balance){
         return _token == ETH ? _account.balance : IERC20(_token).balanceOf(_account);
     }
-
-    function totalSupply(address _token) internal view returns (uint balance){
-        return IERC20(_token).totalSupply();
-    }
+    
 }

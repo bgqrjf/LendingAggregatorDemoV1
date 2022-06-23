@@ -110,7 +110,7 @@ describe("DepositLogic Tests", function () {
   describe("supply tests", function(){
     it("should supply ERC20 properly", async() =>{
       await token0.mint(supplier0.address, 1000000);
-      await token0.approve(pool.address, 1000000, {from: supplier0.address});
+      await token0.connect(supplier0).approve(pool.address, 1000000);
       let tx = await pool.supply(token0.address, supplier0.address, 1000000, true);
       let receipt = await tx.wait();
       m.log("gas used:",receipt.gasUsed);
@@ -214,7 +214,7 @@ describe("DepositLogic Tests", function () {
     it("should withdraw ERC20 properly", async() =>{
       let token0Amount =  ethers.BigNumber.from("1000000000000000000");
       await token0.mint(supplier0.address, token0Amount);
-      await token0.approve(pool.address, token0Amount, {from: supplier0.address});
+      await token0.connect(supplier0).approve(pool.address, token0Amount);
       await pool.supply(token0.address, supplier0.address, token0Amount, true);
 
       let asset = await router.assets(token0.address);
@@ -285,7 +285,7 @@ describe("DepositLogic Tests", function () {
     it("should withdraw twice properly", async() =>{
       let token0Amount =  ethers.BigNumber.from("1000000000000000000");
       await token0.mint(supplier0.address, token0Amount);
-      await token0.approve(pool.address, token0Amount, {from: supplier0.address});
+      await token0.connect(supplier0).approve(pool.address, token0Amount);
       await pool.supply(token0.address, supplier0.address, token0Amount, true);
 
       let asset = await router.assets(token0.address);
@@ -326,7 +326,7 @@ describe("DepositLogic Tests", function () {
     it("should borrow ERC20 properly", async() =>{
       let token0SupplyAmount = new ethers.BigNumber.from("10000000000000000000000"); // 10000 token0
       await token0.mint(supplier0.address, token0SupplyAmount);
-      await token0.approve(pool.address, token0SupplyAmount, {from: supplier0.address});
+      await token0.connect(supplier0).approve(pool.address, token0SupplyAmount);
       await pool.supply(token0.address, supplier0.address, token0SupplyAmount, false);
 
       let usdtColletralAmount = 10000000000 // 10000 usdt
@@ -399,7 +399,7 @@ describe("DepositLogic Tests", function () {
     it("should borrow ERC20 twice properly", async() =>{
       let token0SupplyAmount = new ethers.BigNumber.from("10000000000000000000000"); // 10000 token0
       await token0.mint(supplier0.address, token0SupplyAmount);
-      await token0.approve(pool.address, token0SupplyAmount, {from: supplier0.address});
+      await token0.connect(supplier0).approve(pool.address, token0SupplyAmount);
       await pool.supply(token0.address, supplier0.address, token0SupplyAmount, false);
 
       let usdtColletralAmount = 10000000000 // 10000 usdt
@@ -436,4 +436,117 @@ describe("DepositLogic Tests", function () {
     });
   })
   
+  describe("repay borrow", function(){
+    it("should repay ERC20 properly", async() =>{
+      let token0SupplyAmount = new ethers.BigNumber.from("10000000000000000000000"); // 10000 token0
+      await token0.mint(supplier0.address, token0SupplyAmount);
+      await token0.connect(supplier0).approve(pool.address, token0SupplyAmount);
+      await pool.supply(token0.address, supplier0.address, token0SupplyAmount, false);
+
+      let usdtColletralAmount = 10000000000 // 10000 usdt
+      await usdt.mint(borrower0.address, usdtColletralAmount);
+      await usdt.connect(borrower0).approve(pool.address, usdtColletralAmount);
+      await pool.connect(borrower0).supply(usdt.address, borrower0.address, usdtColletralAmount, true);     
+      
+      let assetToBorrow = await router.assets(token0.address);
+      let dToken = await ethers.getContractAt("DToken", assetToBorrow.dToken);
+
+      let borrowAmount = new ethers.BigNumber.from("100000000000000000000");
+      await dToken.connect(borrower0).borrow(borrower0.address, borrowAmount);
+
+      await token0.mint(borrower0.address, 5006809261);
+      await token0.connect(borrower0).approve(pool.address, borrowAmount.add(5006809261));
+      let tx = await pool.connect(borrower0).repay(token0.address, borrower0.address, borrowAmount);
+      let receipt = await tx.wait();
+      m.log("gas used:", receipt.gasUsed);
+
+      let routerBalance = await token0.balanceOf(router.address);
+      expect(routerBalance).to.equal(0);
+
+      let reserve = await aPool.getReserveData(token0.address);
+      let aPoolBalance = await token0.balanceOf(reserve.aTokenAddress);
+      expect(aPoolBalance).to.equal("9500000000005006809261");
+
+      // check dToken
+      let dTokenBalance = await dToken.balanceOf(borrower0.address)
+      expect(dTokenBalance).to.equal(0);
+
+      let vToken0 = await ethers.getContractAt("VariableDebtToken", reserve.variableDebtTokenAddress)
+      let routerVToken0Balance = await vToken0.balanceOf(router.address);
+      expect(routerVToken0Balance).to.equal(0);
+    });
+
+    it("should repay ETH properly", async() =>{
+      await pool.connect(supplier0).supplyETH(supplier0.address, true, {value: ethers.BigNumber.from("1000000000000000000000")});
+
+      let usdtColletralAmount = 20000000000 // 20000 usdt
+      await usdt.mint(borrower0.address, usdtColletralAmount);
+      await usdt.connect(borrower0).approve(pool.address, usdtColletralAmount);
+      await pool.connect(borrower0).supply(usdt.address, borrower0.address, usdtColletralAmount, true);     
+      let assetToBorrow = await router.assets(ETHAddress);
+      let dToken = await ethers.getContractAt("DToken", assetToBorrow.dToken);
+
+      let borrowAmount = ethers.BigNumber.from("1000000000000000000");
+      await dToken.connect(borrower0).borrow(borrower1.address, borrowAmount);
+
+      let tx = await pool.connect(borrower0).repayETH(borrower0.address, borrowAmount, {value: ethers.BigNumber.from("1100000000000000000000")});
+      let receipt = await tx.wait();
+      m.log("gas used:", receipt.gasUsed);
+
+      let routerBalance = await provider.getBalance(router.address);
+      expect(routerBalance).to.equal(0);
+
+      let reserve = await aPool.getReserveData(wETH.address);
+      let aPoolBalance = await wETH.balanceOf(reserve.aTokenAddress);
+      expect(aPoolBalance).to.equal("950000000000001668936");
+
+      // check dToken
+      let dTokenBalance = await dToken.balanceOf(borrower0.address)
+      expect(dTokenBalance).to.equal(0);
+
+      let vToken0 = await ethers.getContractAt("VariableDebtToken", reserve.variableDebtTokenAddress)
+      let routerVToken0Balance = await vToken0.balanceOf(router.address);
+      expect(routerVToken0Balance).to.equal(0);
+    });
+
+    it("should repay twice ERC20 properly", async() =>{
+      let token0SupplyAmount = new ethers.BigNumber.from("10000000000000000000000"); // 10000 token0
+      await token0.mint(supplier0.address, token0SupplyAmount);
+      await token0.connect(supplier0).approve(pool.address, token0SupplyAmount);
+      await pool.supply(token0.address, supplier0.address, token0SupplyAmount, false);
+
+      let usdtColletralAmount = 10000000000 // 10000 usdt
+      await usdt.mint(borrower0.address, usdtColletralAmount);
+      await usdt.connect(borrower0).approve(pool.address, usdtColletralAmount);
+      await pool.connect(borrower0).supply(usdt.address, borrower0.address, usdtColletralAmount, true);     
+      
+      let assetToBorrow = await router.assets(token0.address);
+      let dToken = await ethers.getContractAt("DToken", assetToBorrow.dToken);
+
+      let borrowAmount = new ethers.BigNumber.from("100000000000000000000");
+      await dToken.connect(borrower0).borrow(borrower0.address, borrowAmount);
+
+      await token0.mint(borrower0.address, 5424043365);
+      await token0.connect(borrower0).approve(pool.address, borrowAmount.add(5424043365));
+      await pool.connect(borrower0).repay(token0.address, borrower0.address, borrowAmount.div(2));
+      let tx = await pool.connect(borrower0).repay(token0.address, borrower0.address, borrowAmount.div(2));
+      let receipt = await tx.wait();
+      m.log("gas used:", receipt.gasUsed);
+
+      let routerBalance = await token0.balanceOf(router.address);
+      expect(routerBalance).to.equal(0);
+
+      let reserve = await aPool.getReserveData(token0.address);
+      let aPoolBalance = await token0.balanceOf(reserve.aTokenAddress);
+      expect(aPoolBalance).to.equal("9500000000005424043365");
+
+      // check dToken
+      let dTokenBalance = await dToken.balanceOf(borrower0.address)
+      expect(dTokenBalance).to.equal(0);
+
+      let vToken0 = await ethers.getContractAt("VariableDebtToken", reserve.variableDebtTokenAddress)
+      let routerVToken0Balance = await vToken0.balanceOf(router.address);
+      expect(routerVToken0Balance).to.equal(0);
+    });
+  });
 });

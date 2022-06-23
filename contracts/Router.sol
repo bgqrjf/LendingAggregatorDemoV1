@@ -14,8 +14,11 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "./libraries/TransferHelper.sol";
 import "./libraries/Utils.sol";
 import "./libraries/UserAssetBitMap.sol";
+import "./libraries/Math.sol";
 
 contract Router is IRouter, Ownable{
+    using Math for uint;
+
     IConfig public config;
     IPriceOracle public priceOracle;
     IStrategy public strategy;
@@ -239,30 +242,32 @@ contract Router is IRouter, Ownable{
         address[] memory repayTo = providers;
         uint dTokenSupply = asset.dToken.totalSupply();
         uint debts = totalDebts(_underlying);
+        
+        amount = TransferHelper.balanceOf(_underlying, address(this));
+        uint dTokenAmount =  amount * dTokenSupply / debts;
+        require(dTokenAmount <= asset.dToken.balanceOf(_for), "Router: excceed repay Limit");
 
-        amount = Utils.minOf(
-            TransferHelper.balanceOf(_underlying, address(this)) * dTokenSupply / debts, 
-            asset.dToken.balanceOf(_for)
-        );
-
-        uint[] memory amounts = strategy.getRepayStrategy(repayTo, _underlying, amount * debts/ dTokenSupply);
+        uint[] memory amounts = strategy.getRepayStrategy(repayTo, _underlying, amount);
         for (uint i = 0; i < repayTo.length; i++){
-            Types.ProviderData memory data = IProvider(repayTo[i]).getRepayData(_underlying, amounts[i]);
-            if (_underlying == TransferHelper.ETH){
-                Utils.lowLevelCall(data.target, data.encodedData, amounts[i]);
-            }else{
-                if (_underlying == TransferHelper.ETH){
-                    IWETH(data.weth).deposit{value: amounts[i]}();
-                    TransferHelper.approve(data.weth, data.approveTo, amounts[i]);
+            if(amounts[i] > 0){
+                Types.ProviderData memory data = IProvider(repayTo[i]).getRepayData(_underlying, amounts[i]);
+                if (data.approveTo == address(0)){
+                    Utils.lowLevelCall(data.target, data.encodedData, amounts[i]);
                 }else{
-                    TransferHelper.approve(_underlying, data.approveTo, amounts[i]);
+                    if (_underlying == TransferHelper.ETH){
+                        IWETH(data.weth).deposit{value: amounts[i]}();
+                        TransferHelper.approve(data.weth, data.approveTo, amounts[i]);
+                    }else{
+                        TransferHelper.approve(_underlying, data.approveTo, amounts[i]);
+                    }
+
+                    Utils.lowLevelCall(data.target, data.encodedData, 0);
                 }
-                Utils.lowLevelCall(data.target, data.encodedData, 0);
             }
         }
 
         // update states
-        asset.dToken.burn(_for, amount);
+        asset.dToken.burn(_for, dTokenAmount);
         _assets[_underlying].sReserve = asset.sToken.totalSupply();
 
         if (asset.dToken.balanceOf(_for) == 0){

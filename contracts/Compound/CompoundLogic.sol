@@ -131,7 +131,7 @@ contract CompoundLogic is IProvider{
 
     function accrueInterest(address underlying, CTokenInterface cToken) internal view returns (uint totalCash, uint totalBorrows, uint totalReserves, uint borrowIndex) {
         /* Read the previous values out of storage */
-        totalCash = TransferHelper.balanceOf(underlying, msg.sender);
+        totalCash = IERC20(underlying).balanceOf(msg.sender);
         totalBorrows = cToken.totalBorrows();
         totalReserves = cToken.totalReserves();
         borrowIndex = cToken.borrowIndex();

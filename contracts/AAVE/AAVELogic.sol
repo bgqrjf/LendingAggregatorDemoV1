@@ -88,23 +88,23 @@ contract AAVELogic is IProvider{
         data.target = address(pool);
         data.approveTo = data.target;
         if (_underlying != TransferHelper.ETH){
-            data.encodedData = abi.encodeWithSelector(pool.borrow.selector, _underlying, _amount, uint(AAVEDataTypes.InterestRateMode.VARIABLE), msg.sender);
+            data.encodedData = abi.encodeWithSelector(pool.repay.selector, _underlying, _amount, uint(AAVEDataTypes.InterestRateMode.VARIABLE), msg.sender);
         }else{
             data.weth = wrappedNative;
-            data.encodedData = abi.encodeWithSelector(pool.borrow.selector, data.weth, _amount, uint(AAVEDataTypes.InterestRateMode.VARIABLE), msg.sender);
+            data.encodedData = abi.encodeWithSelector(pool.repay.selector, data.weth, _amount, uint(AAVEDataTypes.InterestRateMode.VARIABLE), msg.sender);
         }
     } 
 
     function supplyOf(address _underlying, address _account) external view override returns (uint) {
         _underlying = replaceNative(_underlying);
         AAVEDataTypes.ReserveData memory reserve = pool.getReserveData(_underlying);
-        return TransferHelper.balanceOf(reserve.aTokenAddress, _account);
+        return IERC20(reserve.aTokenAddress).balanceOf(_account);
     }
 
     function debtOf(address _underlying, address _account) external view override returns (uint) {
         _underlying = replaceNative(_underlying);
         AAVEDataTypes.ReserveData memory reserve = pool.getReserveData(_underlying);
-        return TransferHelper.balanceOf(reserve.variableDebtTokenAddress, _account);
+        return IERC20(reserve.variableDebtTokenAddress).balanceOf(_account);
     }
 
     function totalColletralAndBorrow(address _account, address _quote) external view override returns(uint collateralValue, uint borrowedValue){
@@ -126,8 +126,8 @@ contract AAVELogic is IProvider{
         _underlying = replaceNative(_underlying);
         AAVEDataTypes.ReserveData memory reserve = pool.getReserveData(_underlying);
         params = Types.UsageParams(
-            TransferHelper.totalSupply(reserve.aTokenAddress),
-            TransferHelper.totalSupply(reserve.variableDebtTokenAddress) + TransferHelper.totalSupply(reserve.stableDebtTokenAddress),
+            IERC20(reserve.aTokenAddress).totalSupply(),
+            IERC20(reserve.variableDebtTokenAddress).totalSupply() + IERC20(reserve.stableDebtTokenAddress).totalSupply(),
             truncateBase(IAAVEInterestRateStrategy(reserve.interestRateStrategyAddress).getVariableRateSlope1()),
             truncateBase(IAAVEInterestRateStrategy(reserve.interestRateStrategyAddress).getVariableRateSlope2()),
             truncateBase(IAAVEInterestRateStrategy(reserve.interestRateStrategyAddress).getBaseVariableBorrowRate()),
