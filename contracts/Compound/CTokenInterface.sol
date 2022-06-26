@@ -3,12 +3,12 @@ pragma solidity ^0.8.14;
 
 import "./InterestRateModel.sol";
 
-interface CTokenInterface {    
+interface CTokenInterface {
     function balanceOf(address owner) external view returns (uint);
     function getAccountSnapshot(address account) external view returns (uint, uint, uint, uint);
     function totalSupply() external view returns(uint);
 
-    function borrowBalanceStore(address) external view returns (uint);
+    function borrowBalanceStored(address account) external view returns (uint);
     function borrowIndex() external view returns (uint);
     function interestRateModel() external view returns(InterestRateModel);
     function borrowRatePerBlock() external view returns (uint);

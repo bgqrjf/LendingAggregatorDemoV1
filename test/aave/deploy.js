@@ -102,8 +102,6 @@ exports.deployContracts = async ({token0, usdt}) => {
   const variableDebtTokenImplementation = await VariableDebtToken.deploy(pool.address);
   
   // deploy ERC20
-
-
   const WETH = await ethers.getContractFactory(`MockWETH`);
   const wETH = await WETH.deploy();
   await priceOracle.setAssetPrice(token0.address, 10000000000); // set price to 100.00

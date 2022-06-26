@@ -158,7 +158,7 @@ contract Router is IRouter, Ownable{
                 if (data.approveTo == address(0)){
                     Utils.lowLevelCall(data.target, data.encodedData, amounts[i]);
                 }else{
-                    if (_underlying == TransferHelper.ETH){
+                    if (data.weth != address(0)){
                         IWETH(data.weth).deposit{value: amounts[i]}();
                         TransferHelper.approve(data.weth, data.approveTo, amounts[i]);
                     }else{
@@ -181,8 +181,9 @@ contract Router is IRouter, Ownable{
         emit AmountsSupplied(_to, amount, supplyTo, amounts);
     }
 
-    function withdraw(address _underlying, address _to, bool _colletralable) public override {
+    function withdraw(address _underlying, address _from, address _to, bool _colletralable) public override {
         Types.Asset memory asset = _assets[_underlying];
+        require(address(asset.sToken) == msg.sender, "Router: only DToken");
         address[] memory withdrawFrom = providers;
         uint sTokenSupply = asset.sToken.totalSupply();
         uint uTokenSupplied = totalSupplied(_underlying);
@@ -198,7 +199,7 @@ contract Router is IRouter, Ownable{
                 if (amounts[i] > 0){
                     Types.ProviderData memory data = IProvider(withdrawFrom[i]).getWithdrawData(_underlying, amounts[i]);
                     Utils.lowLevelCall(data.target, data.encodedData, 0);
-                    if (_underlying == TransferHelper.ETH){
+                    if (data.weth != address(0)){
                         IWETH(data.weth).withdraw(amounts[i]);
                     }
                 }
@@ -206,7 +207,7 @@ contract Router is IRouter, Ownable{
             TransferHelper.transfer(_underlying, _to, amountLeft);
         }
 
-        config.setUsingAsCollateral(_to, asset.index, _colletralable);
+        config.setUsingAsCollateral(_from, asset.index, _colletralable);
     }
 
     function borrow(address _underlying, address _by, address _to) public override returns (uint amount){
@@ -228,7 +229,7 @@ contract Router is IRouter, Ownable{
             if (amounts[i] > 0){
                 Types.ProviderData memory data = IProvider(borrowFrom[i]).getBorrowData(_underlying, amounts[i]);
                 Utils.lowLevelCall(data.target, data.encodedData, 0);
-                if (_underlying == TransferHelper.ETH){
+                if (data.weth != address(0)){
                     IWETH(data.weth).withdraw(amounts[i]);
                 }
             }
@@ -254,7 +255,7 @@ contract Router is IRouter, Ownable{
                 if (data.approveTo == address(0)){
                     Utils.lowLevelCall(data.target, data.encodedData, amounts[i]);
                 }else{
-                    if (_underlying == TransferHelper.ETH){
+                    if (data.weth != address(0)){
                         IWETH(data.weth).deposit{value: amounts[i]}();
                         TransferHelper.approve(data.weth, data.approveTo, amounts[i]);
                     }else{

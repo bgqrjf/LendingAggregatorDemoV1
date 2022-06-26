@@ -45,11 +45,11 @@ contract SToken is ISToken, ERC20{
     }
 
     function scaledAmount(uint _amount) public view override returns (uint){
-        return _amount *  router.totalSupplied(underlying) / totalSupply();
+        return _amount * router.totalSupplied(underlying) / totalSupply();
     }
 
     function _withdraw(address _from, address _to, uint _amount, bool _colletralable) internal {
         _burn(_from, _amount);
-        router.withdraw(underlying, _to, _colletralable);
+        router.withdraw(underlying,_from, _to, _colletralable);
     }
 }
