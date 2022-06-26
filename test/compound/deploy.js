@@ -72,7 +72,6 @@ exports.deployContracts = async ({token0, usdt}) => {
 
 
   return{
-    comptrollerLens: comptrollerLens,
     comptroller: comptroller,
     cToken0: cToken0,
     cUSDT: cUSDT,
