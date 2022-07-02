@@ -28,6 +28,7 @@ contract SToken is ISToken, ERC20{
     }
 
     function withdraw(address _to, uint _amount, bool _colletralable) external override{
+        require(router.withdrawCap(msg.sender, underlying) >= _amount, "SToken: not enough collateral");
         _withdraw(msg.sender, _to, _amount, _colletralable);
     }
 
@@ -50,6 +51,6 @@ contract SToken is ISToken, ERC20{
 
     function _withdraw(address _from, address _to, uint _amount, bool _colletralable) internal {
         _burn(_from, _amount);
-        router.withdraw(underlying,_from, _to, _colletralable);
+        router.withdraw(underlying, _from, _to, _colletralable);
     }
 }

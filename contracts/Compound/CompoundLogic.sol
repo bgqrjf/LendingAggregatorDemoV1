@@ -7,10 +7,16 @@ import "./CETHInterface.sol";
 import "./ComptrollerInterface.sol";
 
 import "../libraries/Utils.sol";
+import "../libraries/Math.sol";
 import "../libraries/TransferHelper.sol";
 
 contract CompoundLogic is IProvider{
-    uint constant public base = 1e12;
+    using Math for uint;
+
+    uint public immutable BASE = 1e12;
+    uint public immutable BLOCK_PER_YEAR = 2102400;
+    bytes4 public immutable GET_USAGE_PARAMS_SELECTOR = CompoundLogic.getUsageParams.selector;
+    bytes4 public immutable SUPPLY_TO_TARGET_SUPPLY_RATE_SELECTOR = CompoundLogic.supplyToTargetSupplyRate.selector;
     
     ComptrollerInterface public comptroller;
 
@@ -53,7 +59,11 @@ contract CompoundLogic is IProvider{
 
     function getWithdrawData(address _underlying, uint _amount) external view override returns(Types.ProviderData memory data){
         data.target = cTokens[_underlying];
-        data.encodedData = abi.encodeWithSelector(CERC20Interface.redeem.selector, _amount);
+        uint cTokenSupply = CTokenInterface(data.target).totalSupply();
+        (uint totalCash, uint totalBorrows, uint totalReserves,) = accrueInterest(_underlying, CTokenInterface(data.target));
+        uint underlyingValue = totalCash + totalBorrows - totalReserves;
+
+        data.encodedData = abi.encodeWithSelector(CERC20Interface.redeem.selector, underlyingValue > 0 ? _amount * cTokenSupply / underlyingValue : 0);
     }
 
     function getWithdrawAllData(address _underlying) external view override returns(Types.ProviderData memory data){
@@ -117,22 +127,60 @@ contract CompoundLogic is IProvider{
         borrowValue = borrowValue * factor / oraclePriceQuote;
     }
 
-    function getUsageParams(address _underlying) external view override returns (Types.UsageParams memory params){
+    function supplyToTargetSupplyRate(uint _targetRate, bytes memory _params) external pure override returns (int){
+        Types.CompoundUsageParams memory params = abi.decode(_params, (Types.CompoundUsageParams));
+
+        _targetRate = _targetRate * Utils.MILLION / params.reserveFactor;
+
+        uint delta = params.base * params.base + 4 * params.slope1 * _targetRate;
+        uint supply = params.totalBorrowed * (params.base  + delta.sqrt()) / (_targetRate + _targetRate);
+
+        if (params.totalBorrowed * Utils.MILLION > supply * params.optimalLTV){
+            params.base +=  params.optimalLTV * params.slope1 / Utils.MILLION;
+
+            uint a = params.slope2 * params.optimalLTV - params.base * Utils.MILLION;
+            delta = (a / Utils.MILLION) ** 2 + 4 * params.slope2 * _targetRate;
+            supply = params.totalBorrowed * (Utils.MILLION * delta.sqrt() - a) / ((_targetRate + _targetRate) * Utils.MILLION);
+        }
+
+        return int(supply) - int(params.totalSupplied);
+    }
+
+    function borrowToTargetBorrowRate(uint _targetRate, bytes memory _params) external pure returns (int){
+        Types.CompoundUsageParams memory params = abi.decode(_params, (Types.CompoundUsageParams));
+        
+        if (_targetRate < params.base){
+            _targetRate = params.base;
+        }
+
+        uint borrow = ((_targetRate - params.base) * params.totalSupplied).divCeil(params.slope1);
+
+        if (borrow * Utils.MILLION > params.totalSupplied * params.optimalLTV){
+            params.base += params.optimalLTV * params.slope1 / Utils.MILLION;
+            borrow = (((_targetRate - params.base) * Utils.MILLION + params.optimalLTV * params.slope2 ) * params.totalSupplied).divCeil(params.slope2 * Utils.MILLION);
+        }
+
+        return int(borrow) - int(params.totalBorrowed);
+    }
+
+
+    function getUsageParams(address _underlying) external view override returns (bytes memory){
         CTokenInterface cToken = CTokenInterface(cTokens[_underlying]);
         (uint totalCash, uint totalBorrows, uint totalReserves,) = accrueInterest(_underlying, cToken);
 
         InterestRateModel interestRateModel = cToken.interestRateModel();
 
-        params = Types.UsageParams(
+        Types.CompoundUsageParams memory params = Types.CompoundUsageParams(
             totalCash + totalBorrows - totalReserves,
             totalBorrows,
-            truncateBase(interestRateModel.multiplierPerBlock()),
-            truncateBase(interestRateModel.jumpMultiplierPerBlock()),
-            truncateBase(interestRateModel.baseRatePerBlock()),
-            truncateBase(interestRateModel.kink()),
-            truncateBase(cToken.borrowRatePerBlock()),
-            truncateBase(cToken.reserveFactorMantissa())
+            interestRateModel.multiplierPerBlock() * BLOCK_PER_YEAR / BASE,
+            interestRateModel.jumpMultiplierPerBlock() * BLOCK_PER_YEAR / BASE,
+            interestRateModel.baseRatePerBlock() * BLOCK_PER_YEAR / BASE,
+            interestRateModel.kink() / BASE,
+            Utils.MILLION - cToken.reserveFactorMantissa() / BASE
         );
+
+        return abi.encode(params);
     }
 
     function updateCTokenList(address _cToken, uint _decimals) external {
@@ -140,10 +188,6 @@ contract CompoundLogic is IProvider{
         require(isListed, "CompoundLogic: cToken Not Listed");
         cTokens[CTokenInterface(_cToken).underlying()] = _cToken;
         underlyingUnit[_cToken] = 10 ** _decimals;
-    }
-
-    function truncateBase(uint x) internal pure returns (uint32 y){
-        return uint32(x / base);
     }
 
     function getAccountSnapshot(CTokenInterface cToken, address account) internal view returns (uint, uint, uint) {
@@ -182,4 +226,11 @@ contract CompoundLogic is IProvider{
         }
     }
 
+    function getCurrentSupplyRate(address _underlying) external view override returns (uint){
+        return CTokenInterface(cTokens[_underlying]).supplyRatePerBlock() * BLOCK_PER_YEAR / BASE;
+    }
+    
+    function getCurrentBorrowRate(address _underlying) external view override returns (uint){
+        return CTokenInterface(cTokens[_underlying]).borrowRatePerBlock() * BLOCK_PER_YEAR / BASE;
+    }
 }

@@ -10,7 +10,7 @@ contract Config is IConfig, Ownable{
     address public immutable router;
     uint public treasuryRatio;
 
-    // mapping underlyingToken to borrowConfig
+    // mapping underlying token to borrowConfig
     mapping(address => Types.BorrowConfig) private _borrowConfigs;
 
     // mapping (user address => collateral/debt assets)

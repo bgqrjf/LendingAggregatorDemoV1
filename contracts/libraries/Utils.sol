@@ -55,4 +55,20 @@ library Utils{
 
         return returnData;
     }
+
+    function lowLevelStaticCall(address _contract, bytes memory _encodedData) internal view returns (bytes memory){
+        (bool success, bytes memory returnData) = _contract.staticcall(_encodedData);
+        if (!success){
+            if (returnData.length > 0){
+                assembly{
+                    let returndataSize := mload(returnData)
+                    revert(add(32, returnData), returndataSize)
+                }
+            }else{
+                revert("call reverted");
+            }
+        }
+
+        return returnData;
+    }
 }

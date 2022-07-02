@@ -111,14 +111,14 @@ exports.deployContracts = async ({token0, usdt}) => {
   const DefaultReserveInterestRateStrategy = await ethers.getContractFactory(`DefaultReserveInterestRateStrategy`);
   const defaultReserveInterestRateStrategy = await DefaultReserveInterestRateStrategy.deploy(
     poolAddressesProvider.address,                            // provider
-    ethers.BigNumber.from("800000000000000000000000000"),     // optimalUsageRatio
+    ethers.BigNumber.from("900000000000000000000000000"),     // optimalUsageRatio
     0,                                                        // baseVariableBorrowRate
     ethers.BigNumber.from("40000000000000000000000000"),      // variableRateSlope1
-    ethers.BigNumber.from("750000000000000000000000000"),     // variableRateSlope2
+    ethers.BigNumber.from("600000000000000000000000000"),     // variableRateSlope2
     ethers.BigNumber.from("5000000000000000000000000"),       // stableRateSlope1
-    ethers.BigNumber.from("750000000000000000000000000"),     // stableRateSlope2
+    ethers.BigNumber.from("600000000000000000000000000"),     // stableRateSlope2
     ethers.BigNumber.from("50000000000000000000000000"),      // baseStableRateOffset 
-    ethers.BigNumber.from("80000000000000000000000000"),      // stableRateExcessOffset 
+    ethers.BigNumber.from("800000000000000000000000000"),     // stableRateExcessOffset 
     ethers.BigNumber.from("200000000000000000000000000"),     // optimalStableToTotalDebtRatio
   );
 

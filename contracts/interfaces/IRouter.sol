@@ -27,7 +27,9 @@ interface IRouter{
     function totalSupplied(address _underlying) external view returns (uint amount);
     function totalDebts(address _underlying) external view returns (uint amount);
     function borrowCap(address _underlying, address _account) external view returns (uint);
+    function withdrawCap(address _account, address _quote) external view returns (uint amount);
     function valueOf(address _account, address _quote) external view returns (uint collateralValue, uint borrowingValue);
+    function getProviders() external view returns (address[] memory);
 
     // external state-getters
     function assets(address) external view returns(Types.Asset memory);

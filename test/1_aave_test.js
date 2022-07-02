@@ -222,7 +222,7 @@ describe("DepositLogic Tests", function () {
 
         let asset = await router.assets(token0.address);
         let sToken = await ethers.getContractAt("SToken", asset.sToken);
-        let tx = await sToken.withdraw(supplier1.address, token0Amount.div(10), false);
+        let tx = await sToken.withdraw(supplier1.address, (await sToken.balanceOf(supplier0.address)).div(10), false);
         let receipt = await tx.wait();
         m.log("gas used:",receipt.gasUsed);
 
@@ -431,15 +431,15 @@ describe("DepositLogic Tests", function () {
 
         // check dToken
         let dTokenBalance = await dToken.balanceOf(borrower0.address)
-        expect(dTokenBalance).to.equal("99999999999582765896");
+        expect(dTokenBalance).to.equal("99999999999629125241");
 
         let vToken0 = await ethers.getContractAt("VariableDebtToken", reserve.variableDebtTokenAddress)
         let routerVToken0Balance = await vToken0.balanceOf(router.address);
-        expect(routerVToken0Balance).to.equal("100000000000417234105");
+        expect(routerVToken0Balance).to.equal("100000000000370874760");
       });
     })
     
-    describe("repay borrow", function(){
+    describe("repay tests", function(){
       it("should repay ERC20 properly", async() =>{
         let token0SupplyAmount = new ethers.BigNumber.from("10000000000000000000000"); // 10000 token0
         await token0.mint(supplier0.address, token0SupplyAmount);
@@ -468,7 +468,7 @@ describe("DepositLogic Tests", function () {
 
         let reserve = await aPool.getReserveData(token0.address);
         let aPoolBalance = await token0.balanceOf(reserve.aTokenAddress);
-        expect(aPoolBalance).to.equal("9500000000005006809261");
+        expect(aPoolBalance).to.equal("9500000000004450497121");
 
         // check dToken
         let dTokenBalance = await dToken.balanceOf(borrower0.address)
@@ -501,7 +501,7 @@ describe("DepositLogic Tests", function () {
 
         let reserve = await aPool.getReserveData(wETH.address);
         let aPoolBalance = await wETH.balanceOf(reserve.aTokenAddress);
-        expect(aPoolBalance).to.equal("950000000000001668936");
+        expect(aPoolBalance).to.equal("950000000000001483499");
 
         // check dToken
         let dTokenBalance = await dToken.balanceOf(borrower0.address)
@@ -541,7 +541,7 @@ describe("DepositLogic Tests", function () {
 
         let reserve = await aPool.getReserveData(token0.address);
         let aPoolBalance = await token0.balanceOf(reserve.aTokenAddress);
-        expect(aPoolBalance).to.equal("9500000000005424043365");
+        expect(aPoolBalance).to.equal("9500000000004821371880");
 
         // check dToken
         let dTokenBalance = await dToken.balanceOf(borrower0.address)

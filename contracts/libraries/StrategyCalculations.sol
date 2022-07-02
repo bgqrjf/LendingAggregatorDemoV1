@@ -5,37 +5,26 @@ import "./Types.sol";
 import "./Utils.sol";
 import "./Math.sol";
 
+import "../interfaces/IProvider.sol";
+
 library StrategyCalculations{
-    function calculateSupplyAmountToReachLTV(Types.UsageParams memory _params, uint _ltv) internal pure returns (uint amount){
-        uint supplyOfLTV = _params.totalBorrowed / _ltv;
-        amount = supplyOfLTV - _params.totalSupplied;
-    }
+    uint constant precision = 1;
 
-    function calculateWithdrawToReachLTV(Types.UsageParams memory _params, uint _ltv) internal pure returns (uint amount){
-        uint supplyOfLTV = _params.totalBorrowed / _ltv;
-        amount = _params.totalSupplied  - supplyOfLTV;
-    }
-
-    function calculateBorrowToReachLTV(Types.UsageParams memory _params, uint _ltv) internal pure returns (uint amount){
-        uint loanOfLTV = _params.totalSupplied * _ltv;
-        amount = loanOfLTV - _params.totalBorrowed;
-    }
-
-    function calculateRepayAmountToReachLTV(Types.UsageParams memory _params, uint _ltv) internal pure returns (uint amount){
-        uint loanOfLTV = _params.totalSupplied * _ltv;
-        amount = _params.totalBorrowed - loanOfLTV;
-    }
-
-    function calculateAmountsToSupply(uint _targetAmount, uint32 _maxRate, Types.UsageParams[] memory _params) internal pure returns (uint[] memory amounts){
-        amounts = new uint[](_params.length);
-        uint32 minRate;
+    function calculateAmountsToSupply(
+        uint _targetAmount, 
+        uint _maxRate, 
+        address[] memory _providers,
+        bytes[] memory _usageParams
+    ) internal pure returns (uint[] memory amounts){
+        amounts = new uint[](_providers.length);
+        uint minRate;
         uint totalAmountToSupply;
         
-        while(_maxRate - minRate > 1){
+        while(_maxRate - minRate > precision){
             totalAmountToSupply = 0;
-            uint32 targetRate = (_maxRate + minRate) / 2;
-            for (uint i = 0; i < _params.length; i++){
-                uint amount = calculateAmountToSupply(targetRate, _params[i]);
+            uint targetRate = (_maxRate + minRate) / 2;
+            for (uint i = 0; i < _providers.length; i++){
+                uint amount = getAmountToSupply(_providers[i], targetRate, _usageParams[i]);
                 amounts[i] = totalAmountToSupply < _targetAmount ? Utils.minOf(amount, _targetAmount - totalAmountToSupply) : 0;
                 totalAmountToSupply += amount;
             }
@@ -56,20 +45,21 @@ library StrategyCalculations{
 
     function calculateAmountsToWithdraw(
         uint _targetAmount, 
-        uint32 _minRate, 
-        Types.UsageParams[] memory _params, 
+        uint _minRate, 
+        address[] memory _providers, 
+        bytes[] memory _usageParams,
         uint[] memory _maxToWithdraw
     ) internal pure returns (uint[] memory amounts){
-        amounts = new uint[](_params.length);
-        uint32 maxRate;
+        amounts = new uint[](_providers.length);
+        uint maxRate;
         uint totalAmountToWithdraw;
 
-        while(maxRate - _minRate > 1){
+        while(maxRate > _minRate + precision || maxRate == 0){
             totalAmountToWithdraw = 0;
-            uint32 targetRate = maxRate == 0 ? _minRate + _minRate : (maxRate + _minRate) / 2;
+            uint targetRate = maxRate == 0 ? _minRate + _minRate + 1 : (maxRate + _minRate) / 2;
 
-            for (uint i = 0; i < _params.length; i++){
-                uint amount = Utils.minOf(calculateAmountToWithdraw(targetRate, _params[i]), _maxToWithdraw[i]);
+            for (uint i = 0; i < _providers.length; i++){
+                uint amount = Utils.minOf(getAmountToWithdraw(_providers[i], targetRate, _usageParams[i]), _maxToWithdraw[i]);
                 amounts[i] = totalAmountToWithdraw < _targetAmount ? Utils.minOf(amount, _targetAmount - totalAmountToWithdraw) : 0;
                 totalAmountToWithdraw += amount;
             }
@@ -84,26 +74,34 @@ library StrategyCalculations{
         }
 
         if (totalAmountToWithdraw < _targetAmount){
-            amounts[0] += _targetAmount - totalAmountToWithdraw;
+            uint amountLeft = _targetAmount - totalAmountToWithdraw;
+            for (uint i = 0; i < amounts.length && amountLeft > 0; i++){
+                if (amounts[i] < _maxToWithdraw[i]){
+                    uint amountDelta = Utils.minOf(amountLeft,  _maxToWithdraw[i] - amounts[i]);
+                    amounts[i] += amountDelta;
+                    amountLeft -= amountDelta;
+                }
+            }
         }
     }
 
     function calculateAmountsToBorrow(
         uint _targetAmount, 
-        uint32 _minRate, 
-        Types.UsageParams[] memory _params, 
+        uint _minRate, 
+        address[] memory _providers, 
+        bytes[] memory _usageParams,
         uint[] memory _maxToBorrow
     ) internal pure returns (uint[] memory amounts){
-        amounts = new uint[](_params.length);
-        uint32 maxRate;
+        amounts = new uint[](_providers.length);
+        uint maxRate;
         uint totalAmountToBorrow;
 
-        while(maxRate - _minRate > 1){
+        while(maxRate > _minRate + precision || maxRate == 0){
             totalAmountToBorrow = 0;
-            uint32 targetRate = maxRate == 0 ? _minRate + _minRate : (maxRate + _minRate) / 2;
+            uint targetRate = maxRate == 0 ? _minRate + _minRate + 1: (maxRate + _minRate) / 2;
 
-            for (uint i = 0; i < _params.length; i++){
-                uint amount = Utils.minOf(calculateAmountToBorrow(targetRate, _params[i]), _maxToBorrow[i]);
+            for (uint i = 0; i < _providers.length; i++){
+                uint amount = Utils.minOf(getAmountToBorrow(_providers[i], targetRate, _usageParams[i]), _maxToBorrow[i]);
                 amounts[i] = totalAmountToBorrow < _targetAmount ? Utils.minOf(amount, _targetAmount - totalAmountToBorrow) : 0;
                 totalAmountToBorrow += amount;
             }
@@ -122,15 +120,21 @@ library StrategyCalculations{
         }
     }
 
-    function calculateAmountsToRepay(uint _targetAmount, uint32 _maxRate, Types.UsageParams[] memory _params) internal pure returns (uint[] memory amounts){
-        amounts = new uint[](_params.length);
-        uint32 minRate;
+    function calculateAmountsToRepay(
+        uint _targetAmount, 
+        uint _maxRate, 
+        address[] memory _providers,
+        bytes[] memory _usageParams,
+        uint[] memory _maxAmountToRepay
+    ) internal pure returns (uint[] memory amounts){
+        amounts = new uint[](_providers.length);
+        uint minRate;
         uint totalAmountToRepay;
-        while(_maxRate - minRate > 1){
+        while(_maxRate - minRate > precision){
             totalAmountToRepay = 0;
-            uint32 targetRate = (_maxRate + minRate) / 2;
-            for (uint i = 0; i < _params.length; i++){
-                uint amount = calculateAmountToRepay(targetRate, _params[i]);
+            uint targetRate = (_maxRate + minRate) / 2;
+            for (uint i = 0; i < _providers.length; i++){
+                uint amount = Utils.minOf(_maxAmountToRepay[i], getAmountToRepay(_providers[i], targetRate, _usageParams[i]));
                 amounts[i] = totalAmountToRepay < _targetAmount ? Utils.minOf(amount, _targetAmount - totalAmountToRepay) : 0;
                 totalAmountToRepay += amount;
             }
@@ -145,74 +149,34 @@ library StrategyCalculations{
         }
 
         if (totalAmountToRepay < _targetAmount){
-            amounts[0] += _targetAmount - totalAmountToRepay;
+            uint amountLeft = _targetAmount - totalAmountToRepay;
+            for (uint i = 0; i < amounts.length && amountLeft > 0; i++){
+                if (amounts[i] < _maxAmountToRepay[i]){
+                    uint amountDelta = Utils.minOf(amountLeft,  _maxAmountToRepay[i] - amounts[i]);
+                    amounts[i] += amountDelta;
+                    amountLeft -= amountDelta;
+                }
+            }
         }
     }
 
-    function calculateAmountToSupply(uint32 _targetRate, Types.UsageParams memory _params) internal pure returns (uint amount){
-        if (_targetRate < _params.rate){
-            uint supplyOfTarget = supplyOfTargetRate(_targetRate, _params);
-            amount = supplyOfTarget - _params.totalSupplied;
-        }
+    function getAmountToSupply(address _provider, uint _targetRate, bytes memory _usageParams) internal pure returns (uint){
+        int amount = IProvider(_provider).supplyToTargetSupplyRate(_targetRate, _usageParams);
+        return amount > 0 ? uint(amount) : 0;
+    }
+    
+    function getAmountToWithdraw(address _provider, uint _targetRate, bytes memory _usageParams) internal pure returns (uint){
+        int amount = IProvider(_provider).supplyToTargetSupplyRate(_targetRate, _usageParams);
+        return amount < 0 ? uint(-amount) : 0;
     }
 
-    function calculateAmountToWithdraw(uint32 _targetRate, Types.UsageParams memory _params) internal pure returns (uint amount){
-        if (_targetRate > _params.rate){
-            uint supplyOfTarget = supplyOfTargetRate(_targetRate, _params);
-            amount = _params.totalSupplied - supplyOfTarget;
-        }
+    function getAmountToBorrow(address _provider, uint _targetRate, bytes memory _usageParams) internal pure returns (uint){
+        int amount = IProvider(_provider).borrowToTargetBorrowRate(_targetRate, _usageParams);
+        return amount > 0 ? uint(amount) : 0;
     }
 
-    function calculateAmountToBorrow(uint32 _targetRate, Types.UsageParams memory _params) internal pure returns (uint amount){
-        if (_targetRate > _params.rate){
-            uint loanOfTarget = loanOfTargetRate(_targetRate, _params);
-            amount = loanOfTarget - _params.totalBorrowed;
-        }
-    }
-
-    function calculateAmountToRepay(uint32 _targetRate, Types.UsageParams memory _params) internal pure returns (uint amount){
-        if (_targetRate < _params.rate){
-            uint loanOfTarget = loanOfTargetRate(_targetRate, _params);
-            amount = _params.totalBorrowed - loanOfTarget;
-        }
-    }
-
-    function supplyOfTargetRate(uint32 _targetRate, Types.UsageParams memory _params) internal pure returns (uint amount){
-        supplyToBorrowRate(_targetRate, _params.reserveFactor);
-        uint a = _params.totalBorrowed * _params.base;
-        uint b = _params.totalBorrowed * Math.sqrt(_params.base * _params.base + 4 * _params.slope1 * _targetRate);
-        amount = (a + b) / (2 * _targetRate);
-
-        uint targetLTV = _params.totalBorrowed * Utils.MILLION / amount;
-        if (targetLTV > _params.optimalLTV){
-            uint base = _params.slope1 * _params.optimalLTV / Utils.MILLION + _params.base; 
-            uint kbp =  _params.slope2 * _params.totalBorrowed * _params.optimalLTV / Utils.MILLION; 
-            a = _params.totalBorrowed * base; 
-            b = Math.sqrt((kbp - _params.totalBorrowed * base) ** 2 + 4 * _params.slope2 * _params.totalBorrowed * _params.totalBorrowed * _targetRate);
-            amount = (a + b - kbp) / (2 * _targetRate);
-        }
-    }
-
-    function loanOfTargetRate(uint32 _targetRate, Types.UsageParams memory _params) internal pure returns (uint amount){
-        uint a = _params.totalSupplied * Math.sqrt(_params.base * _params.base + 4 * _params.slope1 * _targetRate);
-        uint b = _params.totalSupplied * _params.base;
-        amount = (a-b) / (2 * _params.slope1);
-        
-        uint targetLTV = amount * Utils.MILLION / _params.totalSupplied;
-        if (targetLTV > _params.optimalLTV){
-            uint base = _params.slope1 * _params.optimalLTV / Utils.MILLION + _params.base; 
-            uint ksp =  _params.slope2 * _params.totalSupplied * _params.optimalLTV / Utils.MILLION; 
-            a = ksp + _params.totalSupplied * base;
-            b = Math.sqrt(a * a + 4 * _params.slope2 * _params.totalSupplied * _params.totalSupplied * _targetRate);
-            amount = (a + b ) / (2 * _params.slope1);
-        }
-    }
-
-    function supplyToBorrowRate(uint32 _supplyRate, uint32 _reserveFactor) internal pure returns (uint32 _borrowRate){
-        return _supplyRate * uint32(Utils.MILLION) /  (uint32(Utils.MILLION) - _reserveFactor);
-    }
-
-    function borrowToSupplyRate(uint32 _borrowRate, uint32 _reserveFactor) internal pure returns (uint32 _supplyRate){
-        return _borrowRate * _reserveFactor / uint32(Utils.MILLION);
+    function getAmountToRepay(address _provider, uint _targetRate, bytes memory _usageParams) internal pure returns (uint){
+        int amount = IProvider(_provider).borrowToTargetBorrowRate(_targetRate, _usageParams);
+        return amount < 0 ? uint(-amount) : 0;
     }
 }

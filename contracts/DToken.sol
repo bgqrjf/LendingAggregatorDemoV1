@@ -41,6 +41,7 @@ contract DToken is IDToken, ERC20{
     }
 
     function scaledAmount(uint _amount) public view override returns (uint){
-        return _amount *  router.totalSupplied(underlying).divCeil(totalSupply());
+        uint totalSupply = totalSupply();
+        return totalSupply > 0 ? _amount * router.totalSupplied(underlying).divCeil(totalSupply) : _amount;
     }
 }

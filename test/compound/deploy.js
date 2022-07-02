@@ -8,9 +8,9 @@ exports.deployContracts = async ({token0, usdt}) => {
 
   let InterestModel = await ethers.getContractFactory("JumpRateModelV2");
   let interestModel = await InterestModel.deploy(
-    ethers.BigNumber.from("20000000000000000"), 
-    ethers.BigNumber.from("180000000000000000"), 
-    ethers.BigNumber.from("4000000000000000000"), 
+    ethers.BigNumber.from("0"), 
+    ethers.BigNumber.from("40000000000000000"),  //23782343987 = x * 1e18 / blocksPerYear * kink
+    ethers.BigNumber.from("1090000000000000000"),  // 518455098934 = x / blocksPerYear
     ethers.BigNumber.from("800000000000000000"), 
     deployer.address
   );

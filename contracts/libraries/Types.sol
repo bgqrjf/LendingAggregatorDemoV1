@@ -32,15 +32,34 @@ library Types{
         BorrowConfig borrowConfig;
     }
 
-    struct UsageParams{
+    struct AAVEUsageParams{
         uint totalSupplied; // not balance
         uint totalBorrowed;
-        uint32 slope1;
-        uint32 slope2;
-        uint32 base;  // actual base * 10^6
-        uint32 optimalLTV;
-        uint32 rate; // block percentange yield
-        uint32 reserveFactor;
+        uint totalBorrowedStable;
+        uint totalBorrowedVariable;
+        uint unbacked;
+        uint slopeV1;
+        uint slopeV2;
+        uint slopeS1;
+        uint slopeS2;
+        uint baseS;  // actual base * 10^6
+        uint baseV;
+        uint optimalLTV;
+        uint reserveFactor;
+        uint stableToTotalDebtRatio;
+        uint optimalStableToTotalDebtRatio;
+        uint maxExcessStableToTotalDebtRatio;
+        uint maxExcessUsageRatio;
+    }
+
+    struct CompoundUsageParams{
+        uint totalSupplied; // not balance
+        uint totalBorrowed;
+        uint slope1;
+        uint slope2;
+        uint base;
+        uint optimalLTV;
+        uint reserveFactor;
     }
 
     struct ProviderData{

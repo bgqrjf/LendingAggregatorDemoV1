@@ -24,7 +24,6 @@ describe("DepositLogic Tests", function () {
 
     // deploy Compound contracts
     let compContracts = await compound.deployContracts({token0: token0, usdt: usdt});
-    comptrollerLens = compContracts.comptrollerLens;
     comptroller = compContracts.comptroller;
     cToken0 = compContracts.cToken0;
     cUSDT = compContracts.cUSDT;
@@ -248,7 +247,7 @@ describe("DepositLogic Tests", function () {
         m.log("gas used:", receipt.gasUsed);
 
         let cTokenBalance = await token0.balanceOf(cToken0.address);
-        expect(cTokenBalance).to.equal("9500000003191840903339");
+        expect(cTokenBalance).to.equal("9500000000075102138900");
       });
 
       it ("should repay ETH to compound properly", async() => {
@@ -269,7 +268,7 @@ describe("DepositLogic Tests", function () {
         m.log("gas used:", receipt.gasUsed);
 
         let cTokenBalance = await provider.getBalance(cETH.address);
-        expect(cTokenBalance).to.equal("950000000009625590802");
+        expect(cTokenBalance).to.equal("950000000000025034046");
       })
     })
   });
