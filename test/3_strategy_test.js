@@ -152,11 +152,11 @@ describe("DepositLogic Tests", function () {
       m.log("compoundSupplyRate:", compoundSupplyRate);
 
       await token0.connect(supplier0).approve(pool.address, token0SupplyAmount);
-      let strategyForSupply = await strategy.getSupplyStrategy([providerAAVE.address, providerCompound.address], token0.address, token0SupplyAmount.div(1000).mul(95), router.address);
+      let strategyForSupply = await strategy.getSupplyStrategy([providerAAVE.address, providerCompound.address], token0.address, token0SupplyAmount.div(2000).mul(950), router.address);
       m.log("aave Supply:", strategyForSupply[0]);
       m.log("compound Supply:", strategyForSupply[1]);
 
-      let tx = await pool.supply(token0.address, supplier0.address, token0SupplyAmount.div(10), true);
+      let tx = await pool.supply(token0.address, supplier0.address, token0SupplyAmount.div(2), true);
       let receipt = await tx.wait();
       m.log("gas Used:", receipt.gasUsed);
 

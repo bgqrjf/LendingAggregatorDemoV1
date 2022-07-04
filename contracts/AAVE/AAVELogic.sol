@@ -168,8 +168,8 @@ contract AAVELogic is IProvider{
 
         if (borrow * Utils.MILLION > params.totalSupplied * params.optimalLTV){
             params.baseV += params.slopeV1;
-            params.slopeV2 = params.slopeV2 * Utils.MILLION.divCeil(params.maxExcessUsageRatio);
-            borrow = (params.totalSupplied * (_targetRate - params.baseV) * Utils.MILLION + params.optimalLTV * params.slopeV2).divCeil(Utils.MILLION * params.slopeV2);
+            params.slopeV2 = params.slopeV2 * Utils.MILLION / (params.maxExcessUsageRatio);
+            borrow = (params.totalSupplied * (_targetRate - params.baseV) * Utils.MILLION + params.optimalLTV * params.slopeV2) / (Utils.MILLION * params.slopeV2);
         }
 
         return int(borrow) - int(params.totalBorrowed);

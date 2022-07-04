@@ -153,11 +153,11 @@ contract CompoundLogic is IProvider{
             _targetRate = params.base;
         }
 
-        uint borrow = ((_targetRate - params.base) * params.totalSupplied).divCeil(params.slope1);
+        uint borrow = ((_targetRate - params.base) * params.totalSupplied) / (params.slope1);
 
         if (borrow * Utils.MILLION > params.totalSupplied * params.optimalLTV){
             params.base += params.optimalLTV * params.slope1 / Utils.MILLION;
-            borrow = (((_targetRate - params.base) * Utils.MILLION + params.optimalLTV * params.slope2 ) * params.totalSupplied).divCeil(params.slope2 * Utils.MILLION);
+            borrow = (((_targetRate - params.base) * Utils.MILLION + params.optimalLTV * params.slope2 ) * params.totalSupplied) / (params.slope2 * Utils.MILLION);
         }
 
         return int(borrow) - int(params.totalBorrowed);

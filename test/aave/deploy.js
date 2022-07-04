@@ -176,13 +176,59 @@ exports.deployContracts = async ({token0, usdt}) => {
       params: "0x",
     },
   ])
+
+  let ReservesSetupHelper = await ethers.getContractFactory("ReservesSetupHelper");
+  let reservesSetupHelper = await ReservesSetupHelper.deploy();
+
+  await ACLManager.addRiskAdmin(reservesSetupHelper.address)
   
-  await poolConfigurator.configureReserveAsCollateral(token0.address, 7500, 8000, 10500);
-  await poolConfigurator.configureReserveAsCollateral(wETH.address, 7500, 8000, 10500);
-  await poolConfigurator.configureReserveAsCollateral(usdt.address, 7500, 8000, 10500);
-  await poolConfigurator.setReserveBorrowing(token0.address, true);
-  await poolConfigurator.setReserveBorrowing(wETH.address, true);
-  await poolConfigurator.setReserveBorrowing(usdt.address, true);
+  await reservesSetupHelper.configureReserves(
+    poolConfigurator.address, 
+    [
+      {
+        asset: token0.address,
+        baseLTV: 7500,
+        liquidationThreshold: 8000,
+        liquidationBonus: 10500,
+        reserveFactor: 1000,
+        borrowCap: 0,
+        supplyCap: 0,
+        stableBorrowingEnabled: 1,
+        borrowingEnabled: 1
+      },
+      {
+        asset: wETH.address,
+        baseLTV: 7500,
+        liquidationThreshold: 8000,
+        liquidationBonus: 10500,
+        reserveFactor: 1000,
+        borrowCap: 0,
+        supplyCap: 0,
+        stableBorrowingEnabled: 1,
+        borrowingEnabled: 1
+      },
+      {
+        asset: usdt.address,
+        baseLTV: 7500,
+        liquidationThreshold: 8000,
+        liquidationBonus: 10500,
+        reserveFactor: 1000,
+        borrowCap: 0,
+        supplyCap: 0,
+        stableBorrowingEnabled: 1,
+        borrowingEnabled: 1
+      },
+    ]
+  )
+
+  await ACLManager.removeRiskAdmin(reservesSetupHelper.address);
+
+  // await poolConfigurator.configureReserveAsCollateral(token0.address, 7500, 8000, 10500);
+  // await poolConfigurator.configureReserveAsCollateral(wETH.address, 7500, 8000, 10500);
+  // await poolConfigurator.configureReserveAsCollateral(usdt.address, 7500, 8000, 10500);
+  // await poolConfigurator.setReserveBorrowing(token0.address, true);
+  // await poolConfigurator.setReserveBorrowing(wETH.address, true);
+  // await poolConfigurator.setReserveBorrowing(usdt.address, true);
 
   return {
     signer: deployer,
