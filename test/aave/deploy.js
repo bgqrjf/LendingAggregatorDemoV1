@@ -8,8 +8,6 @@ exports.deployContracts = async ({token0, usdt}) => {
   const borrowLogic = await BorrowLogic.deploy();
   const BridgeLogic = await ethers.getContractFactory(`BridgeLogic`);
   const bridgeLogic = await BridgeLogic.deploy();
-  const CalldataLogic = await ethers.getContractFactory(`CalldataLogic`);
-  const calldataLogic = await CalldataLogic.deploy();
   const ConfiguratorLogic = await ethers.getContractFactory(`ConfiguratorLogic`);
   const configuratorLogic = await ConfiguratorLogic.deploy();
   const EModeLogic = await ethers.getContractFactory(`EModeLogic`);
@@ -20,20 +18,12 @@ exports.deployContracts = async ({token0, usdt}) => {
     },
   });
   const flashLoanLogic = await FlashLoanLogic.deploy();
-  const GenericLogic = await ethers.getContractFactory(`GenericLogic`);
-  const genericLogic = await GenericLogic.deploy();
-  const IsolationModeLogic = await ethers.getContractFactory(`IsolationModeLogic`);
-  const isolationModeLogic = await IsolationModeLogic.deploy();
   const LiquidationLogic = await ethers.getContractFactory(`LiquidationLogic`);
   const liquidationLogic = await LiquidationLogic.deploy();
   const PoolLogic = await ethers.getContractFactory(`PoolLogic`);
   const poolLogic = await PoolLogic.deploy();
-  const ReserveLogic = await ethers.getContractFactory(`ReserveLogic`);
-  const reserveLogic = await ReserveLogic.deploy();
   const SupplyLogic = await ethers.getContractFactory(`SupplyLogic`);
   const supplyLogic = await SupplyLogic.deploy();
-  const ValidationLogic = await ethers.getContractFactory(`ValidationLogic`);
-  const validationLogic = await ValidationLogic.deploy();
 
   // deploy poolAddressProvider
   const PoolAddressesProvider = await ethers.getContractFactory(`PoolAddressesProvider`);
@@ -222,13 +212,6 @@ exports.deployContracts = async ({token0, usdt}) => {
   )
 
   await ACLManager.removeRiskAdmin(reservesSetupHelper.address);
-
-  // await poolConfigurator.configureReserveAsCollateral(token0.address, 7500, 8000, 10500);
-  // await poolConfigurator.configureReserveAsCollateral(wETH.address, 7500, 8000, 10500);
-  // await poolConfigurator.configureReserveAsCollateral(usdt.address, 7500, 8000, 10500);
-  // await poolConfigurator.setReserveBorrowing(token0.address, true);
-  // await poolConfigurator.setReserveBorrowing(wETH.address, true);
-  // await poolConfigurator.setReserveBorrowing(usdt.address, true);
 
   return {
     signer: deployer,
