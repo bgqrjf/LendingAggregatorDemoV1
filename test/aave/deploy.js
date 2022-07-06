@@ -54,7 +54,6 @@ exports.deployContracts = async ({token0, usdt}) => {
   // deploy pool proxy
   let txsetPool = await poolAddressesProvider.setPoolImpl(poolImplement.address);
   let txsetPoolReceipt = await txsetPool.wait();
-  // const InitializableImmutableAdminUpgradeabilityProxy = await ethers.getContractFactory(`InitializableImmutableAdminUpgradeabilityProxy`);
   const pool = poolImplement.attach("0x" + JSON.stringify(txsetPoolReceipt.logs[0].topics[2]).substring(27,67))
 
   // deploy pool Configurator Implementation

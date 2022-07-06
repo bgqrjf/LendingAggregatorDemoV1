@@ -7,7 +7,7 @@ interface IRouter{
     function addAsset(Types.NewAssetParams memory _newAsset) external returns (Types.Asset memory asset);
     function updateConfig(address _config) external;
     function updateFactory(address _factory) external;
-    function updateTreasury(address _treasury) external;
+    function updateVault(address _vault) external;
     function addProvider(address _provider) external;
     function removeProvider(uint _providerIndex, address _provider) external;
     function updatePriceOracle(address _priceOracle) external;

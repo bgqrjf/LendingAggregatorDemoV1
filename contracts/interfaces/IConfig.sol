@@ -8,10 +8,10 @@ interface IConfig{
     function setUserColletral(address _user, uint _config) external;
     function setUsingAsCollateral(address _account, uint256 _reserveIndex, bool _usingAsCollateral) external;
     function setBorrowing(address _account, uint256 _reserveIndex, bool _borrowing) external;
-    function setTreasuryRatio(uint _treasuryRatio) external ;
+    function setVaultRatio(uint _vaultRatio) external ;
 
     // external state-getters
-    function treasuryRatio() external view returns(uint);
+    function vaultRatio() external view returns(uint);
     function borrowConfigs(address) external view returns(Types.BorrowConfig memory);
     function userDebtAndCollateral(address) external view returns(uint);
 

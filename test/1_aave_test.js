@@ -56,7 +56,7 @@ describe("DepositLogic Tests", function () {
 
 
     let Router = await ethers.getContractFactory("Router");
-    router = await Router.deploy([providerAAVE.address], priceOracle.address, strategy.address, factory.address, 50000); // set TreasuryRatio to 5%
+    router = await Router.deploy([providerAAVE.address], priceOracle.address, strategy.address, factory.address, 50000); // set VaultRatio to 5%
     await router.addAsset({
       underlying: token0.address, 
       decimals: 18, 
@@ -112,79 +112,99 @@ describe("DepositLogic Tests", function () {
   describe("AAVE tests", function (){
     describe("supply tests", function(){
       it("should supply ERC20 properly", async() =>{
-        await token0.mint(supplier0.address, 1000000);
-        await token0.connect(supplier0).approve(pool.address, 1000000);
-        let tx = await pool.supply(token0.address, supplier0.address, 1000000, true);
+        let token0SupplyAmount = 1000000;
+        await token0.mint(supplier0.address, token0SupplyAmount);
+        await token0.connect(supplier0).approve(pool.address, token0SupplyAmount);
+        let tx = await pool.supply(token0.address, supplier0.address, token0SupplyAmount, true);
         let receipt = await tx.wait();
+        m.log(`supplied ${token0SupplyAmount} token0 for supplier0`)
         m.log("gas used:",receipt.gasUsed);
 
         // check underlying flow
         let routerBalance = await token0.balanceOf(router.address);
+        m.log("routerBalance:", routerBalance)
         expect(routerBalance).to.equal(0);
 
-        let treasury = await router.treasury();
-        let treasuryBalance = await token0.balanceOf(treasury);
-        expect(treasuryBalance).to.equal(50000);
+        let vault = await router.vault();
+        let vaultBalance = await token0.balanceOf(vault);
+        m.log("vaultBalance:", vaultBalance)
+        expect(vaultBalance).to.equal(50000);
 
         let reserve = await aPool.getReserveData(token0.address);
         let aPoolBalance = await token0.balanceOf(reserve.aTokenAddress);
+        m.log("aPoolBalance:", aPoolBalance)
         expect(aPoolBalance).to.equal(950000);
 
         // check sToken
         let asset = await router.assets(token0.address);
         let sToken = await ethers.getContractAt("SToken", asset.sToken);
         let sTokenBalance = await sToken.balanceOf(supplier0.address)
+        m.log("sTokenBalance:", sTokenBalance)
         expect(sTokenBalance).to.equal(1000000);
 
         let aToken0 = await ethers.getContractAt("AToken", reserve.aTokenAddress)
         let routerAToken0Balance = await aToken0.balanceOf(router.address);
+        m.log("routerAToken0Balance:", routerAToken0Balance)
         expect(routerAToken0Balance).to.equal(950000);
       });
 
       it("should supply ETH properly", async() =>{
-        let tx = await pool.supplyETH(supplier0.address, true, {value: 1000000});
+        let ethSupplyAmount = 1000000;
+        let tx = await pool.supplyETH(supplier0.address, true, {value: ethSupplyAmount});
         let receipt = await tx.wait();
+        m.log(`supplied ${ethSupplyAmount} eth for supplier0`)
         m.log("gas used:",receipt.gasUsed);
 
         let routerBalance = await provider.getBalance(router.address)
+        m.log("routerBalance:", routerBalance)
         expect(routerBalance).to.equal(0);
 
-        let treasury = await router.treasury();
-        let treasuryBalance = await provider.getBalance(treasury);
-        expect(treasuryBalance).to.equal(50000);
+        let vault = await router.vault();
+        let vaultBalance = await provider.getBalance(vault);
+        m.log("vaultBalance:", vaultBalance)
+        expect(vaultBalance).to.equal(50000);
 
         let reserve = await aPool.getReserveData(wETH.address);
         let aPoolBalance = await wETH.balanceOf(reserve.aTokenAddress);
+        m.log("aPoolBalance:", aPoolBalance)
         expect(aPoolBalance).to.equal(950000);
 
         let asset = await router.assets(ETHAddress);
         let sToken = await ethers.getContractAt("SToken", asset.sToken);
         let sTokenBalance = await sToken.balanceOf(supplier0.address)
+        m.log("sTokenBalance:", sTokenBalance)
         expect(sTokenBalance).to.equal(1000000);
 
         let aWETH = await ethers.getContractAt("AToken", reserve.aTokenAddress)
         let routerAWETHBalance = await aWETH.balanceOf(router.address);
+        m.log("routerAWETHBalance:", routerAWETHBalance)
         expect(routerAWETHBalance).to.equal(950000);
       });
 
       it("should supply twice properly", async() =>{
-        await token0.mint(supplier0.address, 2000000);
-        await token0.connect(supplier0).approve(pool.address, 2000000);
-        await pool.supply(token0.address, supplier0.address, 1000000, true);
-        let tx = await pool.supply(token0.address, supplier1.address, 1000000, false);
+        let token0SupplyAmount = 1000000;
+        await token0.mint(supplier0.address, token0SupplyAmount * 2 );
+        await token0.connect(supplier0).approve(pool.address,  token0SupplyAmount * 2);
+        await pool.supply(token0.address, supplier0.address, token0SupplyAmount, true);
+        m.log(`supplied ${token0SupplyAmount} token0 for supplier0`)
+        let tx = await pool.supply(token0.address, supplier1.address, token0SupplyAmount, false);
+        m.log(`supplied ${token0SupplyAmount} token0 for supplier1`)
         let receipt = await tx.wait();
         m.log("gas used:",receipt.gasUsed);
 
         // check underlying flow
         let routerBalance = await token0.balanceOf(router.address);
+        m.log("routerBalance:", routerBalance)
         expect(routerBalance).to.equal(0);
 
-        let treasury = await router.treasury();
-        let treasuryBalance = await token0.balanceOf(treasury);
-        expect(treasuryBalance).to.equal(100000);
+        let vault = await router.vault();
+        let vaultBalance = await token0.balanceOf(vault);
+        m.log("vaultBalance:", vaultBalance)
+        expect(vaultBalance).to.equal(100000);
 
         let reserve = await aPool.getReserveData(token0.address);
         let aPoolBalance = await token0.balanceOf(reserve.aTokenAddress);
+        m.log("aPoolBalance:", aPoolBalance)
         expect(aPoolBalance).to.equal(1900000);
 
         // check sToken
@@ -192,11 +212,14 @@ describe("DepositLogic Tests", function () {
         let sToken = await ethers.getContractAt("SToken", asset.sToken);
         let sTokenBalance0 = await sToken.balanceOf(supplier0.address)
         let sTokenBalance1 = await sToken.balanceOf(supplier1.address)
+        m.log("sTokenBalance for supplier0:", sTokenBalance0)
+        m.log("sTokenBalance for supplier1:", sTokenBalance1)
         expect(sTokenBalance0).to.equal(1000000);
         expect(sTokenBalance1).to.equal(1000000);
 
         let aToken0 = await ethers.getContractAt("AToken", reserve.aTokenAddress)
         let routerAToken0Balance = await aToken0.balanceOf(router.address);
+        m.log("routerAToken0Balance:", routerAToken0Balance)
         expect(routerAToken0Balance).to.equal(1900000);
 
         let MockLibraryTest = await ethers.getContractFactory("MockLibraryTest");
@@ -205,10 +228,12 @@ describe("DepositLogic Tests", function () {
 
         let bitMap0 = await config.userDebtAndCollateral(supplier0.address);
         let collateralable0 = await mockLibraryTest.isUsingAsCollateral(bitMap0, asset.index);
+        m.log("collateralable for suplier0:", collateralable0)
         expect(collateralable0).to.equal(true);
 
         let bitMap1 = await config.userDebtAndCollateral(supplier1.address);
         let collateralable1 = await mockLibraryTest.isUsingAsCollateral(bitMap1, asset.index);
+        m.log("collateralable for supplier1:", collateralable1)
         expect(collateralable1).to.equal(false);
       });
     });
@@ -219,69 +244,87 @@ describe("DepositLogic Tests", function () {
         await token0.mint(supplier0.address, token0Amount);
         await token0.connect(supplier0).approve(pool.address, token0Amount);
         await pool.supply(token0.address, supplier0.address, token0Amount, true);
+        m.log(`supplied ${token0Amount} token0 for supplier0`)
 
         let asset = await router.assets(token0.address);
         let sToken = await ethers.getContractAt("SToken", asset.sToken);
-        let tx = await sToken.withdraw(supplier1.address, (await sToken.balanceOf(supplier0.address)).div(10), false);
+        let withdrawAmount = (await sToken.balanceOf(supplier0.address)).div(10)
+        let tx = await sToken.withdraw(supplier1.address, withdrawAmount, false);
+        m.log(`withdraw ${withdrawAmount} token0 for supplier0`)
         let receipt = await tx.wait();
         m.log("gas used:",receipt.gasUsed);
 
         let amountReceived = await token0.balanceOf(supplier1.address);
+        m.log("amountReceived", amountReceived)
         expect(amountReceived).to.equal("100000000000000000")
 
         // check underlying flow
         let routerBalance = await token0.balanceOf(router.address);
+        m.log("routerBalance", routerBalance)
         expect(routerBalance).to.equal(0);
 
-        let treasury = await router.treasury();
-        let treasuryBalance = await token0.balanceOf(treasury);
-        expect(treasuryBalance).to.equal(0);
+        let vault = await router.vault();
+        let vaultBalance = await token0.balanceOf(vault);
+        m.log("vaultBalance", vaultBalance)
+        expect(vaultBalance).to.equal(0);
 
         let reserve = await aPool.getReserveData(token0.address);
         let aPoolBalance = await token0.balanceOf(reserve.aTokenAddress);
+        m.log("aPoolBalance", aPoolBalance)
         expect(aPoolBalance).to.equal("900000000000000000");
 
         // check sToken
         let sTokenBalance = await sToken.balanceOf(supplier0.address)
+        m.log("sTokenBalance", sTokenBalance)
         expect(sTokenBalance).to.equal("900000000000000000");
 
         let aToken0 = await ethers.getContractAt("AToken", reserve.aTokenAddress)
         let routerAToken0Balance = await aToken0.balanceOf(router.address);
+        m.log("routerAToken0Balance", routerAToken0Balance)
         expect(routerAToken0Balance).to.equal("900000000000000000");
       });
 
       it("should withdraw ETH properly", async() =>{
         let wethAmount =  ethers.BigNumber.from("1000000000000000000");
         await pool.supplyETH(supplier0.address, true, {value: wethAmount});
+        m.log(`supplied ${wethAmount} token0 for supplier0`)
 
         let asset = await router.assets(ETHAddress);
         let sToken = await ethers.getContractAt("SToken", asset.sToken);
         let supplier1balance0 = await provider.getBalance(supplier1.address);
-        let tx = await sToken.withdraw(supplier1.address, wethAmount.div(10), false);
+        let withdrawAmount = wethAmount.div(10)
+        let tx = await sToken.withdraw(supplier1.address, withdrawAmount, false);
+        m.log(`withdraw ${withdrawAmount} token0 for supplier0`)
         let receipt = await tx.wait();
         m.log("gas used:",receipt.gasUsed);
 
         let supplier1balance1 = await provider.getBalance(supplier1.address);
+        m.log("supplier1 received", supplier1balance1.sub(supplier1balance0))
         expect(supplier1balance1.sub(supplier1balance0)).to.equal("100000000000000000")
 
         // check underlying flow
         let routerBalance = await provider.getBalance(router.address);
+        m.log("routerBalance", routerBalance)
         expect(routerBalance).to.equal(0);
 
-        let treasury = await router.treasury();
-        let treasuryBalance = await provider.getBalance(treasury);
-        expect(treasuryBalance).to.equal(0);
+        let vault = await router.vault();
+        let vaultBalance = await provider.getBalance(vault);
+        m.log("vaultBalance", vaultBalance)
+        expect(vaultBalance).to.equal(0);
 
         let reserve = await aPool.getReserveData(wETH.address);
         let aPoolBalance = await wETH.balanceOf(reserve.aTokenAddress);
+        m.log("aPoolBalance", aPoolBalance)
         expect(aPoolBalance).to.equal("900000000000000000");
 
         // check sToken
         let sTokenBalance = await sToken.balanceOf(supplier0.address)
+        m.log("sTokenBalance", sTokenBalance)
         expect(sTokenBalance).to.equal("900000000000000000");
 
         let aWETH = await ethers.getContractAt("AToken", reserve.aTokenAddress)
         let routeraWETHBalance = await aWETH.balanceOf(router.address);
+        m.log("routeraWETHBalance", routeraWETHBalance)
         expect(routeraWETHBalance).to.equal("900000000000000000");
       });
 
@@ -290,37 +333,48 @@ describe("DepositLogic Tests", function () {
         await token0.mint(supplier0.address, token0Amount);
         await token0.connect(supplier0).approve(pool.address, token0Amount);
         await pool.supply(token0.address, supplier0.address, token0Amount, true);
+        m.log(`supplied ${token0Amount} token0 for supplier0`)
 
         let asset = await router.assets(token0.address);
         let sToken = await ethers.getContractAt("SToken", asset.sToken);
-        await sToken.withdraw(supplier1.address, token0Amount.div(10), false);
-        let tx = await sToken.withdraw(supplier0.address, token0Amount.div(10), false);
+        let withdrawAmount = token0Amount.div(10)
+        await sToken.withdraw(supplier1.address, withdrawAmount, false);
+        m.log(`withdraw ${withdrawAmount} token0 for supplier0`)
+        let tx = await sToken.withdraw(supplier0.address, withdrawAmount, false);
+        m.log(`withdraw ${withdrawAmount} token0 for supplier0`)
         let receipt = await tx.wait();
         m.log("gas used:",receipt.gasUsed);
 
         let amountReceived0 = await token0.balanceOf(supplier0.address);
+        m.log("amountReceived0", amountReceived0)
         expect(amountReceived0).to.equal("100000000000000000")
         let amountReceived1 = await token0.balanceOf(supplier1.address);
+        m.log("amountReceived1", amountReceived1)
         expect(amountReceived1).to.equal("100000000000000000")
 
         // check underlying flow
         let routerBalance = await token0.balanceOf(router.address);
+        m.log("routerBalance", routerBalance)
         expect(routerBalance).to.equal(0);
 
-        let treasury = await router.treasury();
-        let treasuryBalance = await token0.balanceOf(treasury);
-        expect(treasuryBalance).to.equal(0);
+        let vault = await router.vault();
+        let vaultBalance = await token0.balanceOf(vault);
+        m.log("vaultBalance", vaultBalance)
+        expect(vaultBalance).to.equal(0);
 
         let reserve = await aPool.getReserveData(token0.address);
         let aPoolBalance = await token0.balanceOf(reserve.aTokenAddress);
+        m.log("aPoolBalance", aPoolBalance)
         expect(aPoolBalance).to.equal("800000000000000000");
 
         // check sToken
         let sTokenBalance = await sToken.balanceOf(supplier0.address)
+        m.log("sTokenBalance", sTokenBalance)
         expect(sTokenBalance).to.equal("800000000000000000");
 
         let aToken0 = await ethers.getContractAt("AToken", reserve.aTokenAddress)
         let routerAToken0Balance = await aToken0.balanceOf(router.address);
+        m.log("routerAToken0Balance", routerAToken0Balance)
         expect(routerAToken0Balance).to.equal("800000000000000000");
       });
     });
@@ -331,6 +385,7 @@ describe("DepositLogic Tests", function () {
         await token0.mint(supplier0.address, token0SupplyAmount);
         await token0.connect(supplier0).approve(pool.address, token0SupplyAmount);
         await pool.supply(token0.address, supplier0.address, token0SupplyAmount, false);
+        m.log(`supplied ${token0SupplyAmount} token0 for supplier0`)
 
         let usdtColletralAmount = 10000000000 // 10000 usdt
         await usdt.mint(borrower0.address, usdtColletralAmount);
@@ -371,6 +426,7 @@ describe("DepositLogic Tests", function () {
         await usdt.mint(borrower0.address, usdtColletralAmount);
         await usdt.connect(borrower0).approve(pool.address, usdtColletralAmount);
         await pool.connect(borrower0).supply(usdt.address, borrower0.address, usdtColletralAmount, true);     
+        m.log(`supplied ${usdtColletralAmount} usdt for supplier0`)
         let assetToBorrow = await router.assets(ETHAddress);
         let dToken = await ethers.getContractAt("DToken", assetToBorrow.dToken);
 
@@ -404,6 +460,7 @@ describe("DepositLogic Tests", function () {
         await token0.mint(supplier0.address, token0SupplyAmount);
         await token0.connect(supplier0).approve(pool.address, token0SupplyAmount);
         await pool.supply(token0.address, supplier0.address, token0SupplyAmount, false);
+        m.log(`supplied ${token0SupplyAmount} token0 for supplier0`)
 
         let usdtColletralAmount = 10000000000 // 10000 usdt
         await usdt.mint(borrower0.address, usdtColletralAmount);
@@ -445,6 +502,7 @@ describe("DepositLogic Tests", function () {
         await token0.mint(supplier0.address, token0SupplyAmount);
         await token0.connect(supplier0).approve(pool.address, token0SupplyAmount);
         await pool.supply(token0.address, supplier0.address, token0SupplyAmount, false);
+        m.log(`supplied ${token0SupplyAmount} token0 for supplier0`)
 
         let usdtColletralAmount = 10000000000 // 10000 usdt
         await usdt.mint(borrower0.address, usdtColletralAmount);
@@ -485,7 +543,9 @@ describe("DepositLogic Tests", function () {
         let usdtColletralAmount = 20000000000 // 20000 usdt
         await usdt.mint(borrower0.address, usdtColletralAmount);
         await usdt.connect(borrower0).approve(pool.address, usdtColletralAmount);
-        await pool.connect(borrower0).supply(usdt.address, borrower0.address, usdtColletralAmount, true);     
+        await pool.connect(borrower0).supply(usdt.address, borrower0.address, usdtColletralAmount, true);    
+        m.log(`supplied ${usdtColletralAmount} token0 for supplier0`)
+
         let assetToBorrow = await router.assets(ETHAddress);
         let dToken = await ethers.getContractAt("DToken", assetToBorrow.dToken);
 
@@ -497,6 +557,7 @@ describe("DepositLogic Tests", function () {
         m.log("gas used:", receipt.gasUsed);
 
         let routerBalance = await provider.getBalance(router.address);
+        m.log("routerBalance:", routerBalance)
         expect(routerBalance).to.equal(0);
 
         let reserve = await aPool.getReserveData(wETH.address);
@@ -517,6 +578,7 @@ describe("DepositLogic Tests", function () {
         await token0.mint(supplier0.address, token0SupplyAmount);
         await token0.connect(supplier0).approve(pool.address, token0SupplyAmount);
         await pool.supply(token0.address, supplier0.address, token0SupplyAmount, false);
+        m.log(`supplied ${token0SupplyAmount} token0 for supplier0`)
 
         let usdtColletralAmount = 10000000000 // 10000 usdt
         await usdt.mint(borrower0.address, usdtColletralAmount);

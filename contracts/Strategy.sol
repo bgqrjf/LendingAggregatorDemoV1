@@ -14,29 +14,36 @@ contract Strategy is IStrategy{
     }
 
     function getSupplyStrategy(address[] memory _providers, address _underlying, uint _amount, address _for) external view override returns (uint[] memory amounts){
-        uint providerCount = _providers.length;
-        amounts = new uint[](providerCount);
+        Types.StrategyParams memory params;
+        params.providers = _providers;
+        params.usageParams = new bytes[](params.providers.length);
+
+        amounts = new uint[](params.providers.length);
         uint maxRate;
         uint minSupplyAmount;
-        bytes[] memory usageParams = new bytes[](providerCount);
 
-        for (uint i = 0; i < providerCount && _amount > minSupplyAmount; i++){
-            usageParams[i] = IProvider(_providers[i]).getUsageParams(_underlying);
+        for (uint i = 0; i < params.providers.length && _amount > minSupplyAmount; i++){
+            params.usageParams[i] = IProvider(_providers[i]).getUsageParams(_underlying);
 
             amounts[i] = Utils.minOf(_amount - minSupplyAmount, minSupplyNeeded(_providers[i], _underlying, _for));
             minSupplyAmount += amounts[i];
 
             uint rate = IProvider(_providers[i]).getCurrentSupplyRate(_underlying);
             if (rate > maxRate){
+                params.targetRate0 = maxRate;
                 maxRate = rate;
+                params.targetIndex = i;
+            }else if (rate > params.targetRate0){
+                params.targetRate0 = rate;
             }
         }
 
         if (_amount > minSupplyAmount){
-            uint[] memory strategyAmounts = StrategyCalculations.calculateAmountsToSupply(_amount - minSupplyAmount, maxRate, _providers, usageParams);
+            params.targetAmount = _amount - minSupplyAmount;
 
+            uint[] memory strategyAmounts = StrategyCalculations.calculateAmountsToSupply(maxRate, params);
             if (minSupplyAmount > 0){
-                for (uint i = 0; i < providerCount; i++){
+                for (uint i = 0; i < params.providers.length; i++){
                     amounts[i] += strategyAmounts[i];
                 }
             }else{
@@ -46,80 +53,102 @@ contract Strategy is IStrategy{
     }
 
     function getWithdrawStrategy(address[] memory _providers, address _underlying, uint _amount, address _for) external view override returns (uint[] memory amounts){
-        uint providerCount = _providers.length;
-        amounts = new uint[](providerCount);
+        Types.StrategyParams memory params;
+        params.providers = _providers;
+        params.targetAmount = _amount;
+        params.usageParams = new bytes[](params.providers.length);
+        
+        amounts = new uint[](params.providers.length);
         uint minRate = Utils.MAX_UINT32;
         uint maxWithdrawAmount;
-        bytes[] memory usageParams = new bytes[](providerCount);
 
-        for (uint i = 0; i < providerCount; i++){
-            usageParams[i] = IProvider(_providers[i]).getUsageParams(_underlying);
+        for (uint i = 0; i < params.providers.length; i++){
+            params.usageParams[i] = IProvider(_providers[i]).getUsageParams(_underlying);
 
             amounts[i] = maxWithdrawAllowed(_providers[i], _underlying, _for);
             maxWithdrawAmount += amounts[i];
 
             uint rate = IProvider(_providers[i]).getCurrentSupplyRate(_underlying);
             if (rate < minRate){
+                params.targetRate0 = minRate;
                 minRate = rate;
+                params.targetIndex = i;
+            }else if (rate < params.targetRate0){
+                params.targetRate0 = rate;
             }
         }
 
         require(maxWithdrawAmount >= _amount, "Strategy: insufficient balance");
 
-        amounts = StrategyCalculations.calculateAmountsToWithdraw(_amount, minRate, _providers, usageParams, amounts);
+        amounts = StrategyCalculations.calculateAmountsToWithdraw(minRate, amounts, params);
     }
 
     function getBorrowStrategy(address[] memory _providers, address _underlying, uint _amount, address _for) external view override returns (uint[] memory amounts){
-        uint providerCount = _providers.length;
-        amounts = new uint[](providerCount);
+        Types.StrategyParams memory params;
+        params.providers = _providers;
+        params.targetAmount = _amount;
+        params.usageParams = new bytes[](params.providers.length);
+        
+        amounts = new uint[](params.providers.length);
         uint minRate = Utils.MAX_UINT32;
         uint maxBorrowAmount;
-        bytes[] memory usageParams = new bytes[](providerCount);
 
-        for (uint i = 0; i < providerCount; i++){
-            usageParams[i] = IProvider(_providers[i]).getUsageParams(_underlying);
+        for (uint i = 0; i < params.providers.length; i++){
+            params.usageParams[i] = IProvider(_providers[i]).getUsageParams(_underlying);
 
             amounts[i] = maxBorrowAllowed(_providers[i], _underlying, _for);
             maxBorrowAmount += amounts[i];
 
             uint rate = IProvider(_providers[i]).getCurrentBorrowRate(_underlying);
             if (rate < minRate){
+                params.targetRate0 = minRate;
                 minRate = rate;
+                params.targetIndex = i;
+            }else if (rate < params.targetRate0){
+                params.targetRate0 = rate;
             }
         }
 
         require(maxBorrowAmount >= _amount, "Strategy: insufficient balance");
 
-        amounts = StrategyCalculations.calculateAmountsToBorrow(_amount, minRate, _providers, usageParams, amounts);
+        amounts = StrategyCalculations.calculateAmountsToBorrow(minRate, amounts, params);
     }
 
     function getRepayStrategy(address[] memory _providers, address _underlying, uint _amount, address _for) external view override returns (uint[] memory amounts){
-        uint providerCount = _providers.length;
-        amounts = new uint[](providerCount);
+        Types.StrategyParams memory params;
+        params.providers = _providers;
+        params.targetAmount = _amount;
+        params.usageParams = new bytes[](params.providers.length);
+        
+        amounts = new uint[](params.providers.length);
+        uint[] memory maxAmountsToRepay = new uint[](params.providers.length);
         uint maxRate;
+        
         uint minRepayAmount;
-        bytes[] memory usageParams = new bytes[](providerCount);
-        uint[] memory maxAmountsToRepay = new uint[](providerCount);
+        for (uint i = 0; i < params.providers.length && _amount > params.providers.length; i++){
+            params.usageParams[i] = IProvider(_providers[i]).getUsageParams(_underlying);
 
-        for (uint i = 0; i < providerCount && _amount > minRepayAmount; i++){
-            usageParams[i] = IProvider(_providers[i]).getUsageParams(_underlying);
-
-            amounts[i] = Utils.minOf(_amount - minRepayAmount, minRepayNeeded(_providers[i], _underlying, _for));
+            amounts[i] = Utils.minOf(_amount - params.providers.length, minRepayNeeded(_providers[i], _underlying, _for));
             minRepayAmount += amounts[i];
 
             maxAmountsToRepay[i] = IProvider(_providers[i]).debtOf(_underlying, msg.sender);
 
             uint rate = IProvider(_providers[i]).getCurrentBorrowRate(_underlying);
             if (rate > maxRate){
+                params.targetRate0 = maxRate;
                 maxRate = rate;
+                params.targetIndex = i;
+            }else if (rate > params.targetRate0){
+                params.targetRate0 = rate;
             }
         }
 
-        if (_amount > minRepayAmount){
-            uint[] memory strategyAmounts = StrategyCalculations.calculateAmountsToRepay(_amount - minRepayAmount, maxRate, _providers, usageParams, maxAmountsToRepay);
+        if (_amount > params.providers.length){
+            uint[] memory strategyAmounts = StrategyCalculations.calculateAmountsToRepay(maxRate, maxAmountsToRepay, params);
 
-            if (minRepayAmount > 0){
-                for (uint i = 0; i < providerCount; i++){
+
+            if (params.providers.length > 0){
+                for (uint i = 0; i < params.providers.length; i++){
                     amounts[i] += strategyAmounts[i];
                 }
             }else{

@@ -6,7 +6,7 @@ import "./interfaces/IPriceOracle.sol";
 import "./interfaces/IStrategy.sol";
 import "./interfaces/IFactory.sol";
 import "./interfaces/IConfig.sol";
-import "./interfaces/ITreasury.sol";
+import "./interfaces/IVault.sol";
 import "./interfaces/IRouter.sol";
 import "./interfaces/IWETH.sol";
 
@@ -22,7 +22,7 @@ contract Router is IRouter, Ownable{
     IConfig public config;
     IPriceOracle public priceOracle;
     IStrategy public strategy;
-    ITreasury public treasury;
+    IVault public vault;
     IFactory public factory;
 
     address[] public underlyings;
@@ -38,13 +38,13 @@ contract Router is IRouter, Ownable{
     event AmountsBorrowed(address indexed borrower, address indexed underlying, uint amount, address[] borrowedFrom, uint[] amounts);
     event AmountsRepayed(address indexed borrower, address indexed underlying, uint amount, address[] repayedTo, uint[] amounts);
 
-    constructor(address[] memory _providers, address _priceOracle, address _strategy, address _factory, uint _treasuryRatio){
+    constructor(address[] memory _providers, address _priceOracle, address _strategy, address _factory, uint _vaultRatio){
         factory = IFactory(_factory);
         priceOracle = IPriceOracle(_priceOracle);
         strategy = IStrategy(_strategy);
 
-        config = IConfig(IFactory(_factory).newConfig(msg.sender, _treasuryRatio));
-        treasury = ITreasury(IFactory(_factory).newTreasury());
+        config = IConfig(IFactory(_factory).newConfig(msg.sender, _vaultRatio));
+        vault = IVault(IFactory(_factory).newVault());
 
         providers = _providers;
     }
@@ -69,8 +69,8 @@ contract Router is IRouter, Ownable{
         factory = IFactory(_factory);
     }
 
-    function updateTreasury(address _treasury) external override onlyOwner{
-        treasury = ITreasury(_treasury);
+    function updateVault(address _vault) external override onlyOwner{
+        vault = IVault(_vault);
     }
 
     function addProvider(address _provider) external override onlyOwner{
@@ -153,9 +153,9 @@ contract Router is IRouter, Ownable{
         }
 
         // supply to provider
-        uint amountSuppliedToTreasury = supplyToTreasury(_underlying, amount, uTokenSupplied);
-        if (amount > amountSuppliedToTreasury){
-            uint[] memory amounts = strategy.getSupplyStrategy(supplyTo, _underlying, amount - amountSuppliedToTreasury, address(this));
+        uint amountSuppliedToVault = supplyToVault(_underlying, amount, uTokenSupplied);
+        if (amount > amountSuppliedToVault){
+            uint[] memory amounts = strategy.getSupplyStrategy(supplyTo, _underlying, amount - amountSuppliedToVault, address(this));
             for (uint i = 0; i < supplyTo.length; i++){
                 if (amounts[i] > 0){
                     Types.ProviderData memory data = IProvider(supplyTo[i]).getSupplyData(_underlying, amounts[i]);
@@ -201,9 +201,9 @@ contract Router is IRouter, Ownable{
         _assets[_underlying].sReserve = sTokenSupply;
 
         uint amount = (asset.sReserve - sTokenSupply) * uTokenSupplied / asset.sReserve;
-        uint amountWithdrawedFromTreasury = withdrawFromTreasury(_underlying, _to, amount);
-        if (amount > amountWithdrawedFromTreasury){
-            uint[] memory amounts = strategy.getWithdrawStrategy(withdrawFrom, _underlying, amount - amountWithdrawedFromTreasury, address(this));
+        uint amountWithdrawedFromVault = withdrawFromVault(_underlying, _to, amount);
+        if (amount > amountWithdrawedFromVault){
+            uint[] memory amounts = strategy.getWithdrawStrategy(withdrawFrom, _underlying, amount - amountWithdrawedFromVault, address(this));
             for (uint i = 0; i < withdrawFrom.length; i++){
                 if (amounts[i] > 0){
                     Types.ProviderData memory data = IProvider(withdrawFrom[i]).getWithdrawData(_underlying, amounts[i]);
@@ -216,7 +216,7 @@ contract Router is IRouter, Ownable{
             
             uint balance = TransferHelper.balanceOf(_underlying, address(this));
             TransferHelper.transfer(_underlying, _to, balance);
-            emit AmountsWithdrawed(_from, _underlying, balance + amountWithdrawedFromTreasury, withdrawFrom, amounts);
+            emit AmountsWithdrawed(_from, _underlying, balance + amountWithdrawedFromVault, withdrawFrom, amounts);
         }else{
             emit AmountWithdrawed(_from, _underlying, amount);
         }
@@ -328,7 +328,7 @@ contract Router is IRouter, Ownable{
         for (uint i = 0; i < providersCopy.length; i++){
             amount += IProvider(providersCopy[i]).supplyOf(_underlying, address(this));
         }
-        amount += TransferHelper.balanceOf(_underlying, address(treasury));
+        amount += TransferHelper.balanceOf(_underlying, address(vault));
     }
 
     function totalDebts(address _underlying) public view override returns (uint amount){
@@ -378,7 +378,6 @@ contract Router is IRouter, Ownable{
             for (uint i = 0; i < underlyingsCache.length; i++){
                 Types.Asset memory asset = _assets[underlyingsCache[i]];
                 if (UserAssetBitMap.isBorrowing(userConfig, asset.index)){
-                    revert("debug");
                     uint borrowingValue = priceOracle.valueOfAsset(
                         underlyingsCache[i],
                         _quote,
@@ -412,18 +411,18 @@ contract Router is IRouter, Ownable{
         return providers;
     }
 
-    // transfer to treasury
-    function supplyToTreasury(address _underlying, uint _amount, uint _totalSupplied) internal returns (uint amountToTreasury){
-        uint amountDesired = (_totalSupplied + _amount) * config.treasuryRatio() / Utils.MILLION;
-        uint balance = TransferHelper.balanceOf(_underlying, address(treasury));
+    // transfer to vault
+    function supplyToVault(address _underlying, uint _amount, uint _totalSupplied) internal returns (uint amountToVault){
+        uint amountDesired = (_totalSupplied + _amount) * config.vaultRatio() / Utils.MILLION;
+        uint balance = TransferHelper.balanceOf(_underlying, address(vault));
         if (balance < amountDesired){
-            amountToTreasury = Utils.minOf(_amount,  amountDesired - balance);
-            TransferHelper.transfer(_underlying, address(treasury), amountToTreasury);
+            amountToVault = Utils.minOf(_amount,  amountDesired - balance);
+            TransferHelper.transfer(_underlying, address(vault), amountToVault);
         }
     }
 
-    function withdrawFromTreasury(address _underlying, address _to, uint _amount) internal returns (uint amountFromTreasury){
-        amountFromTreasury = Utils.minOf(TransferHelper.balanceOf(_underlying, address(treasury)), _amount);
-        treasury.withdraw(_underlying, _to, amountFromTreasury);
+    function withdrawFromVault(address _underlying, address _to, uint _amount) internal returns (uint amountFromVault){
+        amountFromVault = Utils.minOf(TransferHelper.balanceOf(_underlying, address(vault)), _amount);
+        vault.withdraw(_underlying, _to, amountFromVault);
     }
 }

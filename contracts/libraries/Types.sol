@@ -69,4 +69,12 @@ library Types{
         address payable weth;
         bytes encodedData;
     }
+
+    struct StrategyParams{
+        uint targetAmount;
+        uint targetRate0;
+        uint targetIndex;
+        bytes[] usageParams;
+        address[] providers;
+    }
 }

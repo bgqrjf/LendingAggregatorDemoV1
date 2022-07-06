@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.14;
 
-import "./interfaces/ITreasury.sol";
+import "./interfaces/IVault.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./libraries/TransferHelper.sol";
 
-contract Treasury is ITreasury, Ownable{
+contract Vault is IVault, Ownable{
 
     constructor(address _owner){
         _transferOwnership(_owner);

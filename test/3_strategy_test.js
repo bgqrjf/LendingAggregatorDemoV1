@@ -4,7 +4,7 @@ const aave = require("./aave/deploy");
 const compound = require("./compound/deploy");
 const m = require('mocha-logger');
 
-describe("DepositLogic Tests", function () {
+describe("Strategy Tests", function () {
   const provider = waffle.provider;
   const ETHAddress = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
   let token0;
@@ -29,6 +29,8 @@ describe("DepositLogic Tests", function () {
   let supplier1;
   let borrower0;
   let borrower1;
+
+  let token0SupplyAmount
 
   beforeEach(async () =>{
     const ERC20Token = await ethers.getContractFactory(`MockERC20`);
@@ -127,37 +129,48 @@ describe("DepositLogic Tests", function () {
     pool = await Pool.deploy(router.address);
     
     [supplier0, supplier1, borrower0, borrower1] = await ethers.getSigners();
+
+    token0SupplyAmount = new ethers.BigNumber.from("1000000000000000000000000"); // 1000000 
+      
+    await token0.mint(supplier0.address, token0SupplyAmount.mul(3));
+
+    await token0.approve(aPool.address, token0SupplyAmount);
+    await aPool.supply(token0.address, token0SupplyAmount, supplier0.address, 0);
+    m.log(`supplied ${token0SupplyAmount} token0 to AAVE directly`)
+
+    await aPool.setUserUseReserveAsCollateral(token0.address, true);
+    m.log(`set token0 as collateral asset`)
+
+    let borrowAmount = token0SupplyAmount.div(10).mul(5);
+    await aPool.borrow(token0.address, borrowAmount, 2, 0, supplier0.address);
+    m.log(`borrow ${borrowAmount} token0 from AAVE directly`);
+
+    await token0.approve(cToken0.address, token0SupplyAmount);
+    await cToken0.mint(token0SupplyAmount);
+    m.log(`supplied ${token0SupplyAmount} token0 to Compound directly`)
+
+    await comptroller.enterMarkets([token0.address]);
+    await cToken0.borrow(borrowAmount);
+    m.log(`borrow ${borrowAmount} token0 from Compound directly`);
   });
 
   describe("strategy tests", function (){
     it("should supply with strategy properly", async() =>{
-      let token0SupplyAmount = new ethers.BigNumber.from("1000000000000000000000000"); // 1000000 
-      
-      await token0.mint(supplier0.address, token0SupplyAmount.mul(3));
-
-      await token0.approve(aPool.address, token0SupplyAmount);
-      await aPool.supply(token0.address, token0SupplyAmount, supplier0.address, 0);
-      await aPool.setUserUseReserveAsCollateral(token0.address, true);
-      await aPool.borrow(token0.address, token0SupplyAmount.div(10).mul(5), 2, 0, supplier0.address);
-
-      await token0.approve(cToken0.address, token0SupplyAmount);
-      await cToken0.mint(token0SupplyAmount);
-      await comptroller.enterMarkets([token0.address]);
-      await cToken0.borrow(token0SupplyAmount.div(10).mul(5));
-
-
       let aaveSupplyRate = await providerAAVE.getCurrentSupplyRate(token0.address);
       m.log("aaveSupplyRate:", aaveSupplyRate);
       let compoundSupplyRate = await providerCompound.getCurrentSupplyRate(token0.address);
       m.log("compoundSupplyRate:", compoundSupplyRate);
 
       await token0.connect(supplier0).approve(pool.address, token0SupplyAmount);
-      let strategyForSupply = await strategy.getSupplyStrategy([providerAAVE.address, providerCompound.address], token0.address, token0SupplyAmount.div(2000).mul(950), router.address);
+      let supplyAmount = token0SupplyAmount.div(2)
+      let strategyForSupply = await strategy.getSupplyStrategy([providerAAVE.address, providerCompound.address], token0.address, supplyAmount.div(100).mul(95), router.address);
+      m.log(`preview strategy for supply ${supplyAmount} token0 via Lending Aggregator`)
       m.log("aave Supply:", strategyForSupply[0]);
       m.log("compound Supply:", strategyForSupply[1]);
 
       let tx = await pool.supply(token0.address, supplier0.address, token0SupplyAmount.div(2), true);
       let receipt = await tx.wait();
+      m.log(`supply ${supplyAmount} via Lending Aggregator`)
       m.log("gas Used:", receipt.gasUsed);
 
       aaveSupplyRate = await providerAAVE.getCurrentSupplyRate(token0.address);
@@ -167,24 +180,14 @@ describe("DepositLogic Tests", function () {
     });
 
     it("should withdraw with strategy properly", async() =>{
-      let token0SupplyAmount = new ethers.BigNumber.from("1000000000000000000000000"); // 1000000 
-      
-      await token0.mint(supplier0.address, token0SupplyAmount.mul(3));
-      await token0.approve(aPool.address, token0SupplyAmount);
-      await aPool.supply(token0.address, token0SupplyAmount, supplier0.address, 0);
-      await aPool.setUserUseReserveAsCollateral(token0.address, true);
-      await aPool.borrow(token0.address, token0SupplyAmount.div(10).mul(5), 2, 0, supplier0.address);
-
-      await token0.approve(cToken0.address, token0SupplyAmount);
-      await cToken0.mint(token0SupplyAmount);
-      await comptroller.enterMarkets([token0.address]);
-      await cToken0.borrow(token0SupplyAmount.div(10).mul(5));
-
       await token0.connect(supplier0).approve(pool.address, token0SupplyAmount);
       await pool.supply(token0.address, supplier0.address, token0SupplyAmount, true);
+      m.log(`supply ${token0SupplyAmount} via Lending Aggregator`)
 
       // to change interest rate on cToken
       await cToken0.borrow(token0SupplyAmount.div(10).mul(1));
+      m.log(`borrow ${token0SupplyAmount.div(10)} from cToken0 again to alter compound interest rate`)
+
       let aaveSupplyRate = await providerAAVE.getCurrentSupplyRate(token0.address);
       m.log("aaveSupplyRate:", aaveSupplyRate);
       let compoundSupplyRate = await providerCompound.getCurrentSupplyRate(token0.address);
@@ -195,8 +198,10 @@ describe("DepositLogic Tests", function () {
       let sBalance = await sToken.balanceOf(supplier0.address);
       m.log("sBalance:", sBalance);
 
-      let tx = await sToken.withdraw(supplier1.address, sBalance.div(2), false);
+      let withdrawAmount = sBalance.div(2)
+      let tx = await sToken.withdraw(supplier1.address, withdrawAmount, false);
       let receipt = await tx.wait();
+      m.log(`withdraw ${withdrawAmount} via Lending Aggregator to supplier1`)
       let log = router.interface.parseLog(receipt.logs[receipt.logs.length - 1]);
       m.log("gas used:",receipt.gasUsed);
       m.log("total withdrawed:", log.args.amount);
@@ -213,21 +218,9 @@ describe("DepositLogic Tests", function () {
     });
 
     it("should borrow with strategy properly", async() => {
-      let token0SupplyAmount = new ethers.BigNumber.from("1000000000000000000000000"); // 1000000 
-      
-      await token0.mint(supplier0.address, token0SupplyAmount.mul(3));
-      await token0.approve(aPool.address, token0SupplyAmount);
-      await aPool.supply(token0.address, token0SupplyAmount, supplier0.address, 0);
-      await aPool.setUserUseReserveAsCollateral(token0.address, true);
-      await aPool.borrow(token0.address, token0SupplyAmount.div(10).mul(5), 2, 0, supplier0.address);
-
-      await token0.approve(cToken0.address, token0SupplyAmount);
-      await cToken0.mint(token0SupplyAmount);
-      await comptroller.enterMarkets([token0.address]);
-      await cToken0.borrow(token0SupplyAmount.div(10).mul(5));
-
       await token0.connect(supplier0).approve(pool.address, token0SupplyAmount);
       await pool.supply(token0.address, borrower0.address, token0SupplyAmount, true);
+      m.log(`supply ${token0SupplyAmount} via Lending Aggregator`)
 
       let asset = await router.assets(token0.address);
       let dToken = await ethers.getContractAt("DToken", asset.dToken);
@@ -237,8 +230,10 @@ describe("DepositLogic Tests", function () {
       let compoundBorrowRate = await providerCompound.getCurrentBorrowRate(token0.address);
       m.log("compoundBorrowRate:", compoundBorrowRate);
 
-      let tx = await dToken.connect(borrower0).borrow(borrower0.address, token0SupplyAmount.div(2));
+      let borrowAmount = token0SupplyAmount.div(2)
+      let tx = await dToken.connect(borrower0).borrow(borrower0.address, borrowAmount);
       let receipt = await tx.wait();
+      m.log(`borrow ${borrowAmount} via Lending Aggregator to borrow0`)
       m.log("gas used:",receipt.gasUsed);
 
       aaveBorrowRate = await providerAAVE.getCurrentBorrowRate(token0.address);
@@ -249,27 +244,19 @@ describe("DepositLogic Tests", function () {
     });
 
     it("should repay with strategy properly", async() => {
-      let token0SupplyAmount = new ethers.BigNumber.from("1000000000000000000000000"); // 1000000 
-        
-      await token0.mint(supplier0.address, token0SupplyAmount.mul(3));
-      await token0.approve(aPool.address, token0SupplyAmount);
-      await aPool.supply(token0.address, token0SupplyAmount, supplier0.address, 0);
-      await aPool.setUserUseReserveAsCollateral(token0.address, true);
-      await aPool.borrow(token0.address, token0SupplyAmount.div(10).mul(5), 2, 0, supplier0.address);
-
-      await token0.approve(cToken0.address, token0SupplyAmount);
-      await cToken0.mint(token0SupplyAmount);
-      await comptroller.enterMarkets([token0.address]);
-      await cToken0.borrow(token0SupplyAmount.div(10).mul(5));
-
       await token0.connect(supplier0).approve(pool.address, token0SupplyAmount);
       await pool.supply(token0.address, borrower0.address, token0SupplyAmount, true);
+      m.log(`supply ${token0SupplyAmount} via Lending Aggregator`)
 
       let asset = await router.assets(token0.address);
       let dToken = await ethers.getContractAt("DToken", asset.dToken);
-      dToken.connect(borrower0).borrow(borrower0.address, token0SupplyAmount.div(2));
+
+      let borrowAmount = token0SupplyAmount.div(2)
+      dToken.connect(borrower0).borrow(borrower0.address, borrowAmount);
+      m.log(`borrow ${borrowAmount} via Lending Aggregator to borrow0`)
 
       await cToken0.borrow(token0SupplyAmount.div(10).mul(1));
+      m.log(`borrow ${token0SupplyAmount.div(10)} from cToken0 again to alter compound interest rate`)
 
       aaveBorrowRate = await providerAAVE.getCurrentBorrowRate(token0.address);
       m.log("aaveBorrowRate:", aaveBorrowRate);
@@ -282,7 +269,9 @@ describe("DepositLogic Tests", function () {
       await token0.mint(borrower0.address, dBalance)
       await token0.connect(borrower0).approve(pool.address, dBalance.mul(2))
 
-      let tx = await pool.connect(borrower0).repay(token0.address, borrower0.address, dBalance.div(2));
+      let repayAmount = dBalance.div(2);
+      let tx = await pool.connect(borrower0).repay(token0.address, borrower0.address, repayAmount);
+      m.log(`repay ${repayAmount} via Lending Aggregator to borrow0`)
       let receipt = await tx.wait();
       m.log("gas used:",receipt.gasUsed);
       let log = router.interface.parseLog(receipt.logs[receipt.logs.length - 1]);
@@ -295,4 +284,8 @@ describe("DepositLogic Tests", function () {
       m.log("compoundBorrowRate:", compoundBorrowRate);
     });
   });
+
+  // 奖励代币
+  // 加快收敛速度
+  // 全取全存
 });
