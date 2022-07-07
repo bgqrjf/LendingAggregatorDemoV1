@@ -11,8 +11,8 @@ library StrategyCalculations{
     uint constant precision = 1;
 
     function calculateAmountsToSupply(
-        uint _maxRate, 
-        Types.StrategyParams memory _params
+        Types.StrategyParams memory _params,
+        uint _maxRate
     ) internal pure returns (uint[] memory amounts){
         amounts = new uint[](_params.providers.length);
         uint minRate;
@@ -56,9 +56,9 @@ library StrategyCalculations{
     }
 
     function calculateAmountsToWithdraw(
+        Types.StrategyParams memory _params,
         uint _minRate, 
-        uint[] memory _maxToWithdraw,
-        Types.StrategyParams memory _params
+        uint[] memory _maxToWithdraw
     ) internal pure returns (uint[] memory amounts){
         amounts = new uint[](_params.providers.length);
         uint maxRate;
@@ -110,9 +110,9 @@ library StrategyCalculations{
     }
 
     function calculateAmountsToBorrow(
+        Types.StrategyParams memory _params,
         uint _minRate, 
-        uint[] memory _maxToBorrow,
-        Types.StrategyParams memory _params
+        uint[] memory _maxToBorrow
     ) internal pure returns (uint[] memory amounts){
         amounts = new uint[](_params.providers.length);
         uint maxRate;
@@ -164,9 +164,9 @@ library StrategyCalculations{
     }
 
     function calculateAmountsToRepay(
+        Types.StrategyParams memory _params,
         uint _maxRate, 
-        uint[] memory _maxAmountToRepay,
-        Types.StrategyParams memory _params
+        uint[] memory _maxAmountToRepay
     ) internal pure returns (uint[] memory amounts){
         amounts = new uint[](_params.providers.length);
         uint minRate;

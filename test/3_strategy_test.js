@@ -284,8 +284,4 @@ describe("Strategy Tests", function () {
       m.log("compoundBorrowRate:", compoundBorrowRate);
     });
   });
-
-  // 奖励代币
-  // 加快收敛速度
-  // 全取全存
 });

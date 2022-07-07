@@ -7,6 +7,8 @@ import "./interfaces/IStrategy.sol";
 import "./libraries/StrategyCalculations.sol";
 
 contract Strategy is IStrategy{
+    using StrategyCalculations for Types.StrategyParams;
+
     uint public maxLTV;
 
     constructor (uint _maxLTV){
@@ -41,7 +43,7 @@ contract Strategy is IStrategy{
         if (_amount > minSupplyAmount){
             params.targetAmount = _amount - minSupplyAmount;
 
-            uint[] memory strategyAmounts = StrategyCalculations.calculateAmountsToSupply(maxRate, params);
+            uint[] memory strategyAmounts = params.calculateAmountsToSupply(maxRate);
             if (minSupplyAmount > 0){
                 for (uint i = 0; i < params.providers.length; i++){
                     amounts[i] += strategyAmounts[i];
@@ -80,7 +82,7 @@ contract Strategy is IStrategy{
 
         require(maxWithdrawAmount >= _amount, "Strategy: insufficient balance");
 
-        amounts = StrategyCalculations.calculateAmountsToWithdraw(minRate, amounts, params);
+        amounts = params.calculateAmountsToWithdraw(minRate, amounts);
     }
 
     function getBorrowStrategy(address[] memory _providers, address _underlying, uint _amount, address _for) external view override returns (uint[] memory amounts){
@@ -111,7 +113,7 @@ contract Strategy is IStrategy{
 
         require(maxBorrowAmount >= _amount, "Strategy: insufficient balance");
 
-        amounts = StrategyCalculations.calculateAmountsToBorrow(minRate, amounts, params);
+        amounts = params.calculateAmountsToBorrow(minRate, amounts);
     }
 
     function getRepayStrategy(address[] memory _providers, address _underlying, uint _amount, address _for) external view override returns (uint[] memory amounts){
@@ -144,7 +146,7 @@ contract Strategy is IStrategy{
         }
 
         if (_amount > params.providers.length){
-            uint[] memory strategyAmounts = StrategyCalculations.calculateAmountsToRepay(maxRate, maxAmountsToRepay, params);
+            uint[] memory strategyAmounts = params.calculateAmountsToRepay(maxRate, maxAmountsToRepay);
 
 
             if (params.providers.length > 0){
