@@ -137,13 +137,14 @@ describe("DepositLogic Tests", function () {
 
     describe("withdraw tests", function(){
       it("should withdraw ERC20 from compound properly", async() =>{
-        await token0.mint(supplier0.address, 1000000);
-        await token0.connect(supplier0).approve(pool.address, 1000000);
-        await pool.supply(token0.address, supplier0.address, 1000000, true);
+        let withdrawAmount = 1000000;
+        await token0.mint(supplier0.address, withdrawAmount);
+        await token0.connect(supplier0).approve(pool.address, withdrawAmount);
+        await pool.supply(token0.address, supplier0.address, withdrawAmount, true);
 
         let asset = await router.assets(token0.address);
         let sToken = await ethers.getContractAt("SToken", asset.sToken);
-        let tx = await sToken.withdraw(supplier1.address, 1000000, false);
+        let tx = await router.withdraw(token0.address, supplier1.address, withdrawAmount, false);
         let receipt = await tx.wait();
         m.log("gas used:",receipt.gasUsed);
 
@@ -155,15 +156,16 @@ describe("DepositLogic Tests", function () {
       });
 
       it("should withdraw ETH from compound properly", async() =>{
-        await pool.supplyETH(supplier0.address, true, {value: 1000000});
+        let withdrawAmount = 1000000;
+        await pool.supplyETH(supplier0.address, true, {value: withdrawAmount});
 
         let asset = await router.assets(ETHAddress);
         let sToken = await ethers.getContractAt("SToken", asset.sToken);
-        let tx = await sToken.withdraw(supplier1.address, 1000000, false);
+        let tx = await router.withdraw(ETHAddress, supplier1.address, withdrawAmount, false);
         let receipt = await tx.wait();
         m.log("gas used:",receipt.gasUsed);
 
-        let cTokenBalance = await provider.getBalance(cToken0.address);
+        let cTokenBalance = await provider.getBalance(cETH.address);
         expect(cTokenBalance).to.equal(0);
 
         let routercETHBalance = await cETH.balanceOf(router.address);
@@ -187,7 +189,7 @@ describe("DepositLogic Tests", function () {
         let dToken = await ethers.getContractAt("DToken", assetToBorrow.dToken);
         let borrowAmount = new ethers.BigNumber.from("100000000000000000000");
 
-        let tx = await dToken.connect(borrower0).borrow(borrower0.address, borrowAmount);
+        let tx = await router.connect(borrower0).borrow(token0.address, borrower0.address, borrowAmount);
         let receipt = await tx.wait();
         m.log("gas used:", receipt.gasUsed);
 
@@ -210,7 +212,7 @@ describe("DepositLogic Tests", function () {
 
         let borrowAmount = ethers.BigNumber.from("1000000000000000000");
         let balance1 = await provider.getBalance(borrower1.address);
-        let tx = await dToken.connect(borrower0).borrow(borrower1.address, borrowAmount);
+        let tx = await router.connect(borrower0).borrow(ETHAddress, borrower1.address, borrowAmount);
         let receipt = await tx.wait();
         m.log("gas used:", receipt.gasUsed);
         
@@ -238,7 +240,7 @@ describe("DepositLogic Tests", function () {
         let dToken = await ethers.getContractAt("DToken", assetToBorrow.dToken);
 
         let borrowAmount = new ethers.BigNumber.from("100000000000000000000");
-        await dToken.connect(borrower0).borrow(borrower0.address, borrowAmount);
+        await router.connect(borrower0).borrow(token0.address, borrower0.address, borrowAmount);
 
         await token0.mint(borrower0.address, 3191840903339);
         await token0.connect(borrower0).approve(pool.address, borrowAmount.add(3191840903339));
@@ -261,7 +263,7 @@ describe("DepositLogic Tests", function () {
         let dToken = await ethers.getContractAt("DToken", assetToBorrow.dToken);
 
         let borrowAmount = ethers.BigNumber.from("1000000000000000000");
-        await dToken.connect(borrower0).borrow(borrower1.address, borrowAmount);
+        await router.connect(borrower0).borrow(ETHAddress, borrower1.address, borrowAmount);
 
         let tx = await pool.connect(borrower0).repayETH(borrower0.address, borrowAmount, {value: ethers.BigNumber.from("11000000000000000000")});
         let receipt = await tx.wait();

@@ -17,8 +17,6 @@ library Types{
         ISToken sToken; // supply token address
         IDToken dToken; // debt token address
         bool collateralable; 
-        uint sReserve;
-        uint dReserve;
     }
 
     struct NewAssetParams{

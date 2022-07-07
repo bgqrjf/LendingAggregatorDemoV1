@@ -23,9 +23,7 @@ contract Factory is IFactory{
             _id,
             new SToken(msg.sender, _newAsset.underlying, _newAsset.sTokenName, _newAsset.sTokenSymbol),
             new DToken(msg.sender, _newAsset.underlying, _newAsset.dTokenName, _newAsset.dTokenSymbol),
-            _newAsset.collateralable,
-            0,
-            0
+            _newAsset.collateralable
         );
     }
 }

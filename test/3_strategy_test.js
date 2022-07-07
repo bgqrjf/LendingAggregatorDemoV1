@@ -199,7 +199,7 @@ describe("Strategy Tests", function () {
       m.log("sBalance:", sBalance);
 
       let withdrawAmount = sBalance.div(2)
-      let tx = await sToken.withdraw(supplier1.address, withdrawAmount, false);
+      let tx = await router.withdraw(token0.address, supplier1.address, withdrawAmount, false);
       let receipt = await tx.wait();
       m.log(`withdraw ${withdrawAmount} via Lending Aggregator to supplier1`)
       let log = router.interface.parseLog(receipt.logs[receipt.logs.length - 1]);
@@ -231,7 +231,7 @@ describe("Strategy Tests", function () {
       m.log("compoundBorrowRate:", compoundBorrowRate);
 
       let borrowAmount = token0SupplyAmount.div(2)
-      let tx = await dToken.connect(borrower0).borrow(borrower0.address, borrowAmount);
+      let tx = await router.connect(borrower0).borrow(token0.address, borrower0.address, borrowAmount);
       let receipt = await tx.wait();
       m.log(`borrow ${borrowAmount} via Lending Aggregator to borrow0`)
       m.log("gas used:",receipt.gasUsed);
@@ -252,7 +252,8 @@ describe("Strategy Tests", function () {
       let dToken = await ethers.getContractAt("DToken", asset.dToken);
 
       let borrowAmount = token0SupplyAmount.div(2)
-      dToken.connect(borrower0).borrow(borrower0.address, borrowAmount);
+      await router.connect(borrower0).borrow(token0.address, borrower0.address, borrowAmount);
+
       m.log(`borrow ${borrowAmount} via Lending Aggregator to borrow0`)
 
       await cToken0.borrow(token0SupplyAmount.div(10).mul(1));

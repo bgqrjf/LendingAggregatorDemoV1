@@ -27,18 +27,8 @@ contract SToken is ISToken, ERC20{
         _mint(_account, amount);
     }
 
-    function withdraw(address _to, uint _amount, bool _colletralable) external override{
-        require(router.withdrawCap(msg.sender, underlying) >= _amount, "SToken: not enough collateral");
-        _withdraw(msg.sender, _to, _amount, _colletralable);
-    }
-
-    function liquidate(address _for, address _to, uint _amount) external override onlyRouter{
-        uint balance = balanceOf(_for);
-        if (_amount > balance){
-            _amount = balance;
-        }
-
-        _withdraw(_for, _to, _amount, true);
+    function burn(address _from, uint _amount) external override onlyRouter{
+        _burn(_from, _amount);
     }
 
     function scaledBalanceOf(address _account) public view override returns (uint){
@@ -47,10 +37,5 @@ contract SToken is ISToken, ERC20{
 
     function scaledAmount(uint _amount) public view override returns (uint){
         return _amount * router.totalSupplied(underlying) / totalSupply();
-    }
-
-    function _withdraw(address _from, address _to, uint _amount, bool _colletralable) internal {
-        _burn(_from, _amount);
-        router.withdraw(underlying, _from, _to, _colletralable);
     }
 }

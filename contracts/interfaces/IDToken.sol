@@ -4,7 +4,7 @@ pragma solidity ^0.8.14;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 interface IDToken is IERC20{
-    function borrow(address _to, uint _amount) external;
+    function mint(address _to, uint _amount) external;
     function burn(address _account, uint _amount) external;
 
     function scaledDebtOf(address _account) external view returns (uint);

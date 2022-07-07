@@ -148,7 +148,6 @@ contract Router is IRouter, Ownable{
             // update states
             sTokenAmount = uTokenSupplied > 0 ? amount * sTokenSupply / uTokenSupplied : amount;
             asset.sToken.mint(_to, sTokenAmount);
-            _assets[_underlying].sReserve = asset.sToken.totalSupply();
             config.setUsingAsCollateral(_to, asset.index, _colletralable);
         }
 
@@ -189,18 +188,19 @@ contract Router is IRouter, Ownable{
         }
     }
 
-    function withdraw(address _underlying, address _from, address _to, bool _colletralable) public override {
+    function withdraw(address _underlying, address _to, uint _sTokenAmount, bool _colletralable) public override {
+        require(withdrawCap(msg.sender, _underlying) >= _sTokenAmount, "SToken: not enough collateral");
+
         Types.Asset memory asset = _assets[_underlying];
-        require(address(asset.sToken) == msg.sender, "Router: only DToken");
         address[] memory withdrawFrom = providers;
         uint sTokenSupply = asset.sToken.totalSupply();
         uint uTokenSupplied = totalSupplied(_underlying);
 
-        // update states
-        config.setUsingAsCollateral(_from, asset.index, _colletralable);
-        _assets[_underlying].sReserve = sTokenSupply;
+        config.setUsingAsCollateral(msg.sender, asset.index, _colletralable);
 
-        uint amount = (asset.sReserve - sTokenSupply) * uTokenSupplied / asset.sReserve;
+        uint amount = _sTokenAmount * uTokenSupplied / sTokenSupply;
+        asset.sToken.burn(msg.sender, _sTokenAmount);
+
         uint amountWithdrawedFromVault = withdrawFromVault(_underlying, _to, amount);
         if (amount > amountWithdrawedFromVault){
             uint[] memory amounts = strategy.getWithdrawStrategy(withdrawFrom, _underlying, amount - amountWithdrawedFromVault, address(this));
@@ -216,28 +216,28 @@ contract Router is IRouter, Ownable{
             
             uint balance = TransferHelper.balanceOf(_underlying, address(this));
             TransferHelper.transfer(_underlying, _to, balance);
-            emit AmountsWithdrawed(_from, _underlying, balance + amountWithdrawedFromVault, withdrawFrom, amounts);
+            emit AmountsWithdrawed(msg.sender, _underlying, balance + amountWithdrawedFromVault, withdrawFrom, amounts);
         }else{
-            emit AmountWithdrawed(_from, _underlying, amount);
+            emit AmountWithdrawed(msg.sender, _underlying, amount);
         }
 
     }
 
-    function borrow(address _underlying, address _by, address _to) public override returns (uint amount){
-        Types.Asset memory asset = _assets[_underlying];
-        require(address(asset.dToken) == msg.sender, "Router: only DToken");
+    function borrow(address _underlying, address _to, uint _borrowAmount) public override returns (uint amount){
+        require(_borrowAmount < borrowCap(_underlying, msg.sender), "DToken: insufficient collateral");
 
+        Types.Asset memory asset = _assets[_underlying];
         address[] memory borrowFrom = providers;
         uint dTokenSupply = asset.dToken.totalSupply();
         uint debts = totalDebts(_underlying);
-        _assets[_underlying].dReserve = asset.dToken.totalSupply();
 
-        amount = asset.dReserve > 0 ? (dTokenSupply - asset.dReserve) * debts / asset.dReserve : dTokenSupply;
+        uint dTokenAmount = dTokenSupply > 0 ? (_borrowAmount * dTokenSupply).divCeil(debts) : _borrowAmount;
+        require(dTokenAmount > 0, "Router: no borrow amount");
+        asset.dToken.mint(msg.sender, dTokenAmount);
 
-        require(amount > 0, "Router: no borrow amount");
-        config.setBorrowing(_by, asset.index, true);
+        config.setBorrowing(msg.sender, asset.index, true);
 
-        uint[] memory amounts = strategy.getBorrowStrategy(borrowFrom, _underlying, amount, address(this));
+        uint[] memory amounts = strategy.getBorrowStrategy(borrowFrom, _underlying, _borrowAmount, address(this));
         for (uint i = 0; i < borrowFrom.length; i++){
             if (amounts[i] > 0){
                 Types.ProviderData memory data = IProvider(borrowFrom[i]).getBorrowData(_underlying, amounts[i]);
@@ -248,9 +248,10 @@ contract Router is IRouter, Ownable{
             }
         }
 
+        uint amount = TransferHelper.balanceOf(_underlying, address(this));
         TransferHelper.transfer(_underlying, _to, amount);
 
-        emit AmountsBorrowed(_by, _underlying, amount, borrowFrom, amounts);
+        emit AmountsBorrowed(msg.sender, _underlying, amount, borrowFrom, amounts);
     }
 
     function repay(address _underlying, address _for) public override returns (uint amount){
@@ -284,7 +285,6 @@ contract Router is IRouter, Ownable{
 
         // update states
         asset.dToken.burn(_for, dTokenAmount);
-        _assets[_underlying].sReserve = asset.sToken.totalSupply();
 
         if (asset.dToken.balanceOf(_for) == 0){
             config.setBorrowing(_for, asset.index, false);
@@ -308,18 +308,19 @@ contract Router is IRouter, Ownable{
 
         require(liquidateAmount <=  debtsValue * bc.maxLiquidateRatio / Utils.MILLION, "Router: Exceed Liquidate Cap");
 
-        burnAmount = priceOracle.valueOfAsset(_debtToken, _colletrallToken, liquidateAmount) * bc.liquidateRewardRatio / Utils.MILLION;
-        _assets[_colletrallToken].sToken.liquidate(_for, _to, burnAmount);
+        burnAmount = priceOracle.valueOfAsset(_debtToken, _colletrallToken, liquidateAmount) * bc.liquidateRewardRatio / Utils.MILLION;        
+        burnAmount = Utils.minOf(burnAmount, _assets[_colletrallToken].sToken.balanceOf(_for));
+        
+         _assets[_colletrallToken].sToken.burn(_for, burnAmount);
+         withdraw(_colletrallToken, _to, burnAmount, true);
     }
 
-    function getAssetByID(uint id) public view override returns (ISToken, IDToken, bool, uint, uint){
+    function getAssetByID(uint id) public view override returns (ISToken, IDToken, bool){
         Types.Asset memory asset = _assets[underlyings[id]];
         return(
             asset.sToken,
             asset.dToken,
-            asset.collateralable,
-            asset.sReserve,
-            asset.dReserve
+            asset.collateralable
         );
     }
 
@@ -338,7 +339,7 @@ contract Router is IRouter, Ownable{
         }
     }
 
-    function borrowCap(address _underlying, address _account) external view override returns (uint){
+    function borrowCap(address _underlying, address _account) public view override returns (uint){
         Types.BorrowConfig memory bc = config.borrowConfigs(_underlying);
         (uint collateralValue, uint debtsValue) = valueOf(_account, _underlying);
         return collateralValue * bc.maxLTV / Utils.MILLION - debtsValue;
@@ -349,7 +350,7 @@ contract Router is IRouter, Ownable{
         for (uint i = 0; i < underlyings.length; i++){
             if (UserAssetBitMap.isUsingAsCollateralOrBorrowing(userConfig, i)){
                 if (UserAssetBitMap.isUsingAsCollateral(userConfig, i)){
-                    (ISToken sToken,,,,) = getAssetByID(i);
+                    (ISToken sToken,,) = getAssetByID(i);
                     collateralValue += priceOracle.valueOfAsset(
                         sToken.underlying(),
                         _quote, 
@@ -358,7 +359,7 @@ contract Router is IRouter, Ownable{
                 }
 
                 if (UserAssetBitMap.isBorrowing(userConfig, i)){
-                    (, IDToken dToken,,,) = getAssetByID(i);
+                    (, IDToken dToken,) = getAssetByID(i);
                     borrowingValue += priceOracle.valueOfAsset(
                         dToken.underlying(),
                         _quote, 

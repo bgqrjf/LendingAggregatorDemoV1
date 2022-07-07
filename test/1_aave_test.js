@@ -249,7 +249,7 @@ describe("DepositLogic Tests", function () {
         let asset = await router.assets(token0.address);
         let sToken = await ethers.getContractAt("SToken", asset.sToken);
         let withdrawAmount = (await sToken.balanceOf(supplier0.address)).div(10)
-        let tx = await sToken.withdraw(supplier1.address, withdrawAmount, false);
+        let tx = await router.withdraw(token0.address, supplier1.address, withdrawAmount, false);
         m.log(`withdraw ${withdrawAmount} token0 for supplier0`)
         let receipt = await tx.wait();
         m.log("gas used:",receipt.gasUsed);
@@ -293,7 +293,7 @@ describe("DepositLogic Tests", function () {
         let sToken = await ethers.getContractAt("SToken", asset.sToken);
         let supplier1balance0 = await provider.getBalance(supplier1.address);
         let withdrawAmount = wethAmount.div(10)
-        let tx = await sToken.withdraw(supplier1.address, withdrawAmount, false);
+        let tx = await router.withdraw(ETHAddress, supplier1.address, withdrawAmount, false);
         m.log(`withdraw ${withdrawAmount} token0 for supplier0`)
         let receipt = await tx.wait();
         m.log("gas used:",receipt.gasUsed);
@@ -338,9 +338,9 @@ describe("DepositLogic Tests", function () {
         let asset = await router.assets(token0.address);
         let sToken = await ethers.getContractAt("SToken", asset.sToken);
         let withdrawAmount = token0Amount.div(10)
-        await sToken.withdraw(supplier1.address, withdrawAmount, false);
+        await router.withdraw(token0.address, supplier1.address, withdrawAmount, false);
         m.log(`withdraw ${withdrawAmount} token0 for supplier0`)
-        let tx = await sToken.withdraw(supplier0.address, withdrawAmount, false);
+        let tx = await router.withdraw(token0.address, supplier0.address, withdrawAmount, false);
         m.log(`withdraw ${withdrawAmount} token0 for supplier0`)
         let receipt = await tx.wait();
         m.log("gas used:",receipt.gasUsed);
@@ -396,7 +396,7 @@ describe("DepositLogic Tests", function () {
         let dToken = await ethers.getContractAt("DToken", assetToBorrow.dToken);
 
         let borrowAmount = new ethers.BigNumber.from("100000000000000000000");
-        let tx = await dToken.connect(borrower0).borrow(borrower0.address, borrowAmount);
+        let tx = await router.connect(borrower0).borrow(token0.address, borrower0.address, borrowAmount);
         let receipt = await tx.wait();
         m.log("gas used:", receipt.gasUsed);
 
@@ -432,7 +432,7 @@ describe("DepositLogic Tests", function () {
 
         let borrowAmount = ethers.BigNumber.from("1000000000000000000");
         let balance1 = await provider.getBalance(borrower1.address);
-        let tx = await dToken.connect(borrower0).borrow(borrower1.address, borrowAmount);
+        let tx = await router.connect(borrower0).borrow(ETHAddress, borrower1.address, borrowAmount);
         let receipt = await tx.wait();
         m.log("gas used:", receipt.gasUsed);
 
@@ -471,8 +471,8 @@ describe("DepositLogic Tests", function () {
         let dToken = await ethers.getContractAt("DToken", assetToBorrow.dToken);
 
         let borrowAmount = new ethers.BigNumber.from("100000000000000000000");
-        await dToken.connect(borrower0).borrow(borrower0.address, borrowAmount.div(2));
-        let tx = await dToken.connect(borrower0).borrow(borrower0.address, borrowAmount.div(2));
+        await router.connect(borrower0).borrow(token0.address, borrower0.address, borrowAmount.div(2));
+        let tx = await router.connect(borrower0).borrow(token0.address, borrower0.address, borrowAmount.div(2));
         let receipt = await tx.wait();
         m.log("gas used:", receipt.gasUsed);
 
@@ -513,7 +513,7 @@ describe("DepositLogic Tests", function () {
         let dToken = await ethers.getContractAt("DToken", assetToBorrow.dToken);
 
         let borrowAmount = new ethers.BigNumber.from("100000000000000000000");
-        await dToken.connect(borrower0).borrow(borrower0.address, borrowAmount);
+        await router.connect(borrower0).borrow(token0.address, borrower0.address, borrowAmount);
 
         await token0.mint(borrower0.address, 5006809261);
         await token0.connect(borrower0).approve(pool.address, borrowAmount.add(5006809261));
@@ -550,7 +550,7 @@ describe("DepositLogic Tests", function () {
         let dToken = await ethers.getContractAt("DToken", assetToBorrow.dToken);
 
         let borrowAmount = ethers.BigNumber.from("1000000000000000000");
-        await dToken.connect(borrower0).borrow(borrower1.address, borrowAmount);
+        await router.connect(borrower0).borrow(ETHAddress, borrower0.address, borrowAmount);
 
         let tx = await pool.connect(borrower0).repayETH(borrower0.address, borrowAmount, {value: ethers.BigNumber.from("11000000000000000000")});
         let receipt = await tx.wait();
@@ -589,7 +589,7 @@ describe("DepositLogic Tests", function () {
         let dToken = await ethers.getContractAt("DToken", assetToBorrow.dToken);
 
         let borrowAmount = new ethers.BigNumber.from("100000000000000000000");
-        await dToken.connect(borrower0).borrow(borrower0.address, borrowAmount);
+        await router.connect(borrower0).borrow(token0.address, borrower0.address, borrowAmount);
 
         await token0.mint(borrower0.address, 5424043365);
         await token0.connect(borrower0).approve(pool.address, borrowAmount.add(5424043365));

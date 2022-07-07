@@ -5,8 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 interface ISToken is IERC20{
     function mint(address _account, uint amount) external;
-    function withdraw(address _to, uint _amount, bool _colletralable) external;
-    function liquidate(address _for, address _to, uint _amount) external;
+    function burn(address _from, uint _amount) external;
     function scaledBalanceOf(address _account) external view returns (uint);
     function scaledAmount(uint _amount) external view returns (uint);
 

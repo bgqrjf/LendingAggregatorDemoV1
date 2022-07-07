@@ -14,8 +14,8 @@ interface IRouter{
     function updateStrategy(address _strategy) external;
 
     function supply(address _underlying, address _to, bool _colletralable) external returns (uint sTokenAmount);
-    function withdraw(address _underlying, address _from, address _to, bool _colletralable) external;
-    function borrow(address _underlying, address _by, address _to) external returns (uint amount);
+    function withdraw(address _underlying, address _to, uint _sTokenAmount, bool _colletralable) external;
+    function borrow(address _underlying, address _to, uint _borrowAmount) external returns (uint amount);
     function repay(address _underlying, address _for) external returns (uint amount);
     function liquidate(
         address _debtToken, 
@@ -23,7 +23,7 @@ interface IRouter{
         address _for, 
         address _to
     ) external returns (uint liquidateAmount, uint burnAmount);
-    function getAssetByID(uint id) external view returns (ISToken, IDToken, bool, uint, uint);
+    function getAssetByID(uint id) external view returns (ISToken, IDToken, bool);
     function totalSupplied(address _underlying) external view returns (uint amount);
     function totalDebts(address _underlying) external view returns (uint amount);
     function borrowCap(address _underlying, address _account) external view returns (uint);
