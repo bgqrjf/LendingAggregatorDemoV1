@@ -65,7 +65,23 @@ library Types{
         address target;
         address approveTo;
         address payable weth;
+        address rewardToken;
+        uint rewardBalance;
         bytes encodedData;
+    }
+
+    struct CompRewardData{
+        uint supplierIndex;
+        uint borrowerIndex;
+        uint compAccured;
+    }
+
+    struct UserShare{
+        uint sTokenAmount;
+        uint sTokenTotalSupply;
+        uint dTokenAmount;
+        uint dTokenTotalSupply;
+        uint totalClaimed;
     }
 
     struct StrategyParams{

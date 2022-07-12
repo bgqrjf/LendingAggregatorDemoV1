@@ -8,7 +8,6 @@ import "./libraries/UserAssetBitMap.sol";
 
 contract Config is IConfig, Ownable{
     address public immutable router;
-    uint public vaultRatio;
 
     // mapping underlying token to borrowConfig
     mapping(address => Types.BorrowConfig) private _borrowConfigs;
@@ -27,10 +26,9 @@ contract Config is IConfig, Ownable{
         _;
     }
 
-    constructor(address _owner, address _router, uint _vaultRatio){
+    constructor(address _owner, address _router){
         transferOwnership(_owner);
         router = _router;
-        vaultRatio = _vaultRatio;
     }
 
     function setBorrowConfig(address _token, Types.BorrowConfig memory _config) external override onlyRouterOrOwner{
@@ -60,10 +58,6 @@ contract Config is IConfig, Ownable{
         } else {
             userDebtAndCollateral[_account] &= ~bit;
         }
-    }
-
-    function setVaultRatio(uint _vaultRatio) external override onlyOwner{
-        vaultRatio = _vaultRatio;
     }
 
     function borrowConfigs(address _token) public view override returns(Types.BorrowConfig memory){

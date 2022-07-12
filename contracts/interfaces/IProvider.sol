@@ -12,10 +12,14 @@ interface IProvider{
     function getWithdrawAllData(address _underlying) external view returns(Types.ProviderData memory data);
     function getBorrowData(address _underlying, uint _amount) external view returns(Types.ProviderData memory data);
     function getRepayData(address _underlying, uint _amount) external view returns(Types.ProviderData memory data);
+    function getClaimRewardData(address _rewardToken) external view returns(Types.ProviderData memory data);
+    function getAmountToClaim(address _underlying, Types.UserShare memory _share, bytes memory _params) external view returns (bytes memory, uint amount);
 
     function getCurrentSupplyRate(address _underlying) external view returns (uint);
     function getCurrentBorrowRate(address _underlying) external view returns (uint);
     function getUsageParams(address _underlying) external view returns(bytes memory);
+    function getRewardSupplyData(address _underlying, Types.UserShare memory _share, bytes memory _params) external view returns (bytes memory);
+    function getRewardBorrowData(address _underlying, Types.UserShare memory _share, bytes memory _params) external view returns (bytes memory);
 
     function supplyOf(address _underlying, address _account) external view returns (uint);
     function debtOf(address _underlying, address _account) external view returns (uint);

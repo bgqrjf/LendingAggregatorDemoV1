@@ -10,8 +10,8 @@ import "./DToken.sol";
 import "./Vault.sol";
 
 contract Factory is IFactory{
-    function newConfig(address _owner, uint _vaultRatio) external override returns (address){
-        return address(new Config(_owner, msg.sender, _vaultRatio));
+    function newConfig(address _owner) external override returns (address){
+        return address(new Config(_owner, msg.sender));
     }
 
     function newVault() external override returns (address){

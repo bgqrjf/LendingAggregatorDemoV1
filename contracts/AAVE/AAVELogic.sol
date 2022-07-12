@@ -23,6 +23,7 @@ contract AAVELogic is IProvider{
     // ray = 1e27 truncate to 1e6
     uint public immutable BASE = 1e21;
     address payable public wrappedNative;
+    address public aaveTokenAddress;
 
     // mapping underlying to msg.sender;
     mapping(address => address) initialized;
@@ -31,9 +32,10 @@ contract AAVELogic is IProvider{
 
     receive() external payable {}
 
-    constructor(address _pool, address payable _wrappedNative){
+    constructor(address _pool, address payable _wrappedNative, address _aaveTokenAddress){
         pool = IAAVEPool(_pool);
         wrappedNative = _wrappedNative;
+        aaveTokenAddress = _aaveTokenAddress;
     }
 
     function setInitialized(address _underlying) external override {
@@ -108,6 +110,13 @@ contract AAVELogic is IProvider{
 
         data.encodedData = abi.encodeWithSelector(pool.repay.selector, _underlying, _amount, uint(AAVEDataTypes.InterestRateMode.VARIABLE), msg.sender);
     } 
+
+
+    function getClaimRewardData(address _rewardToken) external view override returns(Types.ProviderData memory data){
+    }
+
+    function getAmountToClaim(address _underlying, Types.UserShare memory _share, bytes memory _params) external view override returns (bytes memory, uint amount){
+    }
 
     function supplyOf(address _underlying, address _account) external view override returns (uint) {
         _underlying = replaceNative(_underlying);
@@ -225,5 +234,11 @@ contract AAVELogic is IProvider{
 
     function getCurrentBorrowRate(address _underlying) external view returns (uint){
         return pool.getReserveData(replaceNative(_underlying)).currentVariableBorrowRate / BASE;
+    }
+
+    function getRewardSupplyData(address _underlying, Types.UserShare memory _share, bytes memory _params) external view override returns (bytes memory){
+    }
+
+    function getRewardBorrowData(address _underlying, Types.UserShare memory _share, bytes memory _params) external view override returns (bytes memory){
     }
 } 

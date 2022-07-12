@@ -37,7 +37,7 @@ exports.deployContracts = async ({token0, usdt}) => {
   await ACLManager.addPoolAdmin(deployer.address);
 
   // deploy pool Implementation
-  const Pool = await ethers.getContractFactory(`contracts/AAVE/core/protocol/pool/Pool.sol:Pool`,{
+  const Pool = await ethers.getContractFactory(`contracts/mocks/aave-core/protocol/pool/Pool.sol:Pool`,{
     libraries:{
       BorrowLogic: borrowLogic.address,
       BridgeLogic: bridgeLogic.address,

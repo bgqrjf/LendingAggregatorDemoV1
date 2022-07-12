@@ -7,7 +7,7 @@ import "./PriceOracle.sol";
 import "./ComptrollerInterface.sol";
 import "./ComptrollerStorage.sol";
 import "./Unitroller.sol";
-// import "./Governance/Comp.sol";
+import "./Governance/Comp.sol";
 
 /**
  * @title Compound's Comptroller Contract
@@ -86,8 +86,10 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
     // No collateralFactorMantissa may exceed this value
     uint internal constant collateralFactorMaxMantissa = 0.9e18; // 0.9
 
-    constructor() {
+    address public comp;
+    constructor(address _comp) {
         admin = msg.sender;
+        comp = _comp;
     }
 
     /*** Assets You Are In ***/
@@ -362,6 +364,7 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
         if (oracle.getUnderlyingPrice(CToken(cToken)) == 0) {
             return uint(Error.PRICE_ERROR);
         }
+
 
         uint borrowCap = borrowCaps[cToken];
         // Borrow cap of 0 corresponds to unlimited borrowing
@@ -730,7 +733,6 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
 
         // For each asset the account is in
         CToken[] memory assets = accountAssets[account];
-
         for (uint i = 0; i < assets.length; i++) {
             CToken asset = assets[i];
 
@@ -1316,7 +1318,87 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
         }
     }
 
+    /**
+     * @notice Claim all the comp accrued by holder in all markets
+     * @param holder The address to claim COMP for
+     */
+    function claimComp(address holder) public {
+        return claimComp(holder, allMarkets);
+    }
+
+    /**
+     * @notice Claim all the comp accrued by holder in the specified markets
+     * @param holder The address to claim COMP for
+     * @param cTokens The list of markets to claim COMP in
+     */
+    function claimComp(address holder, CToken[] memory cTokens) public {
+        address[] memory holders = new address[](1);
+        holders[0] = holder;
+        claimComp(holders, cTokens, true, true);
+    }
+
+    /**
+     * @notice Claim all comp accrued by the holders
+     * @param holders The addresses to claim COMP for
+     * @param cTokens The list of markets to claim COMP in
+     * @param borrowers Whether or not to claim COMP earned by borrowing
+     * @param suppliers Whether or not to claim COMP earned by supplying
+     */
+    function claimComp(address[] memory holders, CToken[] memory cTokens, bool borrowers, bool suppliers) public {
+        for (uint i = 0; i < cTokens.length; i++) {
+            CToken cToken = cTokens[i];
+            require(markets[address(cToken)].isListed, "market must be listed");
+            if (borrowers == true) {
+                Exp memory borrowIndex = Exp({mantissa: cToken.borrowIndex()});
+                updateCompBorrowIndex(address(cToken), borrowIndex);
+                for (uint j = 0; j < holders.length; j++) {
+                    distributeBorrowerComp(address(cToken), holders[j], borrowIndex);
+                }
+            }
+            if (suppliers == true) {
+                updateCompSupplyIndex(address(cToken));
+                for (uint j = 0; j < holders.length; j++) {
+                    distributeSupplierComp(address(cToken), holders[j]);
+                }
+            }
+        }
+        for (uint j = 0; j < holders.length; j++) {
+            compAccrued[holders[j]] = grantCompInternal(holders[j], compAccrued[holders[j]]);
+        }
+    }
+
+    /**
+     * @notice Transfer COMP to the user
+     * @dev Note: If there is not enough COMP, we do not perform the transfer all.
+     * @param user The address of the user to transfer COMP to
+     * @param amount The amount of COMP to (possibly) transfer
+     * @return The amount of COMP which was NOT transferred to the user
+     */
+    function grantCompInternal(address user, uint amount) internal returns (uint) {
+        Comp comp = Comp(getCompAddress());
+        uint compRemaining = comp.balanceOf(address(this));
+        if (amount > 0 && amount <= compRemaining) {
+            comp.transfer(user, amount);
+            return 0;
+        }
+        return amount;
+    }
+
     /*** Comp Distribution Admin ***/
+
+    /**
+     * @notice Transfer COMP to the recipient
+     * @dev Note: If there is not enough COMP, we do not perform the transfer all.
+     * @param recipient The address of the recipient to transfer COMP to
+     * @param amount The amount of COMP to (possibly) transfer
+     */
+    function _grantComp(address recipient, uint amount) public {
+        require(adminOrInitializing(), "only admin can grant comp");
+        uint amountLeft = grantCompInternal(recipient, amount);
+        require(amountLeft == 0, "insufficient comp for grant");
+        emit CompGranted(recipient, amount);
+    }
+
     /**
      * @notice Set COMP borrow and supply speeds for the specified markets.
      * @param cTokens The markets whose COMP speed to update.
@@ -1386,6 +1468,6 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
      * @return The address of COMP
      */
     function getCompAddress() virtual public view returns (address) {
-        return 0xc00e94Cb662C3520282E6f5717214004A7f26888;
+        return comp;
     }
 }

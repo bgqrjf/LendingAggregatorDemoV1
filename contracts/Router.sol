@@ -6,7 +6,6 @@ import "./interfaces/IPriceOracle.sol";
 import "./interfaces/IStrategy.sol";
 import "./interfaces/IFactory.sol";
 import "./interfaces/IConfig.sol";
-import "./interfaces/IVault.sol";
 import "./interfaces/IRouter.sol";
 import "./interfaces/IWETH.sol";
 
@@ -22,7 +21,6 @@ contract Router is IRouter, Ownable{
     IConfig public config;
     IPriceOracle public priceOracle;
     IStrategy public strategy;
-    IVault public vault;
     IFactory public factory;
 
     address[] public underlyings;
@@ -30,21 +28,20 @@ contract Router is IRouter, Ownable{
 
     mapping(address => Types.Asset) private _assets;
     mapping(address => uint) public assetIndex;
+    mapping(address => mapping(address => mapping(address => uint))) public totalClaimed;
+    mapping(address => mapping(address => mapping(address => bytes))) rewardData;
 
-    event AmountSupplied(address indexed supplier, address indexed underlying, uint amount);
     event AmountsSupplied(address indexed supplier, address indexed underlying, uint amount, address[] suppliedTo, uint[] amounts);
-    event AmountWithdrawed(address indexed supplier, address indexed underlying, uint amount);
     event AmountsWithdrawed(address indexed supplier, address indexed underlying, uint amount, address[] withdrawedFrom, uint[] amounts);
     event AmountsBorrowed(address indexed borrower, address indexed underlying, uint amount, address[] borrowedFrom, uint[] amounts);
     event AmountsRepayed(address indexed borrower, address indexed underlying, uint amount, address[] repayedTo, uint[] amounts);
 
-    constructor(address[] memory _providers, address _priceOracle, address _strategy, address _factory, uint _vaultRatio){
+    constructor(address[] memory _providers, address _priceOracle, address _strategy, address _factory){
         factory = IFactory(_factory);
         priceOracle = IPriceOracle(_priceOracle);
         strategy = IStrategy(_strategy);
 
-        config = IConfig(IFactory(_factory).newConfig(msg.sender, _vaultRatio));
-        vault = IVault(IFactory(_factory).newVault());
+        config = IConfig(IFactory(_factory).newConfig(msg.sender));
 
         providers = _providers;
     }
@@ -67,10 +64,6 @@ contract Router is IRouter, Ownable{
     
     function updateFactory(address _factory) external override onlyOwner{
         factory = IFactory(_factory);
-    }
-
-    function updateVault(address _vault) external override onlyOwner{
-        vault = IVault(_vault);
     }
 
     function addProvider(address _provider) external override onlyOwner{
@@ -137,90 +130,91 @@ contract Router is IRouter, Ownable{
         strategy = IStrategy(_strategy);
     }
 
+    // rebalance with strategy
     function supply(address _underlying, address _to, bool _colletralable) public override returns (uint sTokenAmount){
         Types.Asset memory asset = _assets[_underlying];
         address[] memory supplyTo = providers;
         uint amount = TransferHelper.balanceOf(_underlying, address(this));
-        uint sTokenSupply = asset.sToken.totalSupply();
-        uint uTokenSupplied = totalSupplied(_underlying);
+        require(amount > 0, "Router: no token received");
+        
+        {
+            uint sTokenSupply = asset.sToken.totalSupply();
+            uint uTokenSupplied = totalSupplied(_underlying);
 
-        if (_to != address(0)){
-            // update states
-            sTokenAmount = uTokenSupplied > 0 ? amount * sTokenSupply / uTokenSupplied : amount;
-            asset.sToken.mint(_to, sTokenAmount);
-            config.setUsingAsCollateral(_to, asset.index, _colletralable);
+            if (_to != address(0)){
+                sTokenAmount = uTokenSupplied > 0 ? amount * sTokenSupply / uTokenSupplied : amount;
+                asset.sToken.mint(_to, sTokenAmount);
+                config.setUsingAsCollateral(_to, asset.index, _colletralable);
+            }
         }
 
-        // supply to provider
-        uint amountSuppliedToVault = supplyToVault(_underlying, amount, uTokenSupplied);
-        if (amount > amountSuppliedToVault){
-            uint[] memory amounts = strategy.getSupplyStrategy(supplyTo, _underlying, amount - amountSuppliedToVault, address(this));
-            for (uint i = 0; i < supplyTo.length; i++){
-                if (amounts[i] > 0){
-                    Types.ProviderData memory data = IProvider(supplyTo[i]).getSupplyData(_underlying, amounts[i]);
-                    
-                    // if supply with ETH
-                    if (data.approveTo == address(0)){
-                        Utils.lowLevelCall(data.target, data.encodedData, amounts[i]);
+        uint[] memory amounts = strategy.getSupplyStrategy(supplyTo, _underlying, amount, address(this));
+        for (uint i = 0; i < supplyTo.length; i++){
+            if (amounts[i] > 0){
+                Types.ProviderData memory data = IProvider(supplyTo[i]).getSupplyData(_underlying, amounts[i]);
+                
+                if (data.approveTo == address(0)){
+                    Utils.lowLevelCall(data.target, data.encodedData, amounts[i]);
+                }else{
+                    if (data.weth != address(0)){
+                        IWETH(data.weth).deposit{value: amounts[i]}();
+                        TransferHelper.approve(data.weth, data.approveTo, amounts[i]);
                     }else{
-                        if (data.weth != address(0)){
-                            IWETH(data.weth).deposit{value: amounts[i]}();
-                            TransferHelper.approve(data.weth, data.approveTo, amounts[i]);
-                        }else{
-                            TransferHelper.approve(_underlying, data.approveTo, amounts[i]);
-                        }
-
-                        Utils.lowLevelCall(data.target, data.encodedData, 0);
+                        TransferHelper.approve(_underlying, data.approveTo, amounts[i]);
                     }
 
-                    if (!data.initialized){
-                        Types.ProviderData memory initData = IProvider(supplyTo[i]).getAddAssetData(_underlying);
-                        if (initData.target != address(0)){
-                            Utils.lowLevelCall(initData.target, initData.encodedData, 0);
-                        }
-                        IProvider(supplyTo[i]).setInitialized(_underlying);
+                    Utils.lowLevelCall(data.target, data.encodedData, 0);
+                }
+
+                if (!data.initialized){
+                    Types.ProviderData memory initData = IProvider(supplyTo[i]).getAddAssetData(_underlying);
+                    if (initData.target != address(0)){
+                        Utils.lowLevelCall(initData.target, initData.encodedData, 0);
                     }
+                    IProvider(supplyTo[i]).setInitialized(_underlying);
+                }
+
+                if (_to != address(0)){
+                   rewardData[_to][supplyTo[i]][_underlying] = IProvider(supplyTo[i]).getRewardSupplyData(_underlying, userShare(_to, supplyTo[i], _underlying, asset), rewardData[_to][supplyTo[i]][_underlying]);
                 }
             }
-            emit AmountsSupplied(_to, _underlying, amount, supplyTo, amounts);
-        }else{
-            emit AmountSupplied(_to, _underlying, amount);
         }
+        
+        emit AmountsSupplied(_to, _underlying, amount, supplyTo, amounts);
     }
 
-    function withdraw(address _underlying, address _to, uint _sTokenAmount, bool _colletralable) public override {
+    function withdraw(address _underlying, address _to, uint _sTokenAmount, bool _colletralable) public override returns (uint amount){
         require(withdrawCap(msg.sender, _underlying) >= _sTokenAmount, "SToken: not enough collateral");
 
         Types.Asset memory asset = _assets[_underlying];
-        address[] memory withdrawFrom = providers;
-        uint sTokenSupply = asset.sToken.totalSupply();
-        uint uTokenSupplied = totalSupplied(_underlying);
+        address[] memory withdrawFrom = providers;        
+        {
+            uint sTokenSupply = asset.sToken.totalSupply();
+            uint uTokenSupplied = totalSupplied(_underlying);
 
-        config.setUsingAsCollateral(msg.sender, asset.index, _colletralable);
+            amount = _sTokenAmount * uTokenSupplied / sTokenSupply;
+            require(amount > 0, "Router: withdraw 0");
 
-        uint amount = _sTokenAmount * uTokenSupplied / sTokenSupply;
-        asset.sToken.burn(msg.sender, _sTokenAmount);
-
-        uint amountWithdrawedFromVault = withdrawFromVault(_underlying, _to, amount);
-        if (amount > amountWithdrawedFromVault){
-            uint[] memory amounts = strategy.getWithdrawStrategy(withdrawFrom, _underlying, amount - amountWithdrawedFromVault, address(this));
-            for (uint i = 0; i < withdrawFrom.length; i++){
-                if (amounts[i] > 0){
-                    Types.ProviderData memory data = IProvider(withdrawFrom[i]).getWithdrawData(_underlying, amounts[i]);
-                    Utils.lowLevelCall(data.target, data.encodedData, 0);
-                    if (data.weth != address(0)){
-                        IWETH(data.weth).withdraw(amounts[i]);
-                    }
-                }
-            }
-            
-            uint balance = TransferHelper.balanceOf(_underlying, address(this));
-            TransferHelper.transfer(_underlying, _to, balance);
-            emit AmountsWithdrawed(msg.sender, _underlying, balance + amountWithdrawedFromVault, withdrawFrom, amounts);
-        }else{
-            emit AmountWithdrawed(msg.sender, _underlying, amount);
+            asset.sToken.burn(msg.sender, _sTokenAmount);
+            config.setUsingAsCollateral(msg.sender, asset.index, _colletralable);
         }
 
+        uint[] memory amounts = strategy.getWithdrawStrategy(withdrawFrom, _underlying, amount, address(this));
+        for (uint i = 0; i < withdrawFrom.length; i++){
+            if (amounts[i] > 0){
+                Types.ProviderData memory data = IProvider(withdrawFrom[i]).getWithdrawData(_underlying, amounts[i]);
+                Utils.lowLevelCall(data.target, data.encodedData, 0);
+                if (data.weth != address(0)){
+                    IWETH(data.weth).withdraw(amounts[i]);
+                }
+
+                rewardData[msg.sender][withdrawFrom[i]][_underlying] = IProvider(withdrawFrom[i]).getRewardSupplyData(_underlying, userShare(msg.sender, withdrawFrom[i], _underlying, asset), rewardData[msg.sender][withdrawFrom[i]][_underlying]); 
+            }
+        }
+        
+        uint balance = TransferHelper.balanceOf(_underlying, address(this));
+        TransferHelper.transfer(_underlying, _to, balance);
+        emit AmountsWithdrawed(msg.sender, _underlying, balance, withdrawFrom, amounts);
     }
 
     function borrow(address _underlying, address _to, uint _borrowAmount) public override returns (uint amount){
@@ -228,14 +222,16 @@ contract Router is IRouter, Ownable{
 
         Types.Asset memory asset = _assets[_underlying];
         address[] memory borrowFrom = providers;
-        uint dTokenSupply = asset.dToken.totalSupply();
-        uint debts = totalDebts(_underlying);
 
-        uint dTokenAmount = dTokenSupply > 0 ? (_borrowAmount * dTokenSupply).divCeil(debts) : _borrowAmount;
-        require(dTokenAmount > 0, "Router: no borrow amount");
-        asset.dToken.mint(msg.sender, dTokenAmount);
-
-        config.setBorrowing(msg.sender, asset.index, true);
+        {
+            uint dTokenSupply = asset.dToken.totalSupply();
+            uint debts = totalDebts(_underlying);
+            uint dTokenAmount = dTokenSupply > 0 ? (_borrowAmount * dTokenSupply).divCeil(debts) : _borrowAmount;
+            require(dTokenAmount > 0, "Router: no borrow amount");
+            
+            asset.dToken.mint(msg.sender, dTokenAmount);
+            config.setBorrowing(msg.sender, asset.index, true);
+        }
 
         uint[] memory amounts = strategy.getBorrowStrategy(borrowFrom, _underlying, _borrowAmount, address(this));
         for (uint i = 0; i < borrowFrom.length; i++){
@@ -245,10 +241,13 @@ contract Router is IRouter, Ownable{
                 if (data.weth != address(0)){
                     IWETH(data.weth).withdraw(amounts[i]);
                 }
+
+                rewardData[msg.sender][borrowFrom[i]][_underlying] = IProvider(borrowFrom[i]).getRewardBorrowData(_underlying, userShare(msg.sender, borrowFrom[i], _underlying, asset), rewardData[msg.sender][borrowFrom[i]][_underlying]);
             }
+          
         }
 
-        uint amount = TransferHelper.balanceOf(_underlying, address(this));
+        amount = TransferHelper.balanceOf(_underlying, address(this));
         TransferHelper.transfer(_underlying, _to, amount);
 
         emit AmountsBorrowed(msg.sender, _underlying, amount, borrowFrom, amounts);
@@ -257,12 +256,20 @@ contract Router is IRouter, Ownable{
     function repay(address _underlying, address _for) public override returns (uint amount){
         Types.Asset memory asset = _assets[_underlying];
         address[] memory repayTo = providers;
-        uint dTokenSupply = asset.dToken.totalSupply();
-        uint debts = totalDebts(_underlying);
-        
-        amount = TransferHelper.balanceOf(_underlying, address(this));
-        uint dTokenAmount =  amount * dTokenSupply / debts;
-        require(dTokenAmount <= asset.dToken.balanceOf(_for), "Router: excceed repay Limit");
+
+        {
+            uint dTokenSupply = asset.dToken.totalSupply();
+            uint debts = totalDebts(_underlying);
+            
+            amount = TransferHelper.balanceOf(_underlying, address(this));
+            uint dTokenAmount =  amount * dTokenSupply / debts;
+            require(dTokenAmount <= asset.dToken.balanceOf(_for), "Router: excceed repay Limit");
+            asset.dToken.burn(_for, dTokenAmount);
+
+            if (asset.dToken.balanceOf(_for) == 0){
+                config.setBorrowing(_for, asset.index, false);
+            }
+        }
 
         uint[] memory amounts = strategy.getRepayStrategy(repayTo, _underlying, amount, address(this));
         for (uint i = 0; i < repayTo.length; i++){
@@ -280,14 +287,9 @@ contract Router is IRouter, Ownable{
 
                     Utils.lowLevelCall(data.target, data.encodedData, 0);
                 }
+
+                rewardData[_for][repayTo[i]][_underlying] = IProvider(repayTo[i]).getRewardBorrowData(_underlying, userShare(_for, repayTo[i], _underlying, asset), rewardData[_for][repayTo[i]][_underlying]);
             }
-        }
-
-        // update states
-        asset.dToken.burn(_for, dTokenAmount);
-
-        if (asset.dToken.balanceOf(_for) == 0){
-            config.setBorrowing(_for, asset.index, false);
         }
 
         emit AmountsRepayed(_for, _underlying, amount, repayTo, amounts);
@@ -329,7 +331,6 @@ contract Router is IRouter, Ownable{
         for (uint i = 0; i < providersCopy.length; i++){
             amount += IProvider(providersCopy[i]).supplyOf(_underlying, address(this));
         }
-        amount += TransferHelper.balanceOf(_underlying, address(vault));
     }
 
     function totalDebts(address _underlying) public view override returns (uint amount){
@@ -412,18 +413,24 @@ contract Router is IRouter, Ownable{
         return providers;
     }
 
-    // transfer to vault
-    function supplyToVault(address _underlying, uint _amount, uint _totalSupplied) internal returns (uint amountToVault){
-        uint amountDesired = (_totalSupplied + _amount) * config.vaultRatio() / Utils.MILLION;
-        uint balance = TransferHelper.balanceOf(_underlying, address(vault));
-        if (balance < amountDesired){
-            amountToVault = Utils.minOf(_amount,  amountDesired - balance);
-            TransferHelper.transfer(_underlying, address(vault), amountToVault);
-        }
+    function claimRewardToken(address _provider, address _to, address _underlying) external{
+        Types.ProviderData memory data = IProvider(_provider).getClaimRewardData(_underlying);
+        Utils.lowLevelCall(data.target, data.encodedData, 0);
+
+        (bytes memory params, uint amount) = IProvider(_provider).getAmountToClaim(_underlying, userShare(msg.sender, _provider, _underlying, _assets[_underlying]), rewardData[_to][_provider][_underlying]);
+
+        rewardData[_to][_provider][_underlying] = params;
+        totalClaimed[msg.sender][_provider][_underlying] += amount;
+        TransferHelper.transfer(_underlying, _to, amount);
     }
 
-    function withdrawFromVault(address _underlying, address _to, uint _amount) internal returns (uint amountFromVault){
-        amountFromVault = Utils.minOf(TransferHelper.balanceOf(_underlying, address(vault)), _amount);
-        vault.withdraw(_underlying, _to, amountFromVault);
+    function userShare(address _account, address _provider, address _underlying, Types.Asset memory _asset) internal view returns (Types.UserShare memory){
+        return Types.UserShare(
+            _asset.sToken.balanceOf(_account),
+            _asset.sToken.totalSupply(),
+            _asset.dToken.balanceOf(_account),
+            _asset.dToken.totalSupply(),
+            totalClaimed[_account][_provider][_underlying]
+        );
     }
 }

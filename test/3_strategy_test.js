@@ -24,6 +24,7 @@ describe("Strategy Tests", function () {
   let cToken0;
   let cUSDT;
   let cETH;
+  let comp;
 
   let supplier0;
   let supplier1;
@@ -44,7 +45,7 @@ describe("Strategy Tests", function () {
     wETH = aaveContracts.wETH;
 
     let ProviderAAVE = await ethers.getContractFactory("AAVELogic");
-    providerAAVE = await ProviderAAVE.deploy(aPool.address, wETH.address);
+    providerAAVE = await ProviderAAVE.deploy(aPool.address, wETH.address, wETH.address);
 
     // deploy Compound contracts
     let compContracts = await compound.deployContracts({token0: token0, usdt: usdt});
@@ -52,9 +53,10 @@ describe("Strategy Tests", function () {
     cToken0 = compContracts.cToken0;
     cUSDT = compContracts.cUSDT;
     cETH = compContracts.cETH;
+    comp = compContracts.comp;
 
     let ProviderCompound = await ethers.getContractFactory("CompoundLogic");
-    providerCompound = await ProviderCompound.deploy(comptroller.address, cETH.address, {gasLimit: 5000000});
+    providerCompound = await ProviderCompound.deploy(comptroller.address, cETH.address, comp.address, {gasLimit: 5000000});
 
     await providerCompound.updateCTokenList(cToken0.address, 18);
     await providerCompound.updateCTokenList(cUSDT.address, 6);
@@ -78,7 +80,7 @@ describe("Strategy Tests", function () {
     providers = [providerAAVE.address, providerCompound.address];
 
     let Router = await ethers.getContractFactory("Router");
-    router = await Router.deploy(providers, priceOracle.address, strategy.address, factory.address, 50000); // set TreasuryRatio to 5%
+    router = await Router.deploy(providers, priceOracle.address, strategy.address, factory.address); 
     await router.addAsset({
       underlying: token0.address, 
       decimals: 18, 
@@ -277,7 +279,7 @@ describe("Strategy Tests", function () {
       m.log("gas used:",receipt.gasUsed);
       let log = router.interface.parseLog(receipt.logs[receipt.logs.length - 1]);
       m.log("aave repayed:", log.args.amounts[0]);
-      m.log("compountd repayed:", log.args.amounts[1]);
+      m.log("compound repayed:", log.args.amounts[1]);
 
       aaveBorrowRate = await providerAAVE.getCurrentBorrowRate(token0.address);
       m.log("aaveBorrowRate:", aaveBorrowRate);

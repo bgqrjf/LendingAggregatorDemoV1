@@ -7,14 +7,13 @@ interface IRouter{
     function addAsset(Types.NewAssetParams memory _newAsset) external returns (Types.Asset memory asset);
     function updateConfig(address _config) external;
     function updateFactory(address _factory) external;
-    function updateVault(address _vault) external;
     function addProvider(address _provider) external;
     function removeProvider(uint _providerIndex, address _provider) external;
     function updatePriceOracle(address _priceOracle) external;
     function updateStrategy(address _strategy) external;
 
     function supply(address _underlying, address _to, bool _colletralable) external returns (uint sTokenAmount);
-    function withdraw(address _underlying, address _to, uint _sTokenAmount, bool _colletralable) external;
+    function withdraw(address _underlying, address _to, uint _sTokenAmount, bool _colletralable) external returns(uint amount);
     function borrow(address _underlying, address _to, uint _borrowAmount) external returns (uint amount);
     function repay(address _underlying, address _for) external returns (uint amount);
     function liquidate(

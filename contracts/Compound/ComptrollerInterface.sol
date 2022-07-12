@@ -10,4 +10,8 @@ interface ComptrollerInterface {
     function markets(address cToken) external view returns(bool, uint, bool);
     function getAssetsIn(address account) external view returns (CTokenInterface[] memory);
     function oracle() external view returns (IOracle);
+    function claimComp(address holder) external;
+    function compSupplyState(address cToekn) external view returns(uint224 index, uint32 block);
+    function compBorrowState(address cToken) external view returns(uint224 index, uint32 block);
+
 }

@@ -3,8 +3,11 @@ const { ethers } = require("hardhat");
 exports.deployContracts = async ({token0, usdt}) => {
   const [deployer] = await ethers.getSigners();
 
+  let Comp = await ethers.getContractFactory("Comp");
+  let comp = await Comp.deploy("0x0000000000000000000000000000000000000000");
+
   let Comptroller = await ethers.getContractFactory("Comptroller");
-  let comptroller = await Comptroller.deploy();
+  let comptroller = await Comptroller.deploy(comp.address);
 
   let InterestModel = await ethers.getContractFactory("JumpRateModelV2");
   let interestModel = await InterestModel.deploy(
@@ -71,10 +74,12 @@ exports.deployContracts = async ({token0, usdt}) => {
   await comptroller._setCollateralFactor(cETH.address,  ethers.BigNumber.from("825000000000000000"));
 
 
+
   return{
     comptroller: comptroller,
     cToken0: cToken0,
     cUSDT: cUSDT,
     cETH: cETH,
+    comp: comp
   }
 }

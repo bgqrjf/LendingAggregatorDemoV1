@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.10;
 
-import  '../AAVE/core/interfaces/IPoolAddressesProvider.sol';
+import  './aave-core/interfaces/IPoolAddressesProvider.sol';
 
 // modified aaveOracle
 contract MockAAVEPriceOracle {

@@ -19,18 +19,21 @@ contract CompoundLogic is IProvider{
     bytes4 public immutable SUPPLY_TO_TARGET_SUPPLY_RATE_SELECTOR = CompoundLogic.supplyToTargetSupplyRate.selector;
     
     ComptrollerInterface public comptroller;
+    address public compTokenAddress;
 
     mapping(address => address) cTokens;
     mapping(address => uint) underlyingUnit;
 
     mapping(address => address) initialized;
 
-    constructor(address _comptroller, address _cETH){
+    constructor(address _comptroller, address _cETH, address _compTokenAddress){
         comptroller = ComptrollerInterface(_comptroller);
         (bool isListed,,) = comptroller.markets(_cETH);
         require(isListed, "CompoundLogic: cToken Not Listed");
         cTokens[TransferHelper.ETH] = _cETH;
         underlyingUnit[_cETH] = 1e18;
+
+        compTokenAddress = _compTokenAddress;
     }
 
     receive() external payable {}
@@ -85,6 +88,21 @@ contract CompoundLogic is IProvider{
             data.encodedData = abi.encodeWithSelector(CERC20Interface.repayBorrow.selector, _amount);
         } 
     } 
+
+    function getClaimRewardData(address _rewardToken) external view override returns(Types.ProviderData memory data){
+        data.target = address(comptroller);
+        data.encodedData = abi.encodeWithSelector(ComptrollerInterface.claimComp.selector, msg.sender);
+    }
+
+    function getAmountToClaim(address _underlying, Types.UserShare memory _share, bytes memory _params) external view override returns (bytes memory, uint amount){
+        CTokenInterface cToken = CTokenInterface(cTokens[_underlying]);
+        Types.CompRewardData memory params = abi.decode(_params, (Types.CompRewardData));
+
+        params = distributeBorrowerComp(cToken, _share, params);
+        params = distributeSupplierComp(cToken, _share, params);    
+
+        return (abi.encode(params), params.compAccured);
+    }
 
     // return underlying Token
     // return data for caller
@@ -232,5 +250,63 @@ contract CompoundLogic is IProvider{
     
     function getCurrentBorrowRate(address _underlying) external view override returns (uint){
         return CTokenInterface(cTokens[_underlying]).borrowRatePerBlock() * BLOCK_PER_YEAR / BASE;
+    }
+
+    function getRewardSupplyData(address _underlying, Types.UserShare memory _share, bytes memory _params) external view override returns (bytes memory){
+        CTokenInterface cToken = CTokenInterface(cTokens[_underlying]);
+        Types.CompRewardData memory params;
+
+        if(_params.length > 0){
+            params = abi.decode(_params, (Types.CompRewardData));
+        }
+        if (params.supplierIndex == 0){
+            params.supplierIndex= Utils.UNDECILLION;
+        }
+        // else if(sTokenAmountDelta > 0){
+        //     _params.supplierIndex = (_params.sTokenAmount - uint(sTokenAmountDelta)) * _params.supplierIndex / _params.sTokenAmount;
+        // }else{
+        //     _params.supplierIndex = _params.sTokenAmount * _params.supplierIndex / (_params.sTokenAmount - uint(-sTokenAmountDelta));
+        // }
+        return abi.encode(distributeSupplierComp(cToken, _share, params));
+    }
+
+    function getRewardBorrowData(address _underlying, Types.UserShare memory _share, bytes memory _params) external view override returns (bytes memory){
+        CTokenInterface cToken = CTokenInterface(cTokens[_underlying]);
+        Types.CompRewardData memory params;
+
+        if(_params.length > 0){
+            params = abi.decode(_params, (Types.CompRewardData));
+        }
+
+        if (params.borrowerIndex == 0){
+            params.borrowerIndex = Utils.UNDECILLION; 
+        }
+
+        return abi.encode(distributeBorrowerComp(cToken, _share, params));
+    }
+
+    function distributeSupplierComp(CTokenInterface cToken, Types.UserShare memory _share, Types.CompRewardData memory _params) internal view returns (Types.CompRewardData memory){
+        (uint supplyIndex, ) = comptroller.compSupplyState(address(cToken));
+
+        uint userAmount;
+        if (_share.sTokenTotalSupply > 0){
+            userAmount = _share.sTokenAmount * (cToken.balanceOf(address(this)) + _share.totalClaimed) / _share.sTokenTotalSupply;
+        }
+        
+        _params.compAccured += userAmount * (supplyIndex - _params.supplierIndex) / Utils.QUINTILLION; 
+        _params.supplierIndex = supplyIndex;
+        return _params;
+    }
+
+    function distributeBorrowerComp(CTokenInterface cToken, Types.UserShare memory _share, Types.CompRewardData memory _params) internal view returns (Types.CompRewardData memory){
+        (uint borrowIndex, ) = comptroller.compBorrowState(address(cToken));
+        uint userAmount;
+        if (_share.dTokenTotalSupply > 0){
+            userAmount = _share.dTokenAmount * (cToken.balanceOf(address(this)) + _share.totalClaimed) / _share.dTokenTotalSupply;
+        }
+
+        _params.compAccured += userAmount * (borrowIndex - _params.borrowerIndex) / cToken.borrowIndex();
+        _params.borrowerIndex = borrowIndex;
+        return _params;
     }
 }

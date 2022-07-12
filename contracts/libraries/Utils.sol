@@ -2,12 +2,13 @@
 pragma solidity >= 0.6.0;
 
 library Utils{
-    uint constant MILLION       = 1000000;                  // 10 ** 6
-    uint constant BILLION       = 1000000000;               // 10 ** 9
-    uint constant TRILLION      = 1000000000000;            // 10 ** 12
-    uint constant QUADRILLION   = 1000000000000000;         // 10 ** 15
-    uint constant QUINTILLION   = 1000000000000000000;      // 10 ** 18
-    uint constant NONILLION     = 1000000000000000000000;   // 10 ** 21
+    uint constant MILLION       = 1000000;                                  // 10 ** 6
+    uint constant BILLION       = 1000000000;                               // 10 ** 9
+    uint constant TRILLION      = 1000000000000;                            // 10 ** 12
+    uint constant QUADRILLION   = 1000000000000000;                         // 10 ** 15
+    uint constant QUINTILLION   = 1000000000000000000;                      // 10 ** 18
+    uint constant NONILLION     = 1000000000000000000000;                   // 10 ** 21
+    uint constant UNDECILLION   = 1000000000000000000000000000000000000;    // 10 ** 36
 
     uint8 constant MAC_UINT8        = 0xff;
     uint16 constant MAX_UINT16      = 0xffff;

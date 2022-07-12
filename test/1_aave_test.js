@@ -36,7 +36,8 @@ describe("DepositLogic Tests", function () {
     aOracle = aaveContracts.priceOracle;
 
     let ProviderAAVE = await ethers.getContractFactory("AAVELogic");
-    providerAAVE = await ProviderAAVE.deploy(aPool.address, wETH.address);
+    // _aaveTokenAddress
+    providerAAVE = await ProviderAAVE.deploy(aPool.address, wETH.address, wETH.address); 
 
     //////////////////////////// deploy aggregator contracts
     let PriceOracle = await ethers.getContractFactory("MockPriceOracle");
@@ -54,9 +55,8 @@ describe("DepositLogic Tests", function () {
     let Factory = await ethers.getContractFactory("Factory");
     let factory = await Factory.deploy();
 
-
     let Router = await ethers.getContractFactory("Router");
-    router = await Router.deploy([providerAAVE.address], priceOracle.address, strategy.address, factory.address, 50000); // set VaultRatio to 5%
+    router = await Router.deploy([providerAAVE.address], priceOracle.address, strategy.address, factory.address); 
     await router.addAsset({
       underlying: token0.address, 
       decimals: 18, 
@@ -125,15 +125,10 @@ describe("DepositLogic Tests", function () {
         m.log("routerBalance:", routerBalance)
         expect(routerBalance).to.equal(0);
 
-        let vault = await router.vault();
-        let vaultBalance = await token0.balanceOf(vault);
-        m.log("vaultBalance:", vaultBalance)
-        expect(vaultBalance).to.equal(50000);
-
         let reserve = await aPool.getReserveData(token0.address);
         let aPoolBalance = await token0.balanceOf(reserve.aTokenAddress);
         m.log("aPoolBalance:", aPoolBalance)
-        expect(aPoolBalance).to.equal(950000);
+        expect(aPoolBalance).to.equal(1000000);
 
         // check sToken
         let asset = await router.assets(token0.address);
@@ -145,7 +140,7 @@ describe("DepositLogic Tests", function () {
         let aToken0 = await ethers.getContractAt("AToken", reserve.aTokenAddress)
         let routerAToken0Balance = await aToken0.balanceOf(router.address);
         m.log("routerAToken0Balance:", routerAToken0Balance)
-        expect(routerAToken0Balance).to.equal(950000);
+        expect(routerAToken0Balance).to.equal(1000000);
       });
 
       it("should supply ETH properly", async() =>{
@@ -159,15 +154,10 @@ describe("DepositLogic Tests", function () {
         m.log("routerBalance:", routerBalance)
         expect(routerBalance).to.equal(0);
 
-        let vault = await router.vault();
-        let vaultBalance = await provider.getBalance(vault);
-        m.log("vaultBalance:", vaultBalance)
-        expect(vaultBalance).to.equal(50000);
-
         let reserve = await aPool.getReserveData(wETH.address);
         let aPoolBalance = await wETH.balanceOf(reserve.aTokenAddress);
         m.log("aPoolBalance:", aPoolBalance)
-        expect(aPoolBalance).to.equal(950000);
+        expect(aPoolBalance).to.equal(1000000);
 
         let asset = await router.assets(ETHAddress);
         let sToken = await ethers.getContractAt("SToken", asset.sToken);
@@ -178,7 +168,7 @@ describe("DepositLogic Tests", function () {
         let aWETH = await ethers.getContractAt("AToken", reserve.aTokenAddress)
         let routerAWETHBalance = await aWETH.balanceOf(router.address);
         m.log("routerAWETHBalance:", routerAWETHBalance)
-        expect(routerAWETHBalance).to.equal(950000);
+        expect(routerAWETHBalance).to.equal(1000000);
       });
 
       it("should supply twice properly", async() =>{
@@ -197,15 +187,10 @@ describe("DepositLogic Tests", function () {
         m.log("routerBalance:", routerBalance)
         expect(routerBalance).to.equal(0);
 
-        let vault = await router.vault();
-        let vaultBalance = await token0.balanceOf(vault);
-        m.log("vaultBalance:", vaultBalance)
-        expect(vaultBalance).to.equal(100000);
-
         let reserve = await aPool.getReserveData(token0.address);
         let aPoolBalance = await token0.balanceOf(reserve.aTokenAddress);
         m.log("aPoolBalance:", aPoolBalance)
-        expect(aPoolBalance).to.equal(1900000);
+        expect(aPoolBalance).to.equal(2000000);
 
         // check sToken
         let asset = await router.assets(token0.address);
@@ -220,7 +205,7 @@ describe("DepositLogic Tests", function () {
         let aToken0 = await ethers.getContractAt("AToken", reserve.aTokenAddress)
         let routerAToken0Balance = await aToken0.balanceOf(router.address);
         m.log("routerAToken0Balance:", routerAToken0Balance)
-        expect(routerAToken0Balance).to.equal(1900000);
+        expect(routerAToken0Balance).to.equal(2000000);
 
         let MockLibraryTest = await ethers.getContractFactory("MockLibraryTest");
         let mockLibraryTest = await MockLibraryTest.deploy();
@@ -263,11 +248,6 @@ describe("DepositLogic Tests", function () {
         m.log("routerBalance", routerBalance)
         expect(routerBalance).to.equal(0);
 
-        let vault = await router.vault();
-        let vaultBalance = await token0.balanceOf(vault);
-        m.log("vaultBalance", vaultBalance)
-        expect(vaultBalance).to.equal(0);
-
         let reserve = await aPool.getReserveData(token0.address);
         let aPoolBalance = await token0.balanceOf(reserve.aTokenAddress);
         m.log("aPoolBalance", aPoolBalance)
@@ -306,11 +286,6 @@ describe("DepositLogic Tests", function () {
         let routerBalance = await provider.getBalance(router.address);
         m.log("routerBalance", routerBalance)
         expect(routerBalance).to.equal(0);
-
-        let vault = await router.vault();
-        let vaultBalance = await provider.getBalance(vault);
-        m.log("vaultBalance", vaultBalance)
-        expect(vaultBalance).to.equal(0);
 
         let reserve = await aPool.getReserveData(wETH.address);
         let aPoolBalance = await wETH.balanceOf(reserve.aTokenAddress);
@@ -356,11 +331,6 @@ describe("DepositLogic Tests", function () {
         let routerBalance = await token0.balanceOf(router.address);
         m.log("routerBalance", routerBalance)
         expect(routerBalance).to.equal(0);
-
-        let vault = await router.vault();
-        let vaultBalance = await token0.balanceOf(vault);
-        m.log("vaultBalance", vaultBalance)
-        expect(vaultBalance).to.equal(0);
 
         let reserve = await aPool.getReserveData(token0.address);
         let aPoolBalance = await token0.balanceOf(reserve.aTokenAddress);
@@ -408,7 +378,7 @@ describe("DepositLogic Tests", function () {
 
         let reserve = await aPool.getReserveData(token0.address);
         let aPoolBalance = await token0.balanceOf(reserve.aTokenAddress);
-        expect(aPoolBalance).to.equal("9400000000000000000000");
+        expect(aPoolBalance).to.equal("9900000000000000000000");
 
         // check dToken
         let dTokenBalance = await dToken.balanceOf(borrower0.address)
@@ -444,7 +414,7 @@ describe("DepositLogic Tests", function () {
 
         let reserve = await aPool.getReserveData(wETH.address);
         let aPoolBalance = await wETH.balanceOf(reserve.aTokenAddress);
-        expect(aPoolBalance).to.equal("949000000000000000000");
+        expect(aPoolBalance).to.equal("999000000000000000000");
         
         // check dToken
         let dTokenBalance = await dToken.balanceOf(borrower0.address)
@@ -484,15 +454,15 @@ describe("DepositLogic Tests", function () {
 
         let reserve = await aPool.getReserveData(token0.address);
         let aPoolBalance = await token0.balanceOf(reserve.aTokenAddress);
-        expect(aPoolBalance).to.equal("9400000000000000000000");
+        expect(aPoolBalance).to.equal("9900000000000000000000");
 
         // check dToken
         let dTokenBalance = await dToken.balanceOf(borrower0.address)
-        expect(dTokenBalance).to.equal("99999999999629125241");
+        expect(dTokenBalance).to.equal("99999999999647668979");
 
         let vToken0 = await ethers.getContractAt("VariableDebtToken", reserve.variableDebtTokenAddress)
         let routerVToken0Balance = await vToken0.balanceOf(router.address);
-        expect(routerVToken0Balance).to.equal("100000000000370874760");
+        expect(routerVToken0Balance).to.equal("100000000000352331022");
       });
     })
     
@@ -526,7 +496,7 @@ describe("DepositLogic Tests", function () {
 
         let reserve = await aPool.getReserveData(token0.address);
         let aPoolBalance = await token0.balanceOf(reserve.aTokenAddress);
-        expect(aPoolBalance).to.equal("9500000000004450497121");
+        expect(aPoolBalance).to.equal("10000000000004227972265");
 
         // check dToken
         let dTokenBalance = await dToken.balanceOf(borrower0.address)
@@ -562,7 +532,7 @@ describe("DepositLogic Tests", function () {
 
         let reserve = await aPool.getReserveData(wETH.address);
         let aPoolBalance = await wETH.balanceOf(reserve.aTokenAddress);
-        expect(aPoolBalance).to.equal("950000000000001483499");
+        expect(aPoolBalance).to.equal("1000000000000001409324");
 
         // check dToken
         let dTokenBalance = await dToken.balanceOf(borrower0.address)
@@ -603,7 +573,7 @@ describe("DepositLogic Tests", function () {
 
         let reserve = await aPool.getReserveData(token0.address);
         let aPoolBalance = await token0.balanceOf(reserve.aTokenAddress);
-        expect(aPoolBalance).to.equal("9500000000004821371880");
+        expect(aPoolBalance).to.equal("10000000000004580303286");
 
         // check dToken
         let dTokenBalance = await dToken.balanceOf(borrower0.address)

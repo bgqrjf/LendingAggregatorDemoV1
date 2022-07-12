@@ -13,6 +13,7 @@ describe("DepositLogic Tests", function () {
   let cToken0;
   let cUSDT;
   let cETH;
+  let comp;
 
   let router;
   let pool;
@@ -28,9 +29,10 @@ describe("DepositLogic Tests", function () {
     cToken0 = compContracts.cToken0;
     cUSDT = compContracts.cUSDT;
     cETH = compContracts.cETH;
+    comp = compContracts.comp;
 
     let ProviderCompound = await ethers.getContractFactory("CompoundLogic");
-    providerCompound = await ProviderCompound.deploy(comptroller.address, cETH.address, {gasLimit: 5000000});
+    providerCompound = await ProviderCompound.deploy(comptroller.address, cETH.address, comp.address, {gasLimit: 5000000});
 
     await providerCompound.updateCTokenList(cToken0.address, 18);
     await providerCompound.updateCTokenList(cUSDT.address, 6);
@@ -53,7 +55,7 @@ describe("DepositLogic Tests", function () {
 
 
     let Router = await ethers.getContractFactory("Router");
-    router = await Router.deploy([providerCompound.address], priceOracle.address, strategy.address, factory.address, 50000); // set TreasuryRatio to 5%
+    router = await Router.deploy([providerCompound.address], priceOracle.address, strategy.address, factory.address);
     await router.addAsset({
       underlying: token0.address, 
       decimals: 18, 
@@ -116,10 +118,10 @@ describe("DepositLogic Tests", function () {
         m.log("gas used:",receipt.gasUsed);
 
         let cTokenBalance = await token0.balanceOf(cToken0.address);
-        expect(cTokenBalance).to.equal(950000);
+        expect(cTokenBalance).to.equal(1000000);
 
         let routercToken0Balance = await cToken0.balanceOf(router.address);
-        expect(routercToken0Balance).to.equal(950000);
+        expect(routercToken0Balance).to.equal(1000000);
       });
 
       it("should supply ETH to compound properly", async() =>{
@@ -128,10 +130,10 @@ describe("DepositLogic Tests", function () {
         m.log("gas used:",receipt.gasUsed);
 
         let cTokenBalance = await provider.getBalance(cETH.address);
-        expect(cTokenBalance).to.equal(950000);
+        expect(cTokenBalance).to.equal(1000000);
 
         let routercToken0Balance = await cETH.balanceOf(router.address);
-        expect(routercToken0Balance).to.equal(950000);
+        expect(routercToken0Balance).to.equal(1000000);
       });
     });
 
@@ -197,7 +199,7 @@ describe("DepositLogic Tests", function () {
         expect(amountReceived0).to.equal(borrowAmount);
 
         let cTokenBalance = await token0.balanceOf(cToken0.address);
-        expect(cTokenBalance).to.equal("9400000000000000000000");
+        expect(cTokenBalance).to.equal("9900000000000000000000");
       });
      
       it ("should borrow ETH from compound properly", async() => {
@@ -220,7 +222,7 @@ describe("DepositLogic Tests", function () {
         expect(balance1New).to.equal(balance1.add(borrowAmount));
 
         let cTokenBalance = await provider.getBalance(cETH.address);
-        expect(cTokenBalance).to.equal("949000000000000000000");
+        expect(cTokenBalance).to.equal("999000000000000000000");
       });
     })
 
@@ -249,7 +251,7 @@ describe("DepositLogic Tests", function () {
         m.log("gas used:", receipt.gasUsed);
 
         let cTokenBalance = await token0.balanceOf(cToken0.address);
-        expect(cTokenBalance).to.equal("9500000000075102138900");
+        expect(cTokenBalance).to.equal("10000000000071347031700");
       });
 
       it ("should repay ETH to compound properly", async() => {
@@ -270,7 +272,7 @@ describe("DepositLogic Tests", function () {
         m.log("gas used:", receipt.gasUsed);
 
         let cTokenBalance = await provider.getBalance(cETH.address);
-        expect(cTokenBalance).to.equal("950000000000025034046");
+        expect(cTokenBalance).to.equal("1000000000000023782343");
       })
     })
   });
