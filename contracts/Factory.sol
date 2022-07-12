@@ -7,15 +7,10 @@ import "./libraries/Types.sol";
 import "./Config.sol";
 import "./SToken.sol";
 import "./DToken.sol";
-import "./Vault.sol";
 
 contract Factory is IFactory{
     function newConfig(address _owner) external override returns (address){
         return address(new Config(_owner, msg.sender));
-    }
-
-    function newVault() external override returns (address){
-        return address(new Vault(msg.sender));
     }
 
     function newAsset(Types.NewAssetParams memory _newAsset, uint8 _id) external override returns (Types.Asset memory asset){
