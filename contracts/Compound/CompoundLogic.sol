@@ -94,14 +94,16 @@ contract CompoundLogic is IProvider{
         data.encodedData = abi.encodeWithSelector(ComptrollerInterface.claimComp.selector, msg.sender);
     }
 
-    function getAmountToClaim(address _underlying, Types.UserShare memory _share, bytes memory _params) external view override returns (bytes memory, uint amount){
+    function getAmountToClaim(address _underlying, Types.UserShare memory _share, bytes memory _params) external view override returns (bytes memory data, address rewardToken, uint amount){
         CTokenInterface cToken = CTokenInterface(cTokens[_underlying]);
         Types.CompRewardData memory params = abi.decode(_params, (Types.CompRewardData));
 
         params = distributeBorrowerComp(cToken, _share, params);
         params = distributeSupplierComp(cToken, _share, params);    
-
-        return (abi.encode(params), params.compAccured);
+        rewardToken = compTokenAddress;
+        amount = params.compAccured;
+        params.compAccured = 0;
+        data = abi.encode(params);
     }
 
     // return underlying Token
@@ -259,14 +261,11 @@ contract CompoundLogic is IProvider{
         if(_params.length > 0){
             params = abi.decode(_params, (Types.CompRewardData));
         }
+
         if (params.supplierIndex == 0){
-            params.supplierIndex= Utils.UNDECILLION;
+            params.supplierIndex = Utils.UNDECILLION;
         }
-        // else if(sTokenAmountDelta > 0){
-        //     _params.supplierIndex = (_params.sTokenAmount - uint(sTokenAmountDelta)) * _params.supplierIndex / _params.sTokenAmount;
-        // }else{
-        //     _params.supplierIndex = _params.sTokenAmount * _params.supplierIndex / (_params.sTokenAmount - uint(-sTokenAmountDelta));
-        // }
+
         return abi.encode(distributeSupplierComp(cToken, _share, params));
     }
 
@@ -290,10 +289,10 @@ contract CompoundLogic is IProvider{
 
         uint userAmount;
         if (_share.sTokenTotalSupply > 0){
-            userAmount = _share.sTokenAmount * (cToken.balanceOf(address(this)) + _share.totalClaimed) / _share.sTokenTotalSupply;
+            userAmount = _share.sTokenAmount * cToken.balanceOf(msg.sender) / _share.sTokenTotalSupply;
         }
         
-        _params.compAccured += userAmount * (supplyIndex - _params.supplierIndex) / Utils.QUINTILLION; 
+        _params.compAccured += userAmount * (supplyIndex - _params.supplierIndex) / Utils.UNDECILLION; 
         _params.supplierIndex = supplyIndex;
         return _params;
     }
@@ -302,10 +301,10 @@ contract CompoundLogic is IProvider{
         (uint borrowIndex, ) = comptroller.compBorrowState(address(cToken));
         uint userAmount;
         if (_share.dTokenTotalSupply > 0){
-            userAmount = _share.dTokenAmount * (cToken.balanceOf(address(this)) + _share.totalClaimed) / _share.dTokenTotalSupply;
+            userAmount = _share.dTokenAmount * (cToken.borrowBalanceStored(msg.sender) * Utils.QUINTILLION / cToken.borrowIndex()) / _share.dTokenTotalSupply;
         }
 
-        _params.compAccured += userAmount * (borrowIndex - _params.borrowerIndex) / cToken.borrowIndex();
+        _params.compAccured += userAmount * (borrowIndex - _params.borrowerIndex) /  Utils.UNDECILLION;
         _params.borrowerIndex = borrowIndex;
         return _params;
     }

@@ -13,7 +13,7 @@ interface IProvider{
     function getBorrowData(address _underlying, uint _amount) external view returns(Types.ProviderData memory data);
     function getRepayData(address _underlying, uint _amount) external view returns(Types.ProviderData memory data);
     function getClaimRewardData(address _rewardToken) external view returns(Types.ProviderData memory data);
-    function getAmountToClaim(address _underlying, Types.UserShare memory _share, bytes memory _params) external view returns (bytes memory, uint amount);
+    function getAmountToClaim(address _underlying, Types.UserShare memory _share, bytes memory _params) external view returns (bytes memory, address rewardToken, uint amount);
 
     function getCurrentSupplyRate(address _underlying) external view returns (uint);
     function getCurrentBorrowRate(address _underlying) external view returns (uint);

@@ -115,7 +115,7 @@ contract AAVELogic is IProvider{
     function getClaimRewardData(address _rewardToken) external view override returns(Types.ProviderData memory data){
     }
 
-    function getAmountToClaim(address _underlying, Types.UserShare memory _share, bytes memory _params) external view override returns (bytes memory, uint amount){
+    function getAmountToClaim(address _underlying, Types.UserShare memory _share, bytes memory _params) external view override returns (bytes memory, address rewardToken, uint amount){
     }
 
     function supplyOf(address _underlying, address _account) external view override returns (uint) {

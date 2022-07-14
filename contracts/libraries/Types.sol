@@ -81,7 +81,6 @@ library Types{
         uint sTokenTotalSupply;
         uint dTokenAmount;
         uint dTokenTotalSupply;
-        uint totalClaimed;
     }
 
     struct StrategyParams{

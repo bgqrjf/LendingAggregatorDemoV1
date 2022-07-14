@@ -4,10 +4,12 @@ exports.deployContracts = async ({token0, usdt}) => {
   const [deployer] = await ethers.getSigners();
 
   let Comp = await ethers.getContractFactory("Comp");
-  let comp = await Comp.deploy("0x0000000000000000000000000000000000000000");
+  let comp = await Comp.deploy(deployer.address);
 
   let Comptroller = await ethers.getContractFactory("Comptroller");
   let comptroller = await Comptroller.deploy(comp.address);
+
+  await comp.transfer(comptroller.address, await comp.balanceOf(deployer.address))
 
   let InterestModel = await ethers.getContractFactory("JumpRateModelV2");
   let interestModel = await InterestModel.deploy(
@@ -73,7 +75,11 @@ exports.deployContracts = async ({token0, usdt}) => {
   await comptroller._setCollateralFactor(cUSDT.address,  ethers.BigNumber.from("840000000000000000"));
   await comptroller._setCollateralFactor(cETH.address,  ethers.BigNumber.from("825000000000000000"));
 
-
+  await comptroller._setCompSpeeds(
+    [cToken0.address, cUSDT.address, cETH.address], 
+    ["33500000000000000", "33500000000000000","33500000000000000"], 
+    ["33500000000000000", "33500000000000000","33500000000000000"]
+  )
 
   return{
     comptroller: comptroller,

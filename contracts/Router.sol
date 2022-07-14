@@ -28,8 +28,7 @@ contract Router is IRouter, Ownable{
 
     mapping(address => Types.Asset) private _assets;
     mapping(address => uint) public assetIndex;
-    mapping(address => mapping(address => mapping(address => uint))) public totalClaimed;
-    mapping(address => mapping(address => mapping(address => bytes))) rewardData;
+    mapping(address => mapping(address => mapping(address => bytes))) public rewardData;
 
     event AmountsSupplied(address indexed supplier, address indexed underlying, uint amount, address[] suppliedTo, uint[] amounts);
     event AmountsWithdrawed(address indexed supplier, address indexed underlying, uint amount, address[] withdrawedFrom, uint[] amounts);
@@ -136,7 +135,8 @@ contract Router is IRouter, Ownable{
         address[] memory supplyTo = providers;
         uint amount = TransferHelper.balanceOf(_underlying, address(this));
         require(amount > 0, "Router: no token received");
-        
+        Types.UserShare memory share = userShare(_to, asset);
+
         {
             uint sTokenSupply = asset.sToken.totalSupply();
             uint uTokenSupplied = totalSupplied(_underlying);
@@ -152,6 +152,12 @@ contract Router is IRouter, Ownable{
         for (uint i = 0; i < supplyTo.length; i++){
             if (amounts[i] > 0){
                 Types.ProviderData memory data = IProvider(supplyTo[i]).getSupplyData(_underlying, amounts[i]);
+
+                if (_to != address(0)){
+                    bytes memory rewardDataCache = rewardData[_to][supplyTo[i]][_underlying];
+                    rewardDataCache = IProvider(supplyTo[i]).getRewardSupplyData(_underlying, share, rewardDataCache); 
+                    rewardData[_to][supplyTo[i]][_underlying] = rewardDataCache;
+                }
                 
                 if (data.approveTo == address(0)){
                     Utils.lowLevelCall(data.target, data.encodedData, amounts[i]);
@@ -173,10 +179,6 @@ contract Router is IRouter, Ownable{
                     }
                     IProvider(supplyTo[i]).setInitialized(_underlying);
                 }
-
-                if (_to != address(0)){
-                   rewardData[_to][supplyTo[i]][_underlying] = IProvider(supplyTo[i]).getRewardSupplyData(_underlying, userShare(_to, supplyTo[i], _underlying, asset), rewardData[_to][supplyTo[i]][_underlying]);
-                }
             }
         }
         
@@ -184,31 +186,37 @@ contract Router is IRouter, Ownable{
     }
 
     function withdraw(address _underlying, address _to, uint _sTokenAmount, bool _colletralable) public override returns (uint amount){
-        require(withdrawCap(msg.sender, _underlying) >= _sTokenAmount, "SToken: not enough collateral");
-
         Types.Asset memory asset = _assets[_underlying];
-        address[] memory withdrawFrom = providers;        
+        address[] memory withdrawFrom = providers;       
+
+        Types.UserShare memory share = userShare(msg.sender, asset);
+ 
         {
             uint sTokenSupply = asset.sToken.totalSupply();
             uint uTokenSupplied = totalSupplied(_underlying);
 
             amount = _sTokenAmount * uTokenSupplied / sTokenSupply;
             require(amount > 0, "Router: withdraw 0");
+            require(withdrawCap(msg.sender, _underlying) >= amount, "SToken: not enough collateral");
 
             asset.sToken.burn(msg.sender, _sTokenAmount);
             config.setUsingAsCollateral(msg.sender, asset.index, _colletralable);
         }
 
+
         uint[] memory amounts = strategy.getWithdrawStrategy(withdrawFrom, _underlying, amount, address(this));
         for (uint i = 0; i < withdrawFrom.length; i++){
             if (amounts[i] > 0){
                 Types.ProviderData memory data = IProvider(withdrawFrom[i]).getWithdrawData(_underlying, amounts[i]);
+
+                bytes memory rewardDataCache = rewardData[msg.sender][withdrawFrom[i]][_underlying];
+                rewardDataCache = IProvider(withdrawFrom[i]).getRewardSupplyData(_underlying, share, rewardDataCache); 
+                rewardData[msg.sender][withdrawFrom[i]][_underlying] = rewardDataCache;
+
                 Utils.lowLevelCall(data.target, data.encodedData, 0);
                 if (data.weth != address(0)){
                     IWETH(data.weth).withdraw(amounts[i]);
                 }
-
-                rewardData[msg.sender][withdrawFrom[i]][_underlying] = IProvider(withdrawFrom[i]).getRewardSupplyData(_underlying, userShare(msg.sender, withdrawFrom[i], _underlying, asset), rewardData[msg.sender][withdrawFrom[i]][_underlying]); 
             }
         }
         
@@ -223,10 +231,11 @@ contract Router is IRouter, Ownable{
         Types.Asset memory asset = _assets[_underlying];
         address[] memory borrowFrom = providers;
 
+        Types.UserShare memory share = userShare(msg.sender, asset);
         {
-            uint dTokenSupply = asset.dToken.totalSupply();
+            // uint dTokenSupply = asset.dToken.totalSupply();
             uint debts = totalDebts(_underlying);
-            uint dTokenAmount = dTokenSupply > 0 ? (_borrowAmount * dTokenSupply).divCeil(debts) : _borrowAmount;
+            uint dTokenAmount = share.dTokenTotalSupply > 0 ? (_borrowAmount * share.dTokenTotalSupply).divCeil(debts) : _borrowAmount;
             require(dTokenAmount > 0, "Router: no borrow amount");
             
             asset.dToken.mint(msg.sender, dTokenAmount);
@@ -237,12 +246,14 @@ contract Router is IRouter, Ownable{
         for (uint i = 0; i < borrowFrom.length; i++){
             if (amounts[i] > 0){
                 Types.ProviderData memory data = IProvider(borrowFrom[i]).getBorrowData(_underlying, amounts[i]);
+
+                rewardData[msg.sender][borrowFrom[i]][_underlying] = IProvider(borrowFrom[i]).getRewardBorrowData(_underlying, share, rewardData[msg.sender][borrowFrom[i]][_underlying]);
+
                 Utils.lowLevelCall(data.target, data.encodedData, 0);
                 if (data.weth != address(0)){
                     IWETH(data.weth).withdraw(amounts[i]);
                 }
 
-                rewardData[msg.sender][borrowFrom[i]][_underlying] = IProvider(borrowFrom[i]).getRewardBorrowData(_underlying, userShare(msg.sender, borrowFrom[i], _underlying, asset), rewardData[msg.sender][borrowFrom[i]][_underlying]);
             }
           
         }
@@ -257,12 +268,13 @@ contract Router is IRouter, Ownable{
         Types.Asset memory asset = _assets[_underlying];
         address[] memory repayTo = providers;
 
+        Types.UserShare memory share = userShare(msg.sender, asset);
+
         {
-            uint dTokenSupply = asset.dToken.totalSupply();
             uint debts = totalDebts(_underlying);
             
             amount = TransferHelper.balanceOf(_underlying, address(this));
-            uint dTokenAmount =  amount * dTokenSupply / debts;
+            uint dTokenAmount =  amount * share.dTokenTotalSupply / debts;
             require(dTokenAmount <= asset.dToken.balanceOf(_for), "Router: excceed repay Limit");
             asset.dToken.burn(_for, dTokenAmount);
 
@@ -275,6 +287,8 @@ contract Router is IRouter, Ownable{
         for (uint i = 0; i < repayTo.length; i++){
             if(amounts[i] > 0){
                 Types.ProviderData memory data = IProvider(repayTo[i]).getRepayData(_underlying, amounts[i]);
+                rewardData[_for][repayTo[i]][_underlying] = IProvider(repayTo[i]).getRewardBorrowData(_underlying, share, rewardData[_for][repayTo[i]][_underlying]);
+
                 if (data.approveTo == address(0)){
                     Utils.lowLevelCall(data.target, data.encodedData, amounts[i]);
                 }else{
@@ -288,7 +302,7 @@ contract Router is IRouter, Ownable{
                     Utils.lowLevelCall(data.target, data.encodedData, 0);
                 }
 
-                rewardData[_for][repayTo[i]][_underlying] = IProvider(repayTo[i]).getRewardBorrowData(_underlying, userShare(_for, repayTo[i], _underlying, asset), rewardData[_for][repayTo[i]][_underlying]);
+
             }
         }
 
@@ -413,24 +427,24 @@ contract Router is IRouter, Ownable{
         return providers;
     }
 
-    function claimRewardToken(address _provider, address _to, address _underlying) external{
+    function claimRewardToken(address _provider, address _to, address _underlying) external returns (uint amount){
         Types.ProviderData memory data = IProvider(_provider).getClaimRewardData(_underlying);
         Utils.lowLevelCall(data.target, data.encodedData, 0);
 
-        (bytes memory params, uint amount) = IProvider(_provider).getAmountToClaim(_underlying, userShare(msg.sender, _provider, _underlying, _assets[_underlying]), rewardData[_to][_provider][_underlying]);
+        address rewardToken;
+        bytes memory params;
+        (params, rewardToken, amount) = IProvider(_provider).getAmountToClaim(_underlying, userShare(msg.sender, _assets[_underlying]), rewardData[_to][_provider][_underlying]);
 
         rewardData[_to][_provider][_underlying] = params;
-        totalClaimed[msg.sender][_provider][_underlying] += amount;
-        TransferHelper.transfer(_underlying, _to, amount);
+        TransferHelper.transfer(rewardToken, _to, Utils.minOf(amount, TransferHelper.balanceOf(rewardToken, address(this))));
     }
 
-    function userShare(address _account, address _provider, address _underlying, Types.Asset memory _asset) internal view returns (Types.UserShare memory){
+    function userShare(address _account, Types.Asset memory _asset) internal view returns (Types.UserShare memory){
         return Types.UserShare(
             _asset.sToken.balanceOf(_account),
             _asset.sToken.totalSupply(),
             _asset.dToken.balanceOf(_account),
-            _asset.dToken.totalSupply(),
-            totalClaimed[_account][_provider][_underlying]
+            _asset.dToken.totalSupply()
         );
     }
 }
