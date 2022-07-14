@@ -134,7 +134,7 @@ describe("reward tests", function () {
     m.log("rewardData", await router.rewardData(supplier0.address, providerCompound.address, token0.address));
     
     await router.connect(borrower0).borrow(token0.address, borrower0.address, "100000000000000000000000");
-    await router.withdraw(token0.address, supplier1.address, "300000000000000000000000", false);
+    await router.withdraw(token0.address, supplier1.address, "500000000000000000000000", false);
     m.log("index:", await comptroller.compSupplyState(cToken0.address));
     m.log("rewardData", await router.rewardData(supplier0.address, providerCompound.address, token0.address));
 

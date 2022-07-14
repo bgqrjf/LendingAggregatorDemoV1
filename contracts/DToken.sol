@@ -8,20 +8,31 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./libraries/Math.sol";
 
 // DebtTOken
-contract DToken is IDToken, ERC20{
+contract DToken is IDToken{
     using Math for uint;
+
+    string public name;
+    string public symbol;
+    uint8 public decimals = 18;
+    uint public totalSupply;
+    mapping(address => uint) public balanceOf;
     
     IRouter public immutable router;
     address public override underlying;
+
+    event Mint(address indexed account, uint amount);
+    event Burn(address indexed account, uint amount);
 
     modifier onlyRouter{
         require(msg.sender == address(router), "DToken: OnlyRouter");
         _;
     }
 
-    constructor(address _router, address _underlying, string memory name, string memory symbol) ERC20 (name, symbol){
+    constructor(address _router, address _underlying, string memory _name, string memory _symbol){
         router = IRouter(payable(_router));
         underlying = _underlying;
+        name = _name;
+        symbol = _symbol;
     }
 
     function mint(address _to, uint _amount) external override onlyRouter{
@@ -33,11 +44,31 @@ contract DToken is IDToken, ERC20{
     }
    
     function scaledDebtOf(address _account) public view override returns (uint){
-        return scaledAmount(balanceOf(_account));
+        return scaledAmount(balanceOf[_account]);
     }
 
     function scaledAmount(uint _amount) public view override returns (uint){
-        uint totalSupply = totalSupply();
         return totalSupply > 0 ? (_amount * router.totalDebts(underlying)).divCeil(totalSupply) : _amount;
     }
+
+    function _mint(address account, uint256 amount) internal virtual {
+        require(account != address(0), "ERC20: mint to the zero address");
+        totalSupply += amount;
+        balanceOf[account] += amount;
+        emit Mint(account, amount);
+    }
+
+    function _burn(address account, uint256 amount) internal virtual {
+        require(account != address(0), "ERC20: burn from the zero address");
+
+        uint256 accountBalance = balanceOf[account];
+        require(accountBalance >= amount, "ERC20: burn amount exceeds balance");
+        unchecked {
+            balanceOf[account] = accountBalance - amount;
+        }
+        totalSupply -= amount;
+
+        emit Burn(account, amount);
+    }
+
 }

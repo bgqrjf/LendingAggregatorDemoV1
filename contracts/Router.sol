@@ -366,20 +366,30 @@ contract Router is IRouter, Ownable{
             if (UserAssetBitMap.isUsingAsCollateralOrBorrowing(userConfig, i)){
                 if (UserAssetBitMap.isUsingAsCollateral(userConfig, i)){
                     (ISToken sToken,,) = getAssetByID(i);
-                    collateralValue += priceOracle.valueOfAsset(
-                        sToken.underlying(),
-                        _quote, 
-                        sToken.scaledBalanceOf(_account)
-                    );
+
+                    address underlying = sToken.underlying();
+                    collateralValue += 
+                        underlying == _quote ?
+                        sToken.scaledBalanceOf(_account) :
+                        priceOracle.valueOfAsset(
+                            underlying,
+                            _quote, 
+                            sToken.scaledBalanceOf(_account)
+                        );
                 }
 
                 if (UserAssetBitMap.isBorrowing(userConfig, i)){
                     (, IDToken dToken,) = getAssetByID(i);
-                    borrowingValue += priceOracle.valueOfAsset(
-                        dToken.underlying(),
-                        _quote, 
-                        dToken.scaledDebtOf(_account)
-                    );
+
+                    address underlying = dToken.underlying();
+                    borrowingValue += 
+                        underlying == _quote ?
+                        dToken.scaledDebtOf(_account) :
+                        priceOracle.valueOfAsset(
+                            underlying,
+                            _quote, 
+                            dToken.scaledDebtOf(_account)
+                        );
                 }
             }
         }
