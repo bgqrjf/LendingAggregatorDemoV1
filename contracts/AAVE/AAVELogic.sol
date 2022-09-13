@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.14;
 
-import "../interfaces/IProvider.sol";
+import "../interfaces/IProtocol.sol";
 import "../interfaces/IWETH.sol";
 
 import "./IAAVEPool.sol";
@@ -17,16 +17,24 @@ import "../libraries/Math.sol";
 import "../libraries/TransferHelper.sol";
 import "../libraries/Types.sol";
 
-contract AAVELogic is IProvider{
+contract AAVELogic is IProtocol{
     using Math for uint;
 
+    struct SimulateData{
+        uint amount;
+        uint index;
+    }
+
     // ray = 1e27 truncate to 1e6
+    uint public immutable RAY = 1e27;
     uint public immutable BASE = 1e21;
     address payable public wrappedNative;
     address public aaveTokenAddress;
 
     // mapping underlying to msg.sender;
-    mapping(address => address) initialized;
+    mapping(address => address) public initialized;
+    mapping(address => SimulateData) public lastSimulatedSupply;
+    mapping(address => SimulateData) public lastSimulatedBorrow;
 
     IAAVEPool public pool;
 
@@ -42,13 +50,33 @@ contract AAVELogic is IProvider{
         initialized[_underlying] = msg.sender;
     }
 
-    function getAddAssetData(address _underlying) external view returns(Types.ProviderData memory data){
+    function updateSupplyShare(address _underlying, uint _amount) external override{
+        AAVEDataTypes.ReserveData memory reserve = pool.getReserveData(_underlying);
+        lastSimulatedSupply[_underlying] = SimulateData(_amount, reserve.liquidityIndex);
+    }
+
+    function updateBorrowShare(address _underlying, uint _amount) external override{
+        AAVEDataTypes.ReserveData memory reserve = pool.getReserveData(_underlying);
+        lastSimulatedBorrow[_underlying] = SimulateData(_amount , reserve.variableBorrowIndex);
+    }
+
+    function lastSupplyInterest(address _underlying) external view override returns(uint){
+        uint deltaIndex = pool.getReserveData(_underlying).liquidityIndex - lastSimulatedSupply[_underlying].index;
+        return lastSimulatedSupply[_underlying].amount / lastSimulatedSupply[_underlying].index * deltaIndex;
+    }
+
+    function lastBorrowInterest(address _underlying) external view override returns(uint){
+        uint deltaIndex = pool.getReserveData(_underlying).variableBorrowIndex - lastSimulatedBorrow[_underlying].index;
+        return lastSimulatedBorrow[_underlying].amount / lastSimulatedBorrow[_underlying].index * deltaIndex;
+    }
+
+    function getAddAssetData(address _underlying) external view returns(Types.ProtocolData memory data){
         _underlying = replaceNative(_underlying);
         data.target = address(pool);
         data.encodedData = abi.encodeWithSelector(pool.setUserUseReserveAsCollateral.selector, _underlying, true);
     }
 
-    function getSupplyData(address _underlying, uint _amount) external view override returns(Types.ProviderData memory data){
+    function getSupplyData(address _underlying, uint _amount) external view override returns(Types.ProtocolData memory data){
         data.target = address(pool);
         data.approveTo = data.target;
         if (_underlying != TransferHelper.ETH){
@@ -61,7 +89,7 @@ contract AAVELogic is IProvider{
         data.initialized = initialized[_underlying] == msg.sender;
     }
 
-    function getWithdrawData(address _underlying, uint _amount) external view override returns(Types.ProviderData memory data){
+    function getRedeemData(address _underlying, uint _amount) external view override returns(Types.ProtocolData memory data){
         data.target = address(pool);
 
         if (_underlying == TransferHelper.ETH){
@@ -76,7 +104,7 @@ contract AAVELogic is IProvider{
         data.encodedData = abi.encodeWithSelector(pool.withdraw.selector, _underlying, underlyingValue > 0 ? _amount * aTokenSupply / underlyingValue : 0, msg.sender);
     }
 
-    function getWithdrawAllData(address _underlying) external view override returns(Types.ProviderData memory data){
+    function getRedeemAllData(address _underlying) external view override returns(Types.ProtocolData memory data){
         data.target = address(pool);
         if (_underlying == TransferHelper.ETH){
             _underlying = wrappedNative;
@@ -90,7 +118,7 @@ contract AAVELogic is IProvider{
         data.encodedData = abi.encodeWithSelector(pool.withdraw.selector, _underlying, underlyingValue > 0 ? Utils.MAX_UINT * aTokenSupply / underlyingValue : 0, msg.sender);
     }
 
-    function getBorrowData(address _underlying, uint _amount) external view override returns(Types.ProviderData memory data){
+    function getBorrowData(address _underlying, uint _amount) external view override returns(Types.ProtocolData memory data){
         data.target = address(pool);
         if (_underlying != TransferHelper.ETH){
             data.encodedData = abi.encodeWithSelector(pool.borrow.selector, _underlying, _amount, uint(AAVEDataTypes.InterestRateMode.VARIABLE), 0, msg.sender);
@@ -100,7 +128,7 @@ contract AAVELogic is IProvider{
         }
     }
  
-    function getRepayData(address _underlying, uint _amount) external view override returns(Types.ProviderData memory data){
+    function getRepayData(address _underlying, uint _amount) external view override returns(Types.ProtocolData memory data){
         data.target = address(pool);
         data.approveTo = data.target;
         if (_underlying == TransferHelper.ETH){
@@ -112,10 +140,10 @@ contract AAVELogic is IProvider{
     } 
 
 
-    function getClaimRewardData(address _rewardToken) external view override returns(Types.ProviderData memory data){
+    function getClaimRewardData(address _rewardToken) external view override returns(Types.ProtocolData memory data){
     }
 
-    function getAmountToClaim(address _underlying, Types.UserShare memory _share, bytes memory _params) external view override returns (bytes memory, address rewardToken, uint amount){
+    function getClaimUserRewardData(address _underlying, Types.UserShare memory _share, bytes memory _user, bytes memory _router) external view returns (bytes memory, bytes memory, address, uint){
     }
 
     function supplyOf(address _underlying, address _account) external view override returns (uint) {
@@ -185,12 +213,12 @@ contract AAVELogic is IProvider{
     }
 
 
-    function getUsageParams(address _underlying) external view override returns (bytes memory){
+    function getUsageParams(address _underlying, uint _suppliesToRedeem) external view override returns (bytes memory){
         AAVEDataTypes.ReserveData memory reserve = pool.getReserveData(replaceNative(_underlying));
         IAAVEInterestRateStrategy strategy = IAAVEInterestRateStrategy(reserve.interestRateStrategyAddress);
 
         Types.AAVEUsageParams memory params = Types.AAVEUsageParams(
-            IERC20(reserve.aTokenAddress).totalSupply(),
+            IERC20(reserve.aTokenAddress).totalSupply() - _suppliesToRedeem,
             0,
             IERC20(reserve.stableDebtTokenAddress).totalSupply(),
             IERC20(reserve.variableDebtTokenAddress).totalSupply(),
@@ -236,9 +264,12 @@ contract AAVELogic is IProvider{
         return pool.getReserveData(replaceNative(_underlying)).currentVariableBorrowRate / BASE;
     }
 
-    function getRewardSupplyData(address _underlying, Types.UserShare memory _share, bytes memory _params) external view override returns (bytes memory){
+    function getRewardSupplyData(address _underlying, Types.UserShare memory _share, bytes memory _user, bytes memory _router) external view returns (bytes memory, bytes memory){
     }
 
-    function getRewardBorrowData(address _underlying, Types.UserShare memory _share, bytes memory _params) external view override returns (bytes memory){
+    function getRouterRewardSupplyData(address _underlying, uint _totalShare, bytes memory _router) external view override returns (bytes memory){
+    }
+
+    function getRewardBorrowData(address _underlying, Types.UserShare memory _share, bytes memory _user, bytes memory _router) external view returns (bytes memory, bytes memory){
     }
 } 

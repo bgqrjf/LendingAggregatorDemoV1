@@ -60,7 +60,7 @@ library Types{
         uint reserveFactor;
     }
 
-    struct ProviderData{
+    struct ProtocolData{
         bool initialized;
         address target;
         address approveTo;
@@ -70,24 +70,44 @@ library Types{
         bytes encodedData;
     }
 
-    struct CompRewardData{
-        uint supplierIndex;
-        uint borrowerIndex;
-        uint compAccured;
+    struct UserCompRewardData{
+        UserCompReward supply;
+        UserCompReward borrow;
+    }
+
+    struct UserCompReward{
+        uint rewardPerShare;
+        uint rewardAccured;
+        uint rewardCollected;
+    }
+
+    struct RouterCompRewardData{
+        RouterCompReward supply;
+        RouterCompReward borrow;
+    }
+
+    struct RouterCompReward{
+        uint rewardPerShare;
+        uint index;
     }
 
     struct UserShare{
-        uint sTokenAmount;
-        uint sTokenTotalSupply;
-        uint dTokenAmount;
-        uint dTokenTotalSupply;
+        uint amount;
+        uint total;
     }
 
     struct StrategyParams{
         uint targetAmount;
-        uint targetRate0;
-        uint targetIndex;
+        uint128 maxRate;
+        uint128 minRate;
+        uint[] minAmounts;
+        uint[] maxAmounts;
         bytes[] usageParams;
-        address[] providers;
+    }
+
+    struct UserAssetParams{
+        address asset;
+        uint amount;
+        address to;
     }
 }

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.14;
 
-import "./interfaces/IProvider.sol";
 import "./interfaces/IStrategy.sol";
 
 import "./libraries/StrategyCalculations.sol";
@@ -15,143 +14,113 @@ contract Strategy is IStrategy{
         maxLTV = _maxLTV;
     }
 
-    function getSupplyStrategy(address[] memory _providers, address _underlying, uint _amount, address _for) external view override returns (uint[] memory amounts){
+    function getSupplyStrategy(IProtocol[] memory _protocols, address _asset, uint[] memory _currentSupplies, uint _amount) external view override returns (uint[] memory supplyAmounts, uint[] memory redeemAmounts){
         Types.StrategyParams memory params;
-        params.providers = _providers;
-        params.usageParams = new bytes[](params.providers.length);
+        params.usageParams = new bytes[](_protocols.length);
+        params.minAmounts = new uint[](_protocols.length);
 
-        amounts = new uint[](params.providers.length);
-        uint maxRate;
-        uint minSupplyAmount;
-
-        for (uint i = 0; i < params.providers.length && _amount > minSupplyAmount; i++){
-            params.usageParams[i] = IProvider(_providers[i]).getUsageParams(_underlying);
-
-            amounts[i] = Utils.minOf(_amount - minSupplyAmount, minSupplyNeeded(_providers[i], _underlying, _for));
-            minSupplyAmount += amounts[i];
-
-            uint rate = IProvider(_providers[i]).getCurrentSupplyRate(_underlying);
-            if (rate > maxRate){
-                params.targetRate0 = maxRate;
-                maxRate = rate;
-                params.targetIndex = i;
-            }else if (rate > params.targetRate0){
-                params.targetRate0 = rate;
-            }
+        for (uint i = 0; i < _protocols.length; i++){
+            params.usageParams[i] = _protocols[i].getUsageParams(_asset, _currentSupplies[i]);
+            params.minAmounts[i] = minSupplyNeeded(_protocols[i], _asset, msg.sender);
+                
+            uint rate = _protocols[i].getCurrentSupplyRate(_asset);
+            params.maxRate = uint128(Utils.maxOf(rate, params.maxRate));
         }
 
-        if (_amount > minSupplyAmount){
-            params.targetAmount = _amount - minSupplyAmount;
+        params.targetAmount = _amount;
+        uint[] memory amounts = params.calculateAmountsToSupply(_protocols);
 
-            uint[] memory strategyAmounts = params.calculateAmountsToSupply(maxRate);
-            if (minSupplyAmount > 0){
-                for (uint i = 0; i < params.providers.length; i++){
-                    amounts[i] += strategyAmounts[i];
-                }
+        for (uint i = 0; i < amounts.length; i++){
+            if (amounts[i] < _currentSupplies[i]){
+                redeemAmounts[i] = _currentSupplies[i] - amounts[i];
             }else{
-                return strategyAmounts;
+                supplyAmounts[i] = amounts[i] - _currentSupplies[i];
             }
         }
     }
 
-    function getWithdrawStrategy(address[] memory _providers, address _underlying, uint _amount, address _for) external view override returns (uint[] memory amounts){
+    function getSimulateSupplyStrategy(IProtocol[] memory _protocols, address _asset, uint _amount) external view override returns (uint[] memory amounts){
         Types.StrategyParams memory params;
-        params.providers = _providers;
-        params.targetAmount = _amount;
-        params.usageParams = new bytes[](params.providers.length);
-        
-        amounts = new uint[](params.providers.length);
-        uint minRate = Utils.MAX_UINT32;
-        uint maxWithdrawAmount;
+        params.usageParams = new bytes[](_protocols.length);
+        params.minAmounts = new uint[](_protocols.length);
 
-        for (uint i = 0; i < params.providers.length; i++){
-            params.usageParams[i] = IProvider(_providers[i]).getUsageParams(_underlying);
+        for (uint i = 0; i < _protocols.length; i++){
+            params.usageParams[i] = _protocols[i].getUsageParams(_asset, 0);
+            params.minAmounts[i] = 0;
 
-            amounts[i] = maxWithdrawAllowed(_providers[i], _underlying, _for);
-            maxWithdrawAmount += amounts[i];
-
-            uint rate = IProvider(_providers[i]).getCurrentSupplyRate(_underlying);
-            if (rate < minRate){
-                params.targetRate0 = minRate;
-                minRate = rate;
-                params.targetIndex = i;
-            }else if (rate < params.targetRate0){
-                params.targetRate0 = rate;
-            }
+            uint rate = _protocols[i].getCurrentSupplyRate(_asset);
+            params.maxRate = uint128(Utils.maxOf(rate, params.maxRate));
         }
 
-        require(maxWithdrawAmount >= _amount, "Strategy: insufficient balance");
-
-        amounts = params.calculateAmountsToWithdraw(minRate, amounts);
+        params.targetAmount = _amount;
+        amounts = params.calculateAmountsToSupply(_protocols);
     }
 
-    function getBorrowStrategy(address[] memory _providers, address _underlying, uint _amount, address _for) external view override returns (uint[] memory amounts){
+    function getBorrowStrategy(IProtocol[] memory _protocols, Types.UserAssetParams memory _params) external view override returns (uint[] memory amounts){
         Types.StrategyParams memory params;
-        params.providers = _providers;
-        params.targetAmount = _amount;
-        params.usageParams = new bytes[](params.providers.length);
-        
-        amounts = new uint[](params.providers.length);
-        uint minRate = Utils.MAX_UINT32;
+        params.usageParams = new bytes[](_protocols.length);
+        params.maxAmounts = new uint[](_protocols.length);
         uint maxBorrowAmount;
 
-        for (uint i = 0; i < params.providers.length; i++){
-            params.usageParams[i] = IProvider(_providers[i]).getUsageParams(_underlying);
+        for (uint i = 0; i < _protocols.length; i++){
+            params.usageParams[i] = _protocols[i].getUsageParams(_params.asset, 0);
 
-            amounts[i] = maxBorrowAllowed(_providers[i], _underlying, _for);
-            maxBorrowAmount += amounts[i];
+            params.maxAmounts[i] = maxBorrowAllowed(_protocols[i], _params.asset, _params.to);
+            maxBorrowAmount += params.maxAmounts[i];
 
-            uint rate = IProvider(_providers[i]).getCurrentBorrowRate(_underlying);
-            if (rate < minRate){
-                params.targetRate0 = minRate;
-                minRate = rate;
-                params.targetIndex = i;
-            }else if (rate < params.targetRate0){
-                params.targetRate0 = rate;
-            }
+            uint rate = _protocols[i].getCurrentBorrowRate(_params.asset);
+            params.minRate = uint128(Utils.minOf(rate, params.minRate));
         }
 
-        require(maxBorrowAmount >= _amount, "Strategy: insufficient balance");
+        require(maxBorrowAmount >= _params.amount, "Strategy: insufficient balance");
+        params.targetAmount = _params.amount;
 
-        amounts = params.calculateAmountsToBorrow(minRate, amounts);
+        amounts = params.calculateAmountsToBorrow(_protocols);
     }
 
-    function getRepayStrategy(address[] memory _providers, address _underlying, uint _amount, address _for) external view override returns (uint[] memory amounts){
+    function getSimulateBorrowStrategy(IProtocol[] memory _protocols, address _asset, uint _amount) external view override returns (uint[] memory amounts){
         Types.StrategyParams memory params;
-        params.providers = _providers;
-        params.targetAmount = _amount;
-        params.usageParams = new bytes[](params.providers.length);
-        
-        amounts = new uint[](params.providers.length);
-        uint[] memory maxAmountsToRepay = new uint[](params.providers.length);
-        uint maxRate;
-        
-        uint minRepayAmount;
-        for (uint i = 0; i < params.providers.length && _amount > params.providers.length; i++){
-            params.usageParams[i] = IProvider(_providers[i]).getUsageParams(_underlying);
+        params.usageParams = new bytes[](_protocols.length);
+        params.minAmounts = new uint[](_protocols.length);
 
-            amounts[i] = Utils.minOf(_amount - params.providers.length, minRepayNeeded(_providers[i], _underlying, _for));
-            minRepayAmount += amounts[i];
+        for (uint i = 0; i < _protocols.length; i++){
+            params.usageParams[i] = _protocols[i].getUsageParams(_asset, 0);
+            params.maxAmounts[i] = Utils.MAX_UINT;
 
-            maxAmountsToRepay[i] = IProvider(_providers[i]).debtOf(_underlying, msg.sender);
-
-            uint rate = IProvider(_providers[i]).getCurrentBorrowRate(_underlying);
-            if (rate > maxRate){
-                params.targetRate0 = maxRate;
-                maxRate = rate;
-                params.targetIndex = i;
-            }else if (rate > params.targetRate0){
-                params.targetRate0 = rate;
-            }
+            uint rate = _protocols[i].getCurrentBorrowRate(_asset);
+            params.minRate = uint128(Utils.minOf(rate, params.minRate));
         }
 
-        if (_amount > params.providers.length){
-            uint[] memory strategyAmounts = params.calculateAmountsToRepay(maxRate, maxAmountsToRepay);
+        params.targetAmount = _amount;
+        amounts = params.calculateAmountsToBorrow(_protocols);
+    }
 
+    function getRepayStrategy(IProtocol[] memory _protocols, Types.UserAssetParams memory _params) external view override returns (uint[] memory amounts){
+        Types.StrategyParams memory params;
+        params.usageParams = new bytes[](_protocols.length);
+        
+        params.minAmounts = new uint[](_protocols.length);
+        params.maxAmounts = new uint[](_protocols.length);
+        
+        uint minRepayAmount;
+        for (uint i = 0; i < _protocols.length && _params.amount > minRepayAmount; i++){
+            params.usageParams[i] = _protocols[i].getUsageParams(_params.asset, 0);
 
-            if (params.providers.length > 0){
-                for (uint i = 0; i < params.providers.length; i++){
-                    amounts[i] += strategyAmounts[i];
+            params.minAmounts[i] = Utils.minOf(_params.amount - _protocols.length, minRepayNeeded(_protocols[i], _params.asset, _params.to));
+            minRepayAmount += params.minAmounts[i];
+
+            params.maxAmounts[i] = _protocols[i].debtOf(_params.asset, msg.sender);
+
+            uint rate = _protocols[i].getCurrentBorrowRate(_params.asset);
+            params.maxRate = uint128(Utils.maxOf(rate, params.maxRate));
+        }
+
+        if (_params.amount > _protocols.length){
+            uint[] memory strategyAmounts = params.calculateAmountsToRepay(_protocols);
+
+            if (_protocols.length > 0){
+                for (uint i = 0; i < _protocols.length; i++){
+                    params.minAmounts[i] += strategyAmounts[i];
                 }
             }else{
                 return strategyAmounts;
@@ -159,26 +128,26 @@ contract Strategy is IStrategy{
         }
     }
 
-    function minSupplyNeeded(address _provider, address _underlying, address _account) public view override returns (uint amount){
-        (uint collateral, uint borrowed) = IProvider(_provider).totalColletralAndBorrow(_account, _underlying);
+    function minSupplyNeeded(IProtocol _protocol, address _underlying, address _account) public view override returns (uint amount){
+        (uint collateral, uint borrowed) = _protocol.totalColletralAndBorrow(_account, _underlying);
         uint minCollateralNeeded = borrowed * Utils.MILLION / maxLTV;
         return minCollateralNeeded > collateral ? minCollateralNeeded - collateral : 0;
     }
 
-    function maxWithdrawAllowed(address _provider, address _underlying, address _account) public view override returns (uint amount){
-        (uint collateral, uint borrowed) = IProvider(_provider).totalColletralAndBorrow(_account, _underlying);
+    function maxRedeemAllowed(IProtocol _protocol, address _underlying, address _account) public view override returns (uint amount){
+        (uint collateral, uint borrowed) = _protocol.totalColletralAndBorrow(_account, _underlying);
         uint minCollateralNeeded = borrowed * Utils.MILLION / maxLTV;
-        return minCollateralNeeded < collateral ? Utils.minOf(collateral - minCollateralNeeded, IProvider(_provider).supplyOf(_underlying, _account)) : 0;
+        return minCollateralNeeded < collateral ? Utils.minOf(collateral - minCollateralNeeded, _protocol.supplyOf(_underlying, _account)) : 0;
     }
 
-    function maxBorrowAllowed(address _provider, address _underlying, address _account) public view override returns (uint amount){
-        (uint collateral, uint borrowed) = IProvider(_provider).totalColletralAndBorrow(_account, _underlying);
+    function maxBorrowAllowed(IProtocol _protocol, address _underlying, address _account) public view override returns (uint amount){
+        (uint collateral, uint borrowed) = _protocol.totalColletralAndBorrow(_account, _underlying);
         uint maxDebtAllowed = collateral * maxLTV / Utils.MILLION;
         return maxDebtAllowed > borrowed ? maxDebtAllowed - borrowed : 0;
     }
 
-    function minRepayNeeded(address _provider, address _underlying, address _account) public view override returns (uint amount){
-        (uint collateral, uint borrowed) = IProvider(_provider).totalColletralAndBorrow(_account, _underlying);
+    function minRepayNeeded(IProtocol _protocol, address _underlying, address _account) public view override returns (uint amount){
+        (uint collateral, uint borrowed) = _protocol.totalColletralAndBorrow(_account, _underlying);
         uint maxDebtAllowed = collateral * maxLTV / Utils.MILLION;
         return maxDebtAllowed < borrowed ? borrowed - maxDebtAllowed : 0;
     }

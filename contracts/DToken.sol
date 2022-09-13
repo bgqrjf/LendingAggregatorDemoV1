@@ -2,7 +2,7 @@
 pragma solidity ^0.8.14;
 
 import "./interfaces/IDToken.sol";
-import "./interfaces/IRouter.sol";
+import "./Router.sol";
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./libraries/Math.sol";
@@ -17,7 +17,7 @@ contract DToken is IDToken{
     uint public totalSupply;
     mapping(address => uint) public balanceOf;
     
-    IRouter public immutable router;
+    Router public immutable router;
     address public override underlying;
 
     event Mint(address indexed account, uint amount);
@@ -29,18 +29,21 @@ contract DToken is IDToken{
     }
 
     constructor(address _router, address _underlying, string memory _name, string memory _symbol){
-        router = IRouter(payable(_router));
+        router = Router(payable(_router));
         underlying = _underlying;
         name = _name;
         symbol = _symbol;
     }
 
-    function mint(address _to, uint _amount) external override onlyRouter{
-        _mint(_to, _amount);
+
+    function mint(address _account, uint _amountOfUnderlying, uint _totalUnderlying) external override onlyRouter returns (uint amount){
+        amount = totalSupply > 0 ? _amountOfUnderlying * totalSupply / _totalUnderlying : _amountOfUnderlying;
+        _mint(_account, amount);
     }
 
-    function burn(address _account, uint _amount) external override onlyRouter {
-        _burn(_account, _amount);
+    function burn(address _account, uint _amountOfUnderlying, uint _totalUnderlying) external override onlyRouter returns (uint amount){
+        amount = totalSupply > 0 ? _amountOfUnderlying * totalSupply / _totalUnderlying : _amountOfUnderlying;
+        _burn(_account, amount);
     }
    
     function scaledDebtOf(address _account) public view override returns (uint){
@@ -48,7 +51,12 @@ contract DToken is IDToken{
     }
 
     function scaledAmount(uint _amount) public view override returns (uint){
-        return totalSupply > 0 ? (_amount * router.totalDebts(underlying)).divCeil(totalSupply) : _amount;
+        (, uint totalBorrowed) = router.protocols().totalBorrowed(underlying);
+        return totalSupply > 0 ? (_amount * totalBorrowed).divCeil(totalSupply) : _amount;
+    }
+
+    function totalDebt() public view override returns(uint totalBorrowed){
+        (, totalBorrowed) = router.protocols().totalBorrowed(underlying);
     }
 
     function _mint(address account, uint256 amount) internal virtual {

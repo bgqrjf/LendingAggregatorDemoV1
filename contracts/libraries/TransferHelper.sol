@@ -25,6 +25,14 @@ library TransferHelper{
         require(success && abi.decode(returndata, (bool)), 'TransferHelper:Transfer From Failed');
     }
 
+    function collectTo(address _token, address _from, address _to, uint _amount) internal{
+        if (_token != ETH){
+            transferFrom(_token, _from, _to, _amount);
+        }else{
+            require(msg.value == _amount, "TransferHelper: incorrect eth value received");
+        }
+    }
+
     function approve(address _token, address _spender, uint _amount) internal{
         (bool success, bytes memory returndata) = _token.call(abi.encodeWithSelector(IERC20.approve.selector, _spender, _amount));
         require(success && abi.decode(returndata, (bool)), 'TransferHelper:Approve Failed');
