@@ -7,9 +7,9 @@ pragma solidity ^0.8.14;
  * @notice Defines the basic interface for a Pool Addresses Provider.
  **/
 interface IPoolAddressesProvider {
-   /**
-   * @notice Returns the address of the price oracle.
-   * @return The address of the PriceOracle
-   */
-  function getPriceOracle() external view returns (address);
+    /**
+     * @notice Returns the address of the price oracle.
+     * @return The address of the PriceOracle
+     */
+    function getPriceOracle() external view returns (address);
 }

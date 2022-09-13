@@ -8,54 +8,85 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./libraries/Math.sol";
 
 // DebtTOken
-contract DToken is IDToken{
-    using Math for uint;
+contract DToken is IDToken {
+    using Math for uint256;
 
     string public name;
     string public symbol;
     uint8 public decimals = 18;
-    uint public totalSupply;
-    mapping(address => uint) public balanceOf;
-    
+    uint256 public totalSupply;
+    mapping(address => uint256) public balanceOf;
+
     Router public immutable router;
     address public override underlying;
 
-    event Mint(address indexed account, uint amount);
-    event Burn(address indexed account, uint amount);
+    event Mint(address indexed account, uint256 amount);
+    event Burn(address indexed account, uint256 amount);
 
-    modifier onlyRouter{
+    modifier onlyRouter() {
         require(msg.sender == address(router), "DToken: OnlyRouter");
         _;
     }
 
-    constructor(address _router, address _underlying, string memory _name, string memory _symbol){
+    constructor(
+        address _router,
+        address _underlying,
+        string memory _name,
+        string memory _symbol
+    ) {
         router = Router(payable(_router));
         underlying = _underlying;
         name = _name;
         symbol = _symbol;
     }
 
-
-    function mint(address _account, uint _amountOfUnderlying, uint _totalUnderlying) external override onlyRouter returns (uint amount){
-        amount = totalSupply > 0 ? _amountOfUnderlying * totalSupply / _totalUnderlying : _amountOfUnderlying;
+    function mint(
+        address _account,
+        uint256 _amountOfUnderlying,
+        uint256 _totalUnderlying
+    ) external override onlyRouter returns (uint256 amount) {
+        amount = totalSupply > 0
+            ? (_amountOfUnderlying * totalSupply) / _totalUnderlying
+            : _amountOfUnderlying;
         _mint(_account, amount);
     }
 
-    function burn(address _account, uint _amountOfUnderlying, uint _totalUnderlying) external override onlyRouter returns (uint amount){
-        amount = totalSupply > 0 ? _amountOfUnderlying * totalSupply / _totalUnderlying : _amountOfUnderlying;
+    function burn(
+        address _account,
+        uint256 _amountOfUnderlying,
+        uint256 _totalUnderlying
+    ) external override onlyRouter returns (uint256 amount) {
+        amount = totalSupply > 0
+            ? (_amountOfUnderlying * totalSupply) / _totalUnderlying
+            : _amountOfUnderlying;
         _burn(_account, amount);
     }
-   
-    function scaledDebtOf(address _account) public view override returns (uint){
+
+    function scaledDebtOf(address _account)
+        public
+        view
+        override
+        returns (uint256)
+    {
         return scaledAmount(balanceOf[_account]);
     }
 
-    function scaledAmount(uint _amount) public view override returns (uint){
-        (, uint totalBorrowed) = router.protocols().totalBorrowed(underlying);
-        return totalSupply > 0 ? (_amount * totalBorrowed).divCeil(totalSupply) : _amount;
+    function scaledAmount(uint256 _amount)
+        public
+        view
+        override
+        returns (uint256)
+    {
+        (, uint256 totalBorrowed) = router.protocols().totalBorrowed(
+            underlying
+        );
+        return
+            totalSupply > 0
+                ? (_amount * totalBorrowed).divCeil(totalSupply)
+                : _amount;
     }
 
-    function totalDebt() public view override returns(uint totalBorrowed){
+    function totalDebt() public view override returns (uint256 totalBorrowed) {
         (, totalBorrowed) = router.protocols().totalBorrowed(underlying);
     }
 
@@ -78,5 +109,4 @@ contract DToken is IDToken{
 
         emit Burn(account, amount);
     }
-
 }

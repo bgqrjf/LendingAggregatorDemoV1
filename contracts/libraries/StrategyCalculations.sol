@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity >= 0.8.0;
+pragma solidity >=0.8.0;
 
 import "./Types.sol";
 import "./Utils.sol";
@@ -7,52 +7,76 @@ import "./Math.sol";
 
 import "../interfaces/IProtocol.sol";
 
-library StrategyCalculations{
-    using Math for uint;
-    uint constant precision = 1;
+library StrategyCalculations {
+    using Math for uint256;
+    uint256 constant precision = 1;
 
     function calculateAmountsToSupply(
         Types.StrategyParams memory _params,
         IProtocol[] memory _protocols
-    ) internal pure returns (uint[] memory amounts){
-        amounts = new uint[](_protocols.length);
-        uint totalAmountToSupply;
-        while(_params.maxRate - _params.minRate > precision){
+    ) internal pure returns (uint256[] memory amounts) {
+        amounts = new uint256[](_protocols.length);
+        uint256 totalAmountToSupply;
+        while (_params.maxRate - _params.minRate > precision) {
             totalAmountToSupply = 0;
             uint128 targetRate = (_params.maxRate + _params.minRate) / 2;
-            for (uint i = 0; i < _protocols.length; i++){
-                amounts[i] = Utils.maxOf(_params.minAmounts[i],getAmountToSupply(_protocols[i], targetRate, _params.usageParams[i]));
+            for (uint256 i = 0; i < _protocols.length; i++) {
+                amounts[i] = Utils.maxOf(
+                    _params.minAmounts[i],
+                    getAmountToSupply(
+                        _protocols[i],
+                        targetRate,
+                        _params.usageParams[i]
+                    )
+                );
                 totalAmountToSupply += amounts[i];
             }
 
-            if (totalAmountToSupply < _params.targetAmount){
+            if (totalAmountToSupply < _params.targetAmount) {
                 _params.maxRate = targetRate;
-            }else if (totalAmountToSupply > _params.targetAmount){
+            } else if (totalAmountToSupply > _params.targetAmount) {
                 _params.minRate = targetRate;
-            }else{
+            } else {
                 break;
             }
         }
 
-        if (totalAmountToSupply <= _params.targetAmount){
+        if (totalAmountToSupply <= _params.targetAmount) {
             amounts[0] += _params.targetAmount - totalAmountToSupply;
             return amounts;
         }
 
         // find protocols which allowed to reduce supply
-        for (uint i = 0; i < _protocols.length && totalAmountToSupply > _params.targetAmount; i++){
-            uint amount = Utils.minOf(totalAmountToSupply - _params.targetAmount, amounts[i] - _params.minAmounts[i]);
+        for (
+            uint256 i = 0;
+            i < _protocols.length && totalAmountToSupply > _params.targetAmount;
+            i++
+        ) {
+            uint256 amount = Utils.minOf(
+                totalAmountToSupply - _params.targetAmount,
+                amounts[i] - _params.minAmounts[i]
+            );
             amounts[i] -= amount;
             totalAmountToSupply -= amount;
         }
 
-        if (totalAmountToSupply == _params.targetAmount){
+        if (totalAmountToSupply == _params.targetAmount) {
             return amounts;
         }
 
         // No protocol is allowed to reduce any more tokens. Set insecure supplies based on the current state to minimize the possibility of liquidations.
-        for ((uint i, uint amountToReduce) = (0, totalAmountToSupply - _params.targetAmount); i < _protocols.length && totalAmountToSupply > _params.targetAmount; i++){
-            amounts[i] -= Utils.minOf((amounts[i] * amountToReduce).divCeil(totalAmountToSupply), totalAmountToSupply - _params.targetAmount);
+        for (
+            (uint256 i, uint256 amountToReduce) = (
+                0,
+                totalAmountToSupply - _params.targetAmount
+            );
+            i < _protocols.length && totalAmountToSupply > _params.targetAmount;
+            i++
+        ) {
+            amounts[i] -= Utils.minOf(
+                (amounts[i] * amountToReduce).divCeil(totalAmountToSupply),
+                totalAmountToSupply - _params.targetAmount
+            );
             totalAmountToSupply -= amounts[i];
         }
     }
@@ -60,34 +84,54 @@ library StrategyCalculations{
     function calculateAmountsToBorrow(
         Types.StrategyParams memory _params,
         IProtocol[] memory _protocols
-    ) internal pure returns (uint[] memory amounts){
-        amounts = new uint[](_protocols.length);
+    ) internal pure returns (uint256[] memory amounts) {
+        amounts = new uint256[](_protocols.length);
 
-        uint totalAmountToBorrow;
-        while(_params.maxRate > _params.minRate + precision || _params.maxRate == 0){
+        uint256 totalAmountToBorrow;
+        while (
+            _params.maxRate > _params.minRate + precision ||
+            _params.maxRate == 0
+        ) {
             totalAmountToBorrow = 0;
-            uint128 targetRate = _params.maxRate == 0 ? _params.minRate + _params.minRate + 1: (_params.maxRate + _params.minRate) / 2;
+            uint128 targetRate = _params.maxRate == 0
+                ? _params.minRate + _params.minRate + 1
+                : (_params.maxRate + _params.minRate) / 2;
 
-            for (uint i = 0; i < _protocols.length; i++){
-                uint amount = Utils.minOf(getAmountToBorrow(_protocols[i], targetRate, _params.usageParams[i]), _params.maxAmounts[i]);
-                amounts[i] = totalAmountToBorrow < _params.targetAmount ? Utils.minOf(amount, _params.targetAmount - totalAmountToBorrow) : 0;
+            for (uint256 i = 0; i < _protocols.length; i++) {
+                uint256 amount = Utils.minOf(
+                    getAmountToBorrow(
+                        _protocols[i],
+                        targetRate,
+                        _params.usageParams[i]
+                    ),
+                    _params.maxAmounts[i]
+                );
+                amounts[i] = totalAmountToBorrow < _params.targetAmount
+                    ? Utils.minOf(
+                        amount,
+                        _params.targetAmount - totalAmountToBorrow
+                    )
+                    : 0;
                 totalAmountToBorrow += amount;
             }
 
-            if (totalAmountToBorrow < _params.targetAmount){
+            if (totalAmountToBorrow < _params.targetAmount) {
                 _params.minRate = targetRate;
-            }else if (totalAmountToBorrow > _params.targetAmount){
+            } else if (totalAmountToBorrow > _params.targetAmount) {
                 _params.maxRate = targetRate;
-            }else{
+            } else {
                 break;
             }
         }
 
-        if (totalAmountToBorrow < _params.targetAmount){
-            uint amountLeft = _params.targetAmount - totalAmountToBorrow;
-            for (uint i = 0; i < amounts.length && amountLeft > 0; i++){
-                if (amounts[i] < _params.maxAmounts[i]){
-                    uint amountDelta = Utils.minOf(amountLeft,  _params.maxAmounts[i] - amounts[i]);
+        if (totalAmountToBorrow < _params.targetAmount) {
+            uint256 amountLeft = _params.targetAmount - totalAmountToBorrow;
+            for (uint256 i = 0; i < amounts.length && amountLeft > 0; i++) {
+                if (amounts[i] < _params.maxAmounts[i]) {
+                    uint256 amountDelta = Utils.minOf(
+                        amountLeft,
+                        _params.maxAmounts[i] - amounts[i]
+                    );
                     amounts[i] += amountDelta;
                     amountLeft -= amountDelta;
                 }
@@ -98,33 +142,48 @@ library StrategyCalculations{
     function calculateAmountsToRepay(
         Types.StrategyParams memory _params,
         IProtocol[] memory _protocols
-    ) internal pure returns (uint[] memory amounts){
-        amounts = new uint[](_protocols.length);
-        uint totalAmountToRepay;
+    ) internal pure returns (uint256[] memory amounts) {
+        amounts = new uint256[](_protocols.length);
+        uint256 totalAmountToRepay;
 
-        while(_params.maxRate - _params.minRate > precision){
+        while (_params.maxRate - _params.minRate > precision) {
             totalAmountToRepay = 0;
             uint128 targetRate = (_params.maxRate + _params.minRate) / 2;
-            for (uint i = 0; i < _protocols.length; i++){
-                uint amount = Utils.minOf(_params.maxAmounts[i], getAmountToRepay(_protocols[i], targetRate, _params.usageParams[i]));
-                amounts[i] = totalAmountToRepay < _params.targetAmount ? Utils.minOf(amount, _params.targetAmount - totalAmountToRepay) : 0;
+            for (uint256 i = 0; i < _protocols.length; i++) {
+                uint256 amount = Utils.minOf(
+                    _params.maxAmounts[i],
+                    getAmountToRepay(
+                        _protocols[i],
+                        targetRate,
+                        _params.usageParams[i]
+                    )
+                );
+                amounts[i] = totalAmountToRepay < _params.targetAmount
+                    ? Utils.minOf(
+                        amount,
+                        _params.targetAmount - totalAmountToRepay
+                    )
+                    : 0;
                 totalAmountToRepay += amount;
             }
 
-            if (totalAmountToRepay < _params.targetAmount){
+            if (totalAmountToRepay < _params.targetAmount) {
                 _params.maxRate = targetRate;
-            }else if (totalAmountToRepay > _params.targetAmount){
+            } else if (totalAmountToRepay > _params.targetAmount) {
                 _params.minRate = targetRate;
-            }else{
+            } else {
                 break;
             }
         }
 
-        if (totalAmountToRepay < _params.targetAmount){
-            uint amountLeft = _params.targetAmount - totalAmountToRepay;
-            for (uint i = 0; i < amounts.length && amountLeft > 0; i++){
-                if (amounts[i] < _params.maxAmounts[i]){
-                    uint amountDelta = Utils.minOf(amountLeft, _params.maxAmounts[i] - amounts[i]);
+        if (totalAmountToRepay < _params.targetAmount) {
+            uint256 amountLeft = _params.targetAmount - totalAmountToRepay;
+            for (uint256 i = 0; i < amounts.length && amountLeft > 0; i++) {
+                if (amounts[i] < _params.maxAmounts[i]) {
+                    uint256 amountDelta = Utils.minOf(
+                        amountLeft,
+                        _params.maxAmounts[i] - amounts[i]
+                    );
                     amounts[i] += amountDelta;
                     amountLeft -= amountDelta;
                 }
@@ -132,18 +191,39 @@ library StrategyCalculations{
         }
     }
 
-    function getAmountToSupply(IProtocol _protocol, uint _targetRate, bytes memory _usageParams) internal pure returns (uint){
-        int amount = _protocol.supplyToTargetSupplyRate(_targetRate, _usageParams);
-        return amount > 0 ? uint(amount) : 0;
-    }
-    
-    function getAmountToBorrow(IProtocol _protocol, uint _targetRate, bytes memory _usageParams) internal pure returns (uint){
-        int amount = _protocol.borrowToTargetBorrowRate(_targetRate, _usageParams);
-        return amount > 0 ? uint(amount) : 0;
+    function getAmountToSupply(
+        IProtocol _protocol,
+        uint256 _targetRate,
+        bytes memory _usageParams
+    ) internal pure returns (uint256) {
+        int256 amount = _protocol.supplyToTargetSupplyRate(
+            _targetRate,
+            _usageParams
+        );
+        return amount > 0 ? uint256(amount) : 0;
     }
 
-    function getAmountToRepay(IProtocol _protocol, uint _targetRate, bytes memory _usageParams) internal pure returns (uint){
-        int amount = _protocol.borrowToTargetBorrowRate(_targetRate, _usageParams);
-        return amount < 0 ? uint(-amount) : 0;
+    function getAmountToBorrow(
+        IProtocol _protocol,
+        uint256 _targetRate,
+        bytes memory _usageParams
+    ) internal pure returns (uint256) {
+        int256 amount = _protocol.borrowToTargetBorrowRate(
+            _targetRate,
+            _usageParams
+        );
+        return amount > 0 ? uint256(amount) : 0;
+    }
+
+    function getAmountToRepay(
+        IProtocol _protocol,
+        uint256 _targetRate,
+        bytes memory _usageParams
+    ) internal pure returns (uint256) {
+        int256 amount = _protocol.borrowToTargetBorrowRate(
+            _targetRate,
+            _usageParams
+        );
+        return amount < 0 ? uint256(-amount) : 0;
     }
 }

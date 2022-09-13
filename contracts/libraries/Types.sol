@@ -4,22 +4,22 @@ pragma solidity ^0.8.14;
 import "../interfaces/ISToken.sol";
 import "../interfaces/IDToken.sol";
 
-library Types{
-    struct BorrowConfig{
-        uint maxLTV;
-        uint liquidateLTV;
-        uint maxLiquidateRatio;
-        uint liquidateRewardRatio;
+library Types {
+    struct BorrowConfig {
+        uint256 maxLTV;
+        uint256 liquidateLTV;
+        uint256 maxLiquidateRatio;
+        uint256 liquidateRewardRatio;
     }
 
-    struct Asset{
+    struct Asset {
         uint8 index;
         ISToken sToken; // supply token address
         IDToken dToken; // debt token address
-        bool collateralable; 
+        bool collateralable;
     }
 
-    struct NewAssetParams{
+    struct NewAssetParams {
         address underlying;
         uint8 decimals;
         bool collateralable;
@@ -30,84 +30,84 @@ library Types{
         BorrowConfig borrowConfig;
     }
 
-    struct AAVEUsageParams{
-        uint totalSupplied; // not balance
-        uint totalBorrowed;
-        uint totalBorrowedStable;
-        uint totalBorrowedVariable;
-        uint unbacked;
-        uint slopeV1;
-        uint slopeV2;
-        uint slopeS1;
-        uint slopeS2;
-        uint baseS;  // actual base * 10^6
-        uint baseV;
-        uint optimalLTV;
-        uint reserveFactor;
-        uint stableToTotalDebtRatio;
-        uint optimalStableToTotalDebtRatio;
-        uint maxExcessStableToTotalDebtRatio;
-        uint maxExcessUsageRatio;
+    struct AAVEUsageParams {
+        uint256 totalSupplied; // not balance
+        uint256 totalBorrowed;
+        uint256 totalBorrowedStable;
+        uint256 totalBorrowedVariable;
+        uint256 unbacked;
+        uint256 slopeV1;
+        uint256 slopeV2;
+        uint256 slopeS1;
+        uint256 slopeS2;
+        uint256 baseS; // actual base * 10^6
+        uint256 baseV;
+        uint256 optimalLTV;
+        uint256 reserveFactor;
+        uint256 stableToTotalDebtRatio;
+        uint256 optimalStableToTotalDebtRatio;
+        uint256 maxExcessStableToTotalDebtRatio;
+        uint256 maxExcessUsageRatio;
     }
 
-    struct CompoundUsageParams{
-        uint totalSupplied; // not balance
-        uint totalBorrowed;
-        uint slope1;
-        uint slope2;
-        uint base;
-        uint optimalLTV;
-        uint reserveFactor;
+    struct CompoundUsageParams {
+        uint256 totalSupplied; // not balance
+        uint256 totalBorrowed;
+        uint256 slope1;
+        uint256 slope2;
+        uint256 base;
+        uint256 optimalLTV;
+        uint256 reserveFactor;
     }
 
-    struct ProtocolData{
+    struct ProtocolData {
         bool initialized;
         address target;
         address approveTo;
         address payable weth;
         address rewardToken;
-        uint rewardBalance;
+        uint256 rewardBalance;
         bytes encodedData;
     }
 
-    struct UserCompRewardData{
+    struct UserCompRewardData {
         UserCompReward supply;
         UserCompReward borrow;
     }
 
-    struct UserCompReward{
-        uint rewardPerShare;
-        uint rewardAccured;
-        uint rewardCollected;
+    struct UserCompReward {
+        uint256 rewardPerShare;
+        uint256 rewardAccured;
+        uint256 rewardCollected;
     }
 
-    struct RouterCompRewardData{
+    struct RouterCompRewardData {
         RouterCompReward supply;
         RouterCompReward borrow;
     }
 
-    struct RouterCompReward{
-        uint rewardPerShare;
-        uint index;
+    struct RouterCompReward {
+        uint256 rewardPerShare;
+        uint256 index;
     }
 
-    struct UserShare{
-        uint amount;
-        uint total;
+    struct UserShare {
+        uint256 amount;
+        uint256 total;
     }
 
-    struct StrategyParams{
-        uint targetAmount;
+    struct StrategyParams {
+        uint256 targetAmount;
         uint128 maxRate;
         uint128 minRate;
-        uint[] minAmounts;
-        uint[] maxAmounts;
+        uint256[] minAmounts;
+        uint256[] maxAmounts;
         bytes[] usageParams;
     }
 
-    struct UserAssetParams{
+    struct UserAssetParams {
         address asset;
-        uint amount;
+        uint256 amount;
         address to;
     }
 }
