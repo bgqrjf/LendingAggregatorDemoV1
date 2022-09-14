@@ -1,15 +1,13 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.14;
 
-import "./interfaces/IProtocol.sol";
-import "./interfaces/IRouter.sol";
-import "./interfaces/IStrategy.sol";
+import "./interfaces/IProtocolsHandler.sol";
 
 import "./libraries/TransferHelper.sol";
-import "./libraries/Types.sol";
 import "./libraries/Utils.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract ProtocolsHandler {
+contract ProtocolsHandler is IProtocolsHandler, Ownable {
     IRouter public immutable router;
     IStrategy public strategy;
 
@@ -21,13 +19,15 @@ contract ProtocolsHandler {
     }
 
     constructor(
-        IProtocol[] memory _protocols,
-        IStrategy _strategy,
-        IRouter _router
+        address[] memory _protocols,
+        address _strategy,
+        address _router
     ) {
-        protocols = _protocols;
-        strategy = _strategy;
-        router = _router;
+        for (uint256 i = 0; i < protocols.length; i++) {
+            protocols[i] = IProtocol(_protocols[i]);
+        }
+        strategy = IStrategy(_strategy);
+        router = IRouter(_router);
     }
 
     function redeemAndSupply(
@@ -281,5 +281,10 @@ contract ProtocolsHandler {
         if (data.weth != address(0)) {
             IWETH(data.weth).withdraw(_amount);
         }
+    }
+
+    // admin functions
+    function addProtocol(IProtocol _protocol) external override onlyOwner {
+        protocols.push(_protocol);
     }
 }

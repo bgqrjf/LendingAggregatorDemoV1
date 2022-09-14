@@ -2,9 +2,8 @@
 pragma solidity ^0.8.14;
 
 import "./interfaces/IDToken.sol";
-import "./Router.sol";
+import "./interfaces/IRouter.sol";
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./libraries/Math.sol";
 
 // DebtTOken
@@ -17,7 +16,7 @@ contract DToken is IDToken {
     uint256 public totalSupply;
     mapping(address => uint256) public balanceOf;
 
-    Router public immutable router;
+    IRouter public immutable router;
     address public override underlying;
 
     event Mint(address indexed account, uint256 amount);
@@ -34,7 +33,7 @@ contract DToken is IDToken {
         string memory _name,
         string memory _symbol
     ) {
-        router = Router(payable(_router));
+        router = IRouter(payable(_router));
         underlying = _underlying;
         name = _name;
         symbol = _symbol;

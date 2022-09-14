@@ -1,24 +1,19 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.14;
 
-import "./interfaces/IConfig.sol";
-import "./interfaces/IFactory.sol";
-import "./interfaces/IPriceOracle.sol";
-import "./interfaces/IRewards.sol";
-import "./interfaces/IStrategy.sol";
+import "./interfaces/IRouter.sol";
 
-import "./libraries/Types.sol";
 import "./libraries/TransferHelper.sol";
 import "./libraries/UserAssetBitMap.sol";
 import "./libraries/Utils.sol";
 
-import "./ProtocolsHandler.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract Router {
+contract Router is IRouter, Ownable {
     IConfig public config;
     IFactory public factory;
     IPriceOracle public priceOracle;
-    ProtocolsHandler public protocols;
+    IProtocolsHandler public protocols;
     IRewards public rewards;
     IStrategy public strategy;
 
@@ -57,6 +52,7 @@ contract Router {
     );
 
     constructor(
+        address[] memory _protocols,
         address _priceOracle,
         address _strategy,
         address _factory,
@@ -64,7 +60,9 @@ contract Router {
     ) {
         factory = IFactory(_factory);
         priceOracle = IPriceOracle(_priceOracle);
-        strategy = IStrategy(_strategy);
+        protocols = IProtocolsHandler(
+            IFactory(_factory).newProtocolsHandler(_protocols, _strategy)
+        );
 
         config = IConfig(IFactory(_factory).newConfig(msg.sender));
         rewards = IRewards(_rewards);
@@ -76,7 +74,7 @@ contract Router {
         public
         payable
     {
-        ProtocolsHandler protocolsCache = protocols;
+        IProtocolsHandler protocolsCache = protocols;
         Types.Asset memory asset = _assets[_params.asset];
         uint256 totalLending = protocols.simulateLendings(
             _params.asset,
@@ -127,7 +125,7 @@ contract Router {
     function redeem(Types.UserAssetParams memory _params, bool _collateralable)
         public
     {
-        ProtocolsHandler protocolsCache = protocols;
+        IProtocolsHandler protocolsCache = protocols;
         Types.Asset memory asset = _assets[_params.asset];
         (uint256[] memory supplies, uint256 totalSupplied) = protocolsCache
             .totalSupplied(_params.asset);
@@ -154,7 +152,7 @@ contract Router {
         uint256 _totalSupplied,
         uint256 _totalLending
     ) internal {
-        ProtocolsHandler protocolsCache = protocols;
+        IProtocolsHandler protocolsCache = protocols;
         uint256 redeemed = protocolsCache.redeem(
             _params.asset,
             _params.amount,
@@ -183,11 +181,10 @@ contract Router {
     function borrow(Types.UserAssetParams memory _params) public {
         require(borrowAllowed(_params), "Router: borrow not allowed");
 
-        ProtocolsHandler protocolsCache = protocols;
+        IProtocolsHandler protocolsCache = protocols;
         Types.Asset memory asset = _assets[_params.asset];
 
-        (uint256[] memory borrows, uint256 totalBorrowed) = protocolsCache
-            .totalBorrowed(_params.asset);
+        (, uint256 totalBorrowed) = protocolsCache.totalBorrowed(_params.asset);
         uint256 totalLending = protocolsCache.simulateLendings(
             _params.asset,
             totalLendings[_params.asset]
@@ -227,7 +224,7 @@ contract Router {
     }
 
     function repay(Types.UserAssetParams memory _params) public payable {
-        ProtocolsHandler protocolsCache = protocols;
+        IProtocolsHandler protocolsCache = protocols;
 
         TransferHelper.collectTo(
             _params.asset,
@@ -238,8 +235,7 @@ contract Router {
 
         Types.Asset memory asset = _assets[_params.asset];
 
-        (uint256[] memory borrows, uint256 totalBorrowed) = protocolsCache
-            .totalBorrowed(_params.asset);
+        (, uint256 totalBorrowed) = protocolsCache.totalBorrowed(_params.asset);
         uint256 totalLending = protocolsCache.simulateLendings(
             _params.asset,
             totalLendings[_params.asset]
@@ -382,5 +378,50 @@ contract Router {
         }
     }
 
-    function updateLendings(address _asset) internal {}
+    //  admin functions
+    function addAsset(Types.NewAssetParams memory _newAsset)
+        external
+        override
+        onlyOwner
+        returns (Types.Asset memory asset)
+    {
+        uint8 underlyingCount = uint8(underlyings.length);
+        require(
+            underlyingCount < UserAssetBitMap.MAX_RESERVES_COUNT,
+            "Router: asset list full"
+        );
+        underlyings.push(_newAsset.underlying);
+
+        asset = factory.newAsset(_newAsset, underlyingCount);
+        _assets[_newAsset.underlying] = asset;
+        config.setBorrowConfig(_newAsset.underlying, _newAsset.borrowConfig);
+    }
+
+    function updateConfig(IConfig _config) external override onlyOwner {
+        config = _config;
+    }
+
+    function updateFactory(IFactory _factory) external override onlyOwner {
+        factory = _factory;
+    }
+
+    function updateProtocolsHandler(IProtocolsHandler _protocolsHandler)
+        external
+        override
+        onlyOwner
+    {
+        protocols = _protocolsHandler;
+    }
+
+    function updatePriceOracle(IPriceOracle _priceOracle)
+        external
+        override
+        onlyOwner
+    {
+        priceOracle = _priceOracle;
+    }
+
+    function updateStrategy(IStrategy _strategy) external override onlyOwner {
+        strategy = _strategy;
+    }
 }

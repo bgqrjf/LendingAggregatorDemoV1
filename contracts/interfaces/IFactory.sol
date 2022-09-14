@@ -9,4 +9,8 @@ interface IFactory {
     function newAsset(Types.NewAssetParams memory _newAsset, uint8 _id)
         external
         returns (Types.Asset memory asset);
+
+    function newProtocolsHandler(address[] memory _protocols, address _strategy)
+        external
+        returns (address);
 }
