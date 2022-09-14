@@ -120,12 +120,12 @@ interface IProtocol {
         pure
         returns (int256);
 
-    function lastSupplyInterest(address _underlying)
+    function lastSupplyInterest(address _underlying, address _account)
         external
         view
         returns (uint256);
 
-    function lastBorrowInterest(address _underlying)
+    function lastBorrowInterest(address _underlying, address _account)
         external
         view
         returns (uint256);

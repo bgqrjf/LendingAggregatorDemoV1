@@ -191,8 +191,14 @@ contract ProtocolsHandler is IProtocolsHandler, Ownable {
         uint256 supplyInterest;
         uint256 borrowInterest;
         for (uint256 i = 0; i < protocolsCache.length; i++) {
-            supplyInterest = protocolsCache[i].lastSupplyInterest(_asset);
-            borrowInterest = protocolsCache[i].lastBorrowInterest(_asset);
+            supplyInterest = protocolsCache[i].lastSupplyInterest(
+                _asset,
+                address(this)
+            );
+            borrowInterest = protocolsCache[i].lastBorrowInterest(
+                _asset,
+                address(this)
+            );
         }
 
         uint256 interestDelta = borrowInterest > supplyInterest

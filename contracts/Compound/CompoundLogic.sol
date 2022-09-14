@@ -33,8 +33,10 @@ contract CompoundLogic is IProtocol {
     mapping(address => uint256) public underlyingUnit;
 
     mapping(address => address) public initialized;
-    mapping(address => SimulateSupplyData) public lastSimulatedSupply;
-    mapping(address => SimulateBorrowData) public lastSimulatedBorrow;
+    mapping(address => mapping(address => SimulateSupplyData))
+        public lastSimulatedSupply;
+    mapping(address => mapping(address => SimulateBorrowData))
+        public lastSimulatedBorrow;
 
     constructor(
         address _comptroller,
@@ -68,7 +70,7 @@ contract CompoundLogic is IProtocol {
         ) = accrueInterest(_underlying, cToken);
         uint256 underlyingValue = totalCash + totalBorrows - totalReserves;
 
-        lastSimulatedSupply[_underlying] = SimulateSupplyData(
+        lastSimulatedSupply[_underlying][msg.sender] = SimulateSupplyData(
             (_amount * cTokenSupply) / underlyingValue,
             _amount
         );
@@ -80,13 +82,13 @@ contract CompoundLogic is IProtocol {
     {
         CTokenInterface cToken = CTokenInterface(cTokens[_underlying]);
         (, , , uint256 borrowIndex) = accrueInterest(_underlying, cToken);
-        lastSimulatedBorrow[_underlying] = SimulateBorrowData(
+        lastSimulatedBorrow[_underlying][msg.sender] = SimulateBorrowData(
             _amount,
             borrowIndex
         );
     }
 
-    function lastSupplyInterest(address _underlying)
+    function lastSupplyInterest(address _underlying, address _account)
         external
         view
         override
@@ -102,11 +104,11 @@ contract CompoundLogic is IProtocol {
         ) = accrueInterest(_underlying, cToken);
         uint256 underlyingValue = totalCash + totalBorrows - totalReserves;
         return
-            (lastSimulatedSupply[_underlying].cTokenAmount * underlyingValue) /
-            cTokenSupply;
+            (lastSimulatedSupply[_underlying][_account].cTokenAmount *
+                underlyingValue) / cTokenSupply;
     }
 
-    function lastBorrowInterest(address _underlying)
+    function lastBorrowInterest(address _underlying, address _account)
         external
         view
         override
@@ -116,9 +118,9 @@ contract CompoundLogic is IProtocol {
         (, , , uint256 borrowIndex) = accrueInterest(_underlying, cToken);
 
         return
-            (lastSimulatedBorrow[_underlying].amount * borrowIndex) /
-            lastSimulatedBorrow[_underlying].index -
-            lastSimulatedBorrow[_underlying].amount;
+            (lastSimulatedBorrow[_underlying][_account].amount * borrowIndex) /
+            lastSimulatedBorrow[_underlying][_account].index -
+            lastSimulatedBorrow[_underlying][_account].amount;
     }
 
     function getAddAssetData(address _underlying)

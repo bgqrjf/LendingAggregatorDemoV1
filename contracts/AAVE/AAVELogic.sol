@@ -30,13 +30,15 @@ contract AAVELogic is IProtocol {
     uint256 public immutable BASE = 1e21;
     address payable public wrappedNative;
     address public aaveTokenAddress;
+    IAAVEPool public pool;
 
     // mapping underlying to msg.sender;
     mapping(address => address) public initialized;
-    mapping(address => SimulateData) public lastSimulatedSupply;
-    mapping(address => SimulateData) public lastSimulatedBorrow;
-
-    IAAVEPool public pool;
+    // mapping underlying , msg.sender to simulateData
+    mapping(address => mapping(address => SimulateData))
+        public lastSimulatedSupply;
+    mapping(address => mapping(address => SimulateData))
+        public lastSimulatedBorrow;
 
     receive() external payable {}
 
@@ -61,7 +63,7 @@ contract AAVELogic is IProtocol {
         AAVEDataTypes.ReserveData memory reserve = pool.getReserveData(
             _underlying
         );
-        lastSimulatedSupply[_underlying] = SimulateData(
+        lastSimulatedSupply[_underlying][msg.sender] = SimulateData(
             _amount,
             reserve.liquidityIndex
         );
@@ -74,26 +76,26 @@ contract AAVELogic is IProtocol {
         AAVEDataTypes.ReserveData memory reserve = pool.getReserveData(
             _underlying
         );
-        lastSimulatedBorrow[_underlying] = SimulateData(
+        lastSimulatedBorrow[_underlying][msg.sender] = SimulateData(
             _amount,
             reserve.variableBorrowIndex
         );
     }
 
-    function lastSupplyInterest(address _underlying)
+    function lastSupplyInterest(address _underlying, address _account)
         external
         view
         override
         returns (uint256)
     {
         uint256 deltaIndex = pool.getReserveData(_underlying).liquidityIndex -
-            lastSimulatedSupply[_underlying].index;
+            lastSimulatedSupply[_underlying][_account].index;
         return
-            (lastSimulatedSupply[_underlying].amount /
-                lastSimulatedSupply[_underlying].index) * deltaIndex;
+            (lastSimulatedSupply[_underlying][_account].amount /
+                lastSimulatedSupply[_underlying][_account].index) * deltaIndex;
     }
 
-    function lastBorrowInterest(address _underlying)
+    function lastBorrowInterest(address _underlying, address _account)
         external
         view
         override
@@ -101,10 +103,11 @@ contract AAVELogic is IProtocol {
     {
         uint256 deltaIndex = pool
             .getReserveData(_underlying)
-            .variableBorrowIndex - lastSimulatedBorrow[_underlying].index;
+            .variableBorrowIndex -
+            lastSimulatedBorrow[_underlying][_account].index;
         return
-            (lastSimulatedBorrow[_underlying].amount /
-                lastSimulatedBorrow[_underlying].index) * deltaIndex;
+            (lastSimulatedBorrow[_underlying][_account].amount /
+                lastSimulatedBorrow[_underlying][_account].index) * deltaIndex;
     }
 
     function getAddAssetData(address _underlying)
