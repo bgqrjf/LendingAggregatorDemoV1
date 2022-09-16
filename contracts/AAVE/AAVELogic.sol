@@ -60,12 +60,9 @@ contract AAVELogic is IProtocol {
         external
         override
     {
-        AAVEDataTypes.ReserveData memory reserve = pool.getReserveData(
-            _underlying
-        );
         lastSimulatedSupply[_underlying][msg.sender] = SimulateData(
             _amount,
-            reserve.liquidityIndex
+            pool.getReserveNormalizedIncome(_underlying)
         );
     }
 
@@ -73,12 +70,9 @@ contract AAVELogic is IProtocol {
         external
         override
     {
-        AAVEDataTypes.ReserveData memory reserve = pool.getReserveData(
-            _underlying
-        );
         lastSimulatedBorrow[_underlying][msg.sender] = SimulateData(
             _amount,
-            reserve.variableBorrowIndex
+            pool.getReserveNormalizedVariableDebt(_underlying)
         );
     }
 
@@ -88,11 +82,11 @@ contract AAVELogic is IProtocol {
         override
         returns (uint256)
     {
-        uint256 deltaIndex = pool.getReserveData(_underlying).liquidityIndex -
+        uint256 deltaIndex = pool.getReserveNormalizedIncome(_underlying) -
             lastSimulatedSupply[_underlying][_account].index;
         return
-            (lastSimulatedSupply[_underlying][_account].amount /
-                lastSimulatedSupply[_underlying][_account].index) * deltaIndex;
+            (deltaIndex * lastSimulatedSupply[_underlying][_account].amount) /
+            lastSimulatedSupply[_underlying][_account].index;
     }
 
     function lastBorrowInterest(address _underlying, address _account)
@@ -101,13 +95,12 @@ contract AAVELogic is IProtocol {
         override
         returns (uint256)
     {
-        uint256 deltaIndex = pool
-            .getReserveData(_underlying)
-            .variableBorrowIndex -
-            lastSimulatedBorrow[_underlying][_account].index;
+        uint256 deltaIndex = pool.getReserveNormalizedVariableDebt(
+            _underlying
+        ) - lastSimulatedBorrow[_underlying][_account].index;
         return
-            (lastSimulatedBorrow[_underlying][_account].amount /
-                lastSimulatedBorrow[_underlying][_account].index) * deltaIndex;
+            (deltaIndex * lastSimulatedBorrow[_underlying][_account].amount) /
+            lastSimulatedBorrow[_underlying][_account].index;
     }
 
     function getAddAssetData(address _underlying)
@@ -115,13 +108,13 @@ contract AAVELogic is IProtocol {
         view
         returns (Types.ProtocolData memory data)
     {
-        _underlying = replaceNative(_underlying);
-        data.target = address(pool);
-        data.encodedData = abi.encodeWithSelector(
-            pool.setUserUseReserveAsCollateral.selector,
-            _underlying,
-            true
-        );
+        // _underlying = replaceNative(_underlying);
+        // data.target = address(pool);
+        // data.encodedData = abi.encodeWithSelector(
+        //     pool.setUserUseReserveAsCollateral.selector,
+        //     _underlying,
+        //     true
+        // );
     }
 
     function getSupplyData(address _underlying, uint256 _amount)
@@ -151,7 +144,8 @@ contract AAVELogic is IProtocol {
             );
         }
 
-        data.initialized = initialized[_underlying] == msg.sender;
+        data.initialized = true;
+        // data.initialized = initialized[_underlying] == msg.sender;
     }
 
     function getRedeemData(address _underlying, uint256 _amount)
@@ -335,8 +329,8 @@ contract AAVELogic is IProtocol {
         );
         uint256 unit = 10**(decimals);
 
-        collateralValue *= unit / priceQuote;
-        borrowedValue *= unit / priceQuote;
+        collateralValue = (collateralValue * unit) / priceQuote;
+        borrowedValue = (borrowedValue * unit) / priceQuote;
     }
 
     function supplyToTargetSupplyRate(uint256 _targetRate, bytes memory _params)
@@ -349,7 +343,9 @@ contract AAVELogic is IProtocol {
             _params,
             (Types.AAVEUsageParams)
         );
-        _targetRate = (_targetRate * Utils.MILLION) / params.reserveFactor;
+        _targetRate = (_targetRate * Utils.MILLION).divCeil(
+            params.reserveFactor
+        );
 
         uint256 a = params.optimalLTV *
             (params.baseS *
@@ -502,18 +498,6 @@ contract AAVELogic is IProtocol {
         return abi.encode(params);
     }
 
-    function replaceNative(address _underlying)
-        internal
-        view
-        returns (address)
-    {
-        if (_underlying == TransferHelper.ETH) {
-            return wrappedNative;
-        } else {
-            return _underlying;
-        }
-    }
-
     function getCurrentSupplyRate(address _underlying)
         external
         view
@@ -555,4 +539,16 @@ contract AAVELogic is IProtocol {
         bytes memory _user,
         bytes memory _router
     ) external view returns (bytes memory, bytes memory) {}
+
+    function replaceNative(address _underlying)
+        internal
+        view
+        returns (address)
+    {
+        if (_underlying == TransferHelper.ETH) {
+            return wrappedNative;
+        } else {
+            return _underlying;
+        }
+    }
 }

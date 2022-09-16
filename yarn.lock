@@ -635,6 +635,13 @@
     "tweetnacl" "^1.0.3"
     "tweetnacl-util" "^0.15.1"
 
+"@nomicfoundation/hardhat-network-helpers@^1.0.6":
+  "integrity" "sha512-a35iVD4ycF6AoTfllAnKm96IPIzzHpgKX/ep4oKc2bsUKFfMlacWdyntgC/7d5blyCTXfFssgNAvXDZfzNWVGQ=="
+  "resolved" "https://registry.npmjs.org/@nomicfoundation/hardhat-network-helpers/-/hardhat-network-helpers-1.0.6.tgz"
+  "version" "1.0.6"
+  dependencies:
+    "ethereumjs-util" "^7.1.4"
+
 "@nomiclabs/hardhat-ethers@^2.0.0":
   "integrity" "sha512-q2Cjp20IB48rEn2NPjR1qxsIQBvFVYW9rFRCFq+bC4RUrn1Ljz3g4wM8uSlgIBZYBi2JMXxmOzFqHraczxq4Ng=="
   "resolved" "https://registry.npmjs.org/@nomiclabs/hardhat-ethers/-/hardhat-ethers-2.0.6.tgz"
@@ -3640,7 +3647,7 @@
     "chalk" "^4.0.0"
     "cli-table3" "^0.6.0"
 
-"hardhat@^2.0.0", "hardhat@^2.9.6":
+"hardhat@^2.0.0", "hardhat@^2.9.5", "hardhat@^2.9.6":
   "integrity" "sha512-Vnm1iDfhbavNjvLxArt47rt6G3vPIV4Q/+pNgFkh6sfQH8JVf8px5VxiEs5cj4rPxmU+DXGKoalY+pK8fAL4oA=="
   "resolved" "https://registry.npmjs.org/hardhat/-/hardhat-2.9.6.tgz"
   "version" "2.9.6"

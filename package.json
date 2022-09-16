@@ -4,6 +4,7 @@
     "hardhat": "^2.9.6"
   },
   "dependencies": {
+    "@nomicfoundation/hardhat-network-helpers": "^1.0.6",
     "@nomiclabs/hardhat-waffle": "^2.0.3",
     "@openzeppelin/contracts": "^4.6.0",
     "hardhat-contract-sizer": "^2.5.1",
