@@ -13,12 +13,7 @@ import "../libraries/TransferHelper.sol";
 contract CompoundLogic is IProtocol {
     using Math for uint256;
 
-    struct SimulateSupplyData {
-        uint256 cTokenAmount;
-        uint256 underlyingValue;
-    }
-
-    struct SimulateBorrowData {
+    struct SimulateData {
         uint256 amount;
         uint256 index;
     }
@@ -33,9 +28,9 @@ contract CompoundLogic is IProtocol {
     mapping(address => uint256) public underlyingUnit;
 
     mapping(address => address) public initialized;
-    mapping(address => mapping(address => SimulateSupplyData))
+    mapping(address => mapping(address => SimulateData))
         public lastSimulatedSupply;
-    mapping(address => mapping(address => SimulateBorrowData))
+    mapping(address => mapping(address => SimulateData))
         public lastSimulatedBorrow;
 
     constructor(
@@ -61,18 +56,10 @@ contract CompoundLogic is IProtocol {
         override
     {
         CTokenInterface cToken = CTokenInterface(cTokens[_underlying]);
-        uint256 cTokenSupply = cToken.totalSupply();
-        (
-            uint256 totalCash,
-            uint256 totalBorrows,
-            uint256 totalReserves,
 
-        ) = accrueInterest(_underlying, cToken);
-        uint256 underlyingValue = totalCash + totalBorrows - totalReserves;
-
-        lastSimulatedSupply[_underlying][msg.sender] = SimulateSupplyData(
-            (_amount * cTokenSupply) / underlyingValue,
-            _amount
+        lastSimulatedSupply[_underlying][msg.sender] = SimulateData(
+            _amount,
+            getSupplyIndex(_underlying, cToken)
         );
     }
 
@@ -81,8 +68,9 @@ contract CompoundLogic is IProtocol {
         override
     {
         CTokenInterface cToken = CTokenInterface(cTokens[_underlying]);
+
         (, , , uint256 borrowIndex) = accrueInterest(_underlying, cToken);
-        lastSimulatedBorrow[_underlying][msg.sender] = SimulateBorrowData(
+        lastSimulatedBorrow[_underlying][msg.sender] = SimulateData(
             _amount,
             borrowIndex
         );
@@ -95,17 +83,10 @@ contract CompoundLogic is IProtocol {
         returns (uint256)
     {
         CTokenInterface cToken = CTokenInterface(cTokens[_underlying]);
-        uint256 cTokenSupply = cToken.totalSupply();
-        (
-            uint256 totalCash,
-            uint256 totalBorrows,
-            uint256 totalReserves,
+        SimulateData memory data = lastSimulatedSupply[_underlying][_account];
+        uint256 deltaIndex = getSupplyIndex(_underlying, cToken) - data.index;
 
-        ) = accrueInterest(_underlying, cToken);
-        uint256 underlyingValue = totalCash + totalBorrows - totalReserves;
-        return
-            (lastSimulatedSupply[_underlying][_account].cTokenAmount *
-                underlyingValue) / cTokenSupply;
+        return (deltaIndex * data.amount) / data.index;
     }
 
     function lastBorrowInterest(address _underlying, address _account)
@@ -115,12 +96,12 @@ contract CompoundLogic is IProtocol {
         returns (uint256)
     {
         CTokenInterface cToken = CTokenInterface(cTokens[_underlying]);
-        (, , , uint256 borrowIndex) = accrueInterest(_underlying, cToken);
+        SimulateData memory data = lastSimulatedBorrow[_underlying][_account];
 
-        return
-            (lastSimulatedBorrow[_underlying][_account].amount * borrowIndex) /
-            lastSimulatedBorrow[_underlying][_account].index -
-            lastSimulatedBorrow[_underlying][_account].amount;
+        (, , , uint256 borrowIndex) = accrueInterest(_underlying, cToken);
+        uint256 deltaIndex = borrowIndex - data.index;
+        return (deltaIndex * data.amount) / data.index;
+        // return deltaIndex;
     }
 
     function getAddAssetData(address _underlying)
@@ -371,14 +352,9 @@ contract CompoundLogic is IProtocol {
 
             uint256 underlyingAmount = (cTokenBalance * exchangeRate) /
                 Utils.QUINTILLION;
-            collateralValue +=
-                (((underlyingAmount * oraclePrice) / Utils.QUINTILLION) *
-                    underlyingUnit[address(cToken)]) /
-                Utils.QUINTILLION;
-            borrowValue +=
-                (((borrowBalance * oraclePrice) / Utils.QUINTILLION) *
-                    underlyingUnit[address(cToken)]) /
-                Utils.QUINTILLION;
+            collateralValue += underlyingAmount * oraclePrice;
+
+            borrowValue += borrowBalance * oraclePrice;
         }
 
         address cQuote = cTokens[_quote];
@@ -387,10 +363,8 @@ contract CompoundLogic is IProtocol {
         );
         require(oraclePriceQuote > 0, "Compound Logic: Price Not found");
 
-        uint256 factor = (Utils.QUINTILLION * Utils.QUINTILLION) /
-            underlyingUnit[cQuote];
-        collateralValue = (collateralValue * factor) / oraclePriceQuote;
-        borrowValue = (borrowValue * factor) / oraclePriceQuote;
+        collateralValue = collateralValue / oraclePriceQuote;
+        borrowValue = borrowValue / oraclePriceQuote;
     }
 
     function supplyToTargetSupplyRate(uint256 _targetRate, bytes memory _params)
@@ -688,5 +662,25 @@ contract CompoundLogic is IProtocol {
         _params.borrow.index = borrowIndex;
         _params.borrow.rewardPerShare += amount / _totalShare;
         return _params;
+    }
+
+    function getSupplyIndex(address _underlying, CTokenInterface cToken)
+        public
+        view
+        returns (uint256 supplyIndex)
+    {
+        uint256 supplyTokens = cToken.totalSupply();
+
+        (
+            uint256 totalCash,
+            uint256 totalBorrows,
+            uint256 totalReserves,
+
+        ) = accrueInterest(_underlying, cToken);
+
+        supplyIndex = supplyTokens > 0
+            ? ((totalCash + totalBorrows - totalReserves) * Utils.QUINTILLION) /
+                supplyTokens
+            : Utils.QUINTILLION;
     }
 }

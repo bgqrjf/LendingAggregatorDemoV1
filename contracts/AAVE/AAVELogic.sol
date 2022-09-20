@@ -82,11 +82,10 @@ contract AAVELogic is IProtocol {
         override
         returns (uint256)
     {
+        SimulateData memory data = lastSimulatedSupply[_underlying][_account];
         uint256 deltaIndex = pool.getReserveNormalizedIncome(_underlying) -
-            lastSimulatedSupply[_underlying][_account].index;
-        return
-            (deltaIndex * lastSimulatedSupply[_underlying][_account].amount) /
-            lastSimulatedSupply[_underlying][_account].index;
+            data.index;
+        return (deltaIndex * data.amount) / data.index;
     }
 
     function lastBorrowInterest(address _underlying, address _account)
@@ -95,12 +94,11 @@ contract AAVELogic is IProtocol {
         override
         returns (uint256)
     {
+        SimulateData memory data = lastSimulatedBorrow[_underlying][_account];
         uint256 deltaIndex = pool.getReserveNormalizedVariableDebt(
             _underlying
-        ) - lastSimulatedBorrow[_underlying][_account].index;
-        return
-            (deltaIndex * lastSimulatedBorrow[_underlying][_account].amount) /
-            lastSimulatedBorrow[_underlying][_account].index;
+        ) - data.index;
+        return (deltaIndex * data.amount) / data.index;
     }
 
     function getAddAssetData(address _underlying)

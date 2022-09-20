@@ -36,4 +36,9 @@ interface ComptrollerInterface {
         external
         view
         returns (uint224 index, uint32 block);
+
+    function compSupplySpeeds(address cToken)
+        external
+        view
+        returns (uint256 speed);
 }

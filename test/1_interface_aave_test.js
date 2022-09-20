@@ -42,7 +42,7 @@ describe("Protocol Interfaces tests", function () {
   }
 
   describe("AAVE interface tests", function () {
-    it("should read data from AAVE handler properly", async () => {
+    it("should read data properly", async () => {
       const deploys = await loadFixture(aaveInterfaceTestFixture);
 
       let wETH = deploys.wETH;
@@ -143,10 +143,11 @@ describe("Protocol Interfaces tests", function () {
       await token0.mint(deployer.address, supplyAmount);
       await token0.approve(aPool.address, supplyAmount);
 
-      // deposit aave
-      await aPool.supply(token0.address, supplyAmount, deployer.address, 0);
       // await aPool.setUserUseReserveAsCollateral(token0.address, true);
       await aaveHandler.updateSupplyShare(token0.address, supplyAmount);
+
+      // deposit aave
+      await aPool.supply(token0.address, supplyAmount, deployer.address, 0);
 
       // borrow from aave
       await aPool.borrow(token0.address, borrowAmount, 2, 0, deployer.address);
@@ -160,7 +161,15 @@ describe("Protocol Interfaces tests", function () {
         token0.address,
         deployer.address
       );
-      expect(simulateInterest).to.equal("133333333333333");
+
+      let reserveData = await aPool.getReserveData(token0.address);
+      let aToken = await ethers.getContractAt(
+        "AToken",
+        reserveData.aTokenAddress
+      );
+      let balance = await aToken.balanceOf(deployer.address);
+
+      expect(simulateInterest).to.equal(balance.sub(supplyAmount));
     });
 
     it("should calculate borrow Interest properly", async () => {
@@ -227,7 +236,6 @@ describe("Protocol Interfaces tests", function () {
     //   //   to: data.target,
     //   //   value: 0,
     //   //   gasLimit: ethers.utils.hexlify(1000000), // 100000
-    //   //   gasPrice: 21408767,
     //   //   data: data.encodedData,
     //   // };
 
@@ -257,7 +265,6 @@ describe("Protocol Interfaces tests", function () {
         to: data.target,
         value: 0,
         gasLimit: ethers.utils.hexlify(1000000),
-        gasPrice: 21408767,
         data: data.encodedData,
       };
 
@@ -293,7 +300,6 @@ describe("Protocol Interfaces tests", function () {
         to: data.target,
         value: 0,
         gasLimit: ethers.utils.hexlify(1000000),
-        gasPrice: 21408767,
         data: data.encodedData,
       };
 
@@ -330,7 +336,6 @@ describe("Protocol Interfaces tests", function () {
         to: data.target,
         value: 0,
         gasLimit: ethers.utils.hexlify(1000000),
-        gasPrice: 21408767,
         data: data.encodedData,
       };
 
@@ -367,7 +372,6 @@ describe("Protocol Interfaces tests", function () {
         to: data.target,
         value: 0,
         gasLimit: ethers.utils.hexlify(1000000),
-        gasPrice: 21408767,
         data: data.encodedData,
       };
 
@@ -555,7 +559,7 @@ describe("Protocol Interfaces tests", function () {
       expect(supplyRate).to.equal(targetRate);
     });
 
-    it("should calculate supplyToTargetSupplyRate properly", async () => {
+    it("should calculate borrowToTargetBorrowRate properly", async () => {
       const deploys = await loadFixture(aaveInterfaceTestFixture);
 
       let aaveHandler = deploys.aaveHandler;
@@ -572,7 +576,7 @@ describe("Protocol Interfaces tests", function () {
       await aPool.supply(token0.address, supplyAmount, deployer.address, 0);
       await aPool.borrow(token0.address, borrowAmount, 2, 0, deployer.address);
 
-      let targetRate = 20000; // 0.5%
+      let targetRate = 20000; // 2%
       let params = await aaveHandler.getUsageParams(token0.address, 0);
       let amountToBorrow = await aaveHandler.borrowToTargetBorrowRate(
         targetRate,
