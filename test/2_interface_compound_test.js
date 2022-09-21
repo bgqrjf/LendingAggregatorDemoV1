@@ -24,16 +24,16 @@ describe("Protocol Interfaces tests", function () {
     let cETH = compoundContracts.cETH;
     let comp = compoundContracts.comp;
 
-    let ProviderCompound = await ethers.getContractFactory("CompoundLogic");
-    providerCompound = await ProviderCompound.deploy(
+    let CompoundHandler = await ethers.getContractFactory("CompoundLogic");
+    let compoundHandler = await CompoundHandler.deploy(
       comptroller.address,
       cETH.address,
       comp.address,
       { gasLimit: 5000000 }
     );
 
-    await providerCompound.updateCTokenList(cToken0.address, 18);
-    await providerCompound.updateCTokenList(cUSDT.address, 6);
+    await compoundHandler.updateCTokenList(cToken0.address, 18);
+    await compoundHandler.updateCTokenList(cUSDT.address, 6);
 
     return {
       deployer: compoundContracts.deployer,
@@ -44,7 +44,7 @@ describe("Protocol Interfaces tests", function () {
       cUSDT: cUSDT,
       cETH: cETH,
       comp: comp,
-      providerCompound: providerCompound,
+      compoundHandler: compoundHandler,
     };
   }
 
@@ -52,7 +52,7 @@ describe("Protocol Interfaces tests", function () {
     it("should read data properly", async () => {
       const deploys = await loadFixture(compoundInterfaceTestFixture);
 
-      let compoundHandler = deploys.providerCompound;
+      let compoundHandler = deploys.compoundHandler;
       let comptroller = deploys.comptroller;
       let comp = deploys.comp;
 
@@ -70,7 +70,7 @@ describe("Protocol Interfaces tests", function () {
       const deploys = await loadFixture(compoundInterfaceTestFixture);
 
       let deployer = deploys.deployer;
-      let compoundHandler = deploys.providerCompound;
+      let compoundHandler = deploys.compoundHandler;
       let token0 = deploys.token0;
 
       let simulateSupplyData = await compoundHandler.lastSimulatedSupply(
@@ -96,7 +96,7 @@ describe("Protocol Interfaces tests", function () {
       const deploys = await loadFixture(compoundInterfaceTestFixture);
 
       let deployer = deploys.deployer;
-      let compoundHandler = deploys.providerCompound;
+      let compoundHandler = deploys.compoundHandler;
       let token0 = deploys.token0;
 
       let simulateBorrowData = await compoundHandler.lastSimulatedBorrow(
@@ -123,7 +123,7 @@ describe("Protocol Interfaces tests", function () {
 
       let deployer = deploys.deployer;
       let comptroller = deploys.comptroller;
-      let compoundHandler = deploys.providerCompound;
+      let compoundHandler = deploys.compoundHandler;
       let token0 = deploys.token0;
       let cToken0 = deploys.cToken0;
 
@@ -162,7 +162,7 @@ describe("Protocol Interfaces tests", function () {
 
       let deployer = deploys.deployer;
       let comptroller = deploys.comptroller;
-      let compoundHandler = deploys.providerCompound;
+      let compoundHandler = deploys.compoundHandler;
       let token0 = deploys.token0;
       let cToken0 = deploys.cToken0;
 
@@ -201,7 +201,7 @@ describe("Protocol Interfaces tests", function () {
 
       let deployer = deploys.deployer;
       let comptroller = deploys.comptroller;
-      let compoundHandler = deploys.providerCompound;
+      let compoundHandler = deploys.compoundHandler;
       let token0 = deploys.token0;
       let cToken0 = deploys.cToken0;
 
@@ -243,7 +243,7 @@ describe("Protocol Interfaces tests", function () {
 
       let deployer = deploys.deployer;
       let comptroller = deploys.comptroller;
-      let compoundHandler = deploys.providerCompound;
+      let compoundHandler = deploys.compoundHandler;
       let token0 = deploys.token0;
       let cToken0 = deploys.cToken0;
 
@@ -285,7 +285,7 @@ describe("Protocol Interfaces tests", function () {
 
       let deployer = deploys.deployer;
       let comptroller = deploys.comptroller;
-      let compoundHandler = deploys.providerCompound;
+      let compoundHandler = deploys.compoundHandler;
       let token0 = deploys.token0;
       let cToken0 = deploys.cToken0;
 
@@ -321,7 +321,7 @@ describe("Protocol Interfaces tests", function () {
 
       let deployer = deploys.deployer;
       let comptroller = deploys.comptroller;
-      let compoundHandler = deploys.providerCompound;
+      let compoundHandler = deploys.compoundHandler;
       let token0 = deploys.token0;
       let cToken0 = deploys.cToken0;
 
@@ -358,7 +358,7 @@ describe("Protocol Interfaces tests", function () {
 
       let deployer = deploys.deployer;
       let comptroller = deploys.comptroller;
-      let compoundHandler = deploys.providerCompound;
+      let compoundHandler = deploys.compoundHandler;
       let token0 = deploys.token0;
       let cToken0 = deploys.cToken0;
 
@@ -382,7 +382,7 @@ describe("Protocol Interfaces tests", function () {
 
       let deployer = deploys.deployer;
       let comptroller = deploys.comptroller;
-      let compoundHandler = deploys.providerCompound;
+      let compoundHandler = deploys.compoundHandler;
       let token0 = deploys.token0;
       let cToken0 = deploys.cToken0;
 
@@ -407,7 +407,7 @@ describe("Protocol Interfaces tests", function () {
 
       let deployer = deploys.deployer;
       let comptroller = deploys.comptroller;
-      let compoundHandler = deploys.providerCompound;
+      let compoundHandler = deploys.compoundHandler;
       let token0 = deploys.token0;
       let cToken0 = deploys.cToken0;
       let usdt = deploys.usdt;
@@ -445,7 +445,7 @@ describe("Protocol Interfaces tests", function () {
 
       let deployer = deploys.deployer;
       let comptroller = deploys.comptroller;
-      let compoundHandler = deploys.providerCompound;
+      let compoundHandler = deploys.compoundHandler;
       let token0 = deploys.token0;
       let cToken0 = deploys.cToken0;
 
@@ -468,7 +468,7 @@ describe("Protocol Interfaces tests", function () {
 
       let deployer = deploys.deployer;
       let comptroller = deploys.comptroller;
-      let compoundHandler = deploys.providerCompound;
+      let compoundHandler = deploys.compoundHandler;
       let token0 = deploys.token0;
       let cToken0 = deploys.cToken0;
 
@@ -491,7 +491,7 @@ describe("Protocol Interfaces tests", function () {
 
       let deployer = deploys.deployer;
       let comptroller = deploys.comptroller;
-      let compoundHandler = deploys.providerCompound;
+      let compoundHandler = deploys.compoundHandler;
       let token0 = deploys.token0;
       let cToken0 = deploys.cToken0;
 
@@ -523,7 +523,7 @@ describe("Protocol Interfaces tests", function () {
 
       let deployer = deploys.deployer;
       let comptroller = deploys.comptroller;
-      let compoundHandler = deploys.providerCompound;
+      let compoundHandler = deploys.compoundHandler;
       let token0 = deploys.token0;
       let cToken0 = deploys.cToken0;
 

@@ -19,38 +19,38 @@ interface IStrategy {
             uint256[] memory redeemAmounts
         );
 
-    // function getRedeemStrategy(IProtocol[] memory _protocols, Types.UserAssetParams memory _params) external view returns (uint[] memory amounts);
     function getBorrowStrategy(
-        IProtocol[] memory _providers,
-        Types.UserAssetParams memory _params
+        IProtocol[] memory _protocols,
+        address _asset,
+        uint256 _amount
     ) external view returns (uint256[] memory amounts);
 
     function getRepayStrategy(
-        IProtocol[] memory _providers,
-        Types.UserAssetParams memory _params
+        IProtocol[] memory _protocols,
+        address _asset,
+        uint256 _amount
     ) external view returns (uint256[] memory amounts);
 
-    // function rebalanceSupplies(IProtocol[] memory _protocols, address _underlying) external view returns (uint[] memory currentSupplies, uint[] memory newSupplies);
     function minSupplyNeeded(
-        IProtocol _provider,
+        IProtocol _protocol,
         address _underlying,
         address _account
     ) external view returns (uint256 amount);
 
     function minRepayNeeded(
-        IProtocol _provider,
+        IProtocol _protocol,
         address _underlying,
         address _account
     ) external view returns (uint256 amount);
 
     function maxRedeemAllowed(
-        IProtocol _provider,
+        IProtocol _protocol,
         address _underlying,
         address _account
     ) external view returns (uint256 amount);
 
     function maxBorrowAllowed(
-        IProtocol _provider,
+        IProtocol _protocol,
         address _underlying,
         address _account
     ) external view returns (uint256 amount);

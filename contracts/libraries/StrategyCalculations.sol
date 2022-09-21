@@ -158,12 +158,15 @@ library StrategyCalculations {
                         _params.usageParams[i]
                     )
                 );
-                amounts[i] = totalAmountToRepay < _params.targetAmount
-                    ? Utils.minOf(
-                        amount,
-                        _params.targetAmount - totalAmountToRepay
-                    )
-                    : 0;
+                amounts[i] = Utils.maxOf(
+                    _params.minAmounts[i],
+                    totalAmountToRepay < _params.targetAmount
+                        ? Utils.minOf(
+                            amount,
+                            _params.targetAmount - totalAmountToRepay
+                        )
+                        : 0
+                );
                 totalAmountToRepay += amount;
             }
 

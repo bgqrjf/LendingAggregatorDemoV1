@@ -28,7 +28,6 @@ contract Strategy is IStrategy {
         Types.StrategyParams memory params;
         params.usageParams = new bytes[](_protocols.length);
         params.minAmounts = new uint256[](_protocols.length);
-
         for (uint256 i = 0; i < _protocols.length; i++) {
             params.usageParams[i] = _protocols[i].getUsageParams(
                 _asset,
@@ -39,14 +38,14 @@ contract Strategy is IStrategy {
                 _asset,
                 msg.sender
             );
-
             uint256 rate = _protocols[i].getCurrentSupplyRate(_asset);
             params.maxRate = uint128(Utils.maxOf(rate, params.maxRate));
         }
-
         params.targetAmount = _amount;
         uint256[] memory amounts = params.calculateAmountsToSupply(_protocols);
 
+        supplyAmounts = new uint256[](_protocols.length);
+        redeemAmounts = new uint256[](_protocols.length);
         for (uint256 i = 0; i < amounts.length; i++) {
             if (amounts[i] < _currentSupplies[i]) {
                 redeemAmounts[i] = _currentSupplies[i] - amounts[i];
@@ -79,7 +78,8 @@ contract Strategy is IStrategy {
 
     function getBorrowStrategy(
         IProtocol[] memory _protocols,
-        Types.UserAssetParams memory _params
+        address _asset,
+        uint256 _amount
     ) external view override returns (uint256[] memory amounts) {
         Types.StrategyParams memory params;
         params.usageParams = new bytes[](_protocols.length);
@@ -87,27 +87,22 @@ contract Strategy is IStrategy {
         uint256 maxBorrowAmount;
 
         for (uint256 i = 0; i < _protocols.length; i++) {
-            params.usageParams[i] = _protocols[i].getUsageParams(
-                _params.asset,
-                0
-            );
+            params.usageParams[i] = _protocols[i].getUsageParams(_asset, 0);
 
             params.maxAmounts[i] = maxBorrowAllowed(
                 _protocols[i],
-                _params.asset,
-                _params.to
+                _asset,
+                msg.sender
             );
             maxBorrowAmount += params.maxAmounts[i];
 
-            uint256 rate = _protocols[i].getCurrentBorrowRate(_params.asset);
+            uint256 rate = _protocols[i].getCurrentBorrowRate(_asset);
             params.minRate = uint128(Utils.minOf(rate, params.minRate));
         }
 
-        require(
-            maxBorrowAmount >= _params.amount,
-            "Strategy: insufficient balance"
-        );
-        params.targetAmount = _params.amount;
+        require(maxBorrowAmount >= _amount, "Strategy: insufficient balance");
+
+        params.targetAmount = _amount;
 
         amounts = params.calculateAmountsToBorrow(_protocols);
     }
@@ -119,23 +114,21 @@ contract Strategy is IStrategy {
     ) external view override returns (uint256[] memory amounts) {
         Types.StrategyParams memory params;
         params.usageParams = new bytes[](_protocols.length);
-        params.minAmounts = new uint256[](_protocols.length);
-
+        params.maxAmounts = new uint256[](_protocols.length);
         for (uint256 i = 0; i < _protocols.length; i++) {
             params.usageParams[i] = _protocols[i].getUsageParams(_asset, 0);
             params.maxAmounts[i] = Utils.MAX_UINT;
-
             uint256 rate = _protocols[i].getCurrentBorrowRate(_asset);
             params.minRate = uint128(Utils.minOf(rate, params.minRate));
         }
-
         params.targetAmount = _amount;
         amounts = params.calculateAmountsToBorrow(_protocols);
     }
 
     function getRepayStrategy(
         IProtocol[] memory _protocols,
-        Types.UserAssetParams memory _params
+        address _asset,
+        uint256 _amount
     ) external view override returns (uint256[] memory amounts) {
         Types.StrategyParams memory params;
         params.usageParams = new bytes[](_protocols.length);
@@ -144,44 +137,32 @@ contract Strategy is IStrategy {
         params.maxAmounts = new uint256[](_protocols.length);
 
         uint256 minRepayAmount;
-        for (
-            uint256 i = 0;
-            i < _protocols.length && _params.amount > minRepayAmount;
-            i++
-        ) {
-            params.usageParams[i] = _protocols[i].getUsageParams(
-                _params.asset,
-                0
-            );
+        for (uint256 i = 0; i < _protocols.length; i++) {
+            params.usageParams[i] = _protocols[i].getUsageParams(_asset, 0);
 
             params.minAmounts[i] = Utils.minOf(
-                _params.amount - _protocols.length,
-                minRepayNeeded(_protocols[i], _params.asset, _params.to)
+                _amount - minRepayAmount,
+                minRepayNeeded(_protocols[i], _asset, msg.sender)
             );
+
             minRepayAmount += params.minAmounts[i];
+            params.maxAmounts[i] = _protocols[i].debtOf(_asset, msg.sender);
 
-            params.maxAmounts[i] = _protocols[i].debtOf(
-                _params.asset,
-                msg.sender
-            );
-
-            uint256 rate = _protocols[i].getCurrentBorrowRate(_params.asset);
+            uint256 rate = _protocols[i].getCurrentBorrowRate(_asset);
             params.maxRate = uint128(Utils.maxOf(rate, params.maxRate));
         }
 
-        if (_params.amount > _protocols.length) {
+        if (_amount > minRepayAmount) {
+            params.targetAmount = _amount;
+
             uint256[] memory strategyAmounts = params.calculateAmountsToRepay(
                 _protocols
             );
 
-            if (_protocols.length > 0) {
-                for (uint256 i = 0; i < _protocols.length; i++) {
-                    params.minAmounts[i] += strategyAmounts[i];
-                }
-            } else {
-                return strategyAmounts;
-            }
+            return strategyAmounts;
         }
+
+        return params.minAmounts;
     }
 
     function minSupplyNeeded(

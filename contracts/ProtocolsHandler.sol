@@ -88,7 +88,8 @@ contract ProtocolsHandler is IProtocolsHandler, Ownable {
         IProtocol[] memory protocolsCache = protocols;
         uint256[] memory amounts = strategy.getBorrowStrategy(
             protocolsCache,
-            _params
+            _params.asset,
+            _params.amount
         );
 
         for (uint256 i = 0; i < protocolsCache.length; i++) {
@@ -118,7 +119,8 @@ contract ProtocolsHandler is IProtocolsHandler, Ownable {
         IProtocol[] memory protocolsCache = protocols;
         uint256[] memory amounts = strategy.getRepayStrategy(
             protocolsCache,
-            _params
+            _params.asset,
+            _params.amount
         );
         for (uint256 i = 0; i < protocolsCache.length; i++) {
             if (amounts[i] > 0) {
