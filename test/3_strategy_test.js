@@ -82,6 +82,8 @@ describe("Strategy tests", function () {
     expect(await strategy.maxLTV()).to.equal(700000);
   });
 
+  it("should call minSupplyNeeded correctly", async () => {});
+
   it("should call maxRedeemAllowed correctly", async () => {});
 
   it("should call maxBorrowAllowed correctly", async () => {});
@@ -109,11 +111,6 @@ describe("Strategy tests", function () {
     await aPool.supply(token0.address, supplyAmount, deployer.address, 0);
     await cToken0.borrow(borrowAmount);
     await aPool.borrow(token0.address, borrowAmount, 2, 0, deployer.address);
-
-    let aaveSupplyRate = await aaveHandler.getCurrentSupplyRate(token0.address);
-    let compoundSupplyRate = await compoundHandler.getCurrentSupplyRate(
-      token0.address
-    );
 
     let supplyStrategy = await strategy.getSupplyStrategy(
       [aaveHandler.address, compoundHandler.address],
@@ -147,8 +144,8 @@ describe("Strategy tests", function () {
       await cToken0.mint(supplyStrategy.supplyAmounts[1]);
     }
 
-    aaveSupplyRate = await aaveHandler.getCurrentSupplyRate(token0.address);
-    compoundSupplyRate = await compoundHandler.getCurrentSupplyRate(
+    let aaveSupplyRate = await aaveHandler.getCurrentSupplyRate(token0.address);
+    let compoundSupplyRate = await compoundHandler.getCurrentSupplyRate(
       token0.address
     );
 
@@ -311,6 +308,8 @@ describe("Strategy tests", function () {
       token0.address,
       borrowAmount
     );
+
+    expect(repayAmounts[0].add(repayAmounts[1])).to.equal(borrowAmount);
 
     await aPool.repay(token0.address, repayAmounts[0], 2, deployer.address);
     await cToken0.repayBorrow(repayAmounts[1]);

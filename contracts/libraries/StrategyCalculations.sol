@@ -145,29 +145,31 @@ library StrategyCalculations {
     ) internal pure returns (uint256[] memory amounts) {
         amounts = new uint256[](_protocols.length);
         uint256 totalAmountToRepay;
+        uint256 totalAmount;
 
         while (_params.maxRate - _params.minRate > precision) {
             totalAmountToRepay = 0;
+            totalAmount = 0;
             uint128 targetRate = (_params.maxRate + _params.minRate) / 2;
             for (uint256 i = 0; i < _protocols.length; i++) {
-                uint256 amount = Utils.minOf(
-                    _params.maxAmounts[i],
-                    getAmountToRepay(
-                        _protocols[i],
-                        targetRate,
-                        _params.usageParams[i]
-                    )
+                uint256 amount = getAmountToRepay(
+                    _protocols[i],
+                    targetRate,
+                    _params.usageParams[i]
                 );
-                amounts[i] = Utils.maxOf(
-                    _params.minAmounts[i],
-                    totalAmountToRepay < _params.targetAmount
-                        ? Utils.minOf(
-                            amount,
-                            _params.targetAmount - totalAmountToRepay
-                        )
-                        : 0
-                );
+
+                amounts[i] = Utils.maxOf(_params.minAmounts[i], amount);
+
+                if (totalAmountToRepay < _params.targetAmount) {
+                    amounts[i] = Utils.minOf(
+                        amounts[i],
+                        _params.targetAmount - totalAmountToRepay
+                    );
+                }
+
+                amounts[i] = Utils.minOf(_params.maxAmounts[i], amounts[i]);
                 totalAmountToRepay += amount;
+                totalAmount += amounts[i];
             }
 
             if (totalAmountToRepay < _params.targetAmount) {
@@ -179,8 +181,8 @@ library StrategyCalculations {
             }
         }
 
-        if (totalAmountToRepay < _params.targetAmount) {
-            uint256 amountLeft = _params.targetAmount - totalAmountToRepay;
+        if (totalAmount < _params.targetAmount) {
+            uint256 amountLeft = _params.targetAmount - totalAmount;
             for (uint256 i = 0; i < amounts.length && amountLeft > 0; i++) {
                 if (amounts[i] < _params.maxAmounts[i]) {
                     uint256 amountDelta = Utils.minOf(

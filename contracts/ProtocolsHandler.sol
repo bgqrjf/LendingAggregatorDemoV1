@@ -8,13 +8,12 @@ import "./libraries/Utils.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract ProtocolsHandler is IProtocolsHandler, Ownable {
-    IRouter public immutable router;
+    address public immutable router;
     IStrategy public strategy;
-
     IProtocol[] public protocols;
 
     modifier onlyRouter() {
-        require(msg.sender == address(router), "SToken: OnlyRouter");
+        require(msg.sender == router, "ProtocolsHandler: OnlyRouter");
         _;
     }
 
@@ -23,11 +22,12 @@ contract ProtocolsHandler is IProtocolsHandler, Ownable {
         address _strategy,
         address _router
     ) {
-        for (uint256 i = 0; i < protocols.length; i++) {
+        protocols = new IProtocol[](_protocols.length);
+        for (uint256 i = 0; i < _protocols.length; i++) {
             protocols[i] = IProtocol(_protocols[i]);
         }
         strategy = IStrategy(_strategy);
-        router = IRouter(_router);
+        router = _router;
     }
 
     function redeemAndSupply(
@@ -95,7 +95,7 @@ contract ProtocolsHandler is IProtocolsHandler, Ownable {
         for (uint256 i = 0; i < protocolsCache.length; i++) {
             if (amounts[i] > 0) {
                 Types.ProtocolData memory data = protocolsCache[i]
-                    .getBorrowData(_params.asset, _params.amount);
+                    .getBorrowData(_params.asset, amounts[i]);
                 Utils.lowLevelCall(data.target, data.encodedData, 0);
                 if (data.weth != address(0)) {
                     IWETH(data.weth).withdraw(amounts[i]);
@@ -122,11 +122,12 @@ contract ProtocolsHandler is IProtocolsHandler, Ownable {
             _params.asset,
             _params.amount
         );
+
         for (uint256 i = 0; i < protocolsCache.length; i++) {
             if (amounts[i] > 0) {
                 Types.ProtocolData memory data = protocolsCache[i].getRepayData(
                     _params.asset,
-                    _params.amount
+                    amounts[i]
                 );
 
                 if (data.approveTo == address(0)) {
@@ -155,6 +156,7 @@ contract ProtocolsHandler is IProtocolsHandler, Ownable {
                 }
             }
         }
+
         return _params.amount;
     }
 
@@ -192,11 +194,13 @@ contract ProtocolsHandler is IProtocolsHandler, Ownable {
         IProtocol[] memory protocolsCache = protocols;
         uint256 supplyInterest;
         uint256 borrowInterest;
+
         for (uint256 i = 0; i < protocolsCache.length; i++) {
             supplyInterest = protocolsCache[i].lastSupplyInterest(
                 _asset,
                 address(this)
             );
+
             borrowInterest = protocolsCache[i].lastBorrowInterest(
                 _asset,
                 address(this)
@@ -206,8 +210,10 @@ contract ProtocolsHandler is IProtocolsHandler, Ownable {
         uint256 interestDelta = borrowInterest > supplyInterest
             ? borrowInterest - supplyInterest
             : 0;
+
         (, uint256 borrowed) = totalBorrowed(_asset);
         (, uint256 supplied) = totalSupplied(_asset);
+
         totalLending = _totalLending + (interestDelta * borrowed) / supplied;
     }
 
@@ -289,6 +295,10 @@ contract ProtocolsHandler is IProtocolsHandler, Ownable {
         if (data.weth != address(0)) {
             IWETH(data.weth).withdraw(_amount);
         }
+    }
+
+    function getProtocols() public view override returns (IProtocol[] memory) {
+        return protocols;
     }
 
     // admin functions

@@ -2,7 +2,6 @@
 pragma solidity ^0.8.14;
 
 import "./IProtocol.sol";
-import "./IRouter.sol";
 import "./IStrategy.sol";
 import "./IWETH.sol";
 
@@ -52,4 +51,6 @@ interface IProtocolsHandler {
     function simulateBorrow(address _asset, uint256 _totalLending) external;
 
     function addProtocol(IProtocol _protocol) external;
+
+    function getProtocols() external view returns (IProtocol[] memory);
 }
