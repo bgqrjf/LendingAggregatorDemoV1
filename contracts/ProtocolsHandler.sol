@@ -8,26 +8,26 @@ import "./libraries/Utils.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract ProtocolsHandler is IProtocolsHandler, Ownable {
-    address public immutable router;
+    address public router;
     IStrategy public strategy;
     IProtocol[] public protocols;
+
+    event Supplied(address indexed asset, uint256 amount);
+    event Redeemed(address indexed asset, uint256 amount);
+    event Borrowed(address indexed asset, uint256 amount);
+    event Repayed(address indexed asset, uint256 amount);
 
     modifier onlyRouter() {
         require(msg.sender == router, "ProtocolsHandler: OnlyRouter");
         _;
     }
 
-    constructor(
-        address[] memory _protocols,
-        address _strategy,
-        address _router
-    ) {
+    constructor(address[] memory _protocols, address _strategy) {
         protocols = new IProtocol[](_protocols.length);
         for (uint256 i = 0; i < _protocols.length; i++) {
             protocols[i] = IProtocol(_protocols[i]);
         }
         strategy = IStrategy(_strategy);
-        router = _router;
     }
 
     function redeemAndSupply(
@@ -45,11 +45,14 @@ contract ProtocolsHandler is IProtocolsHandler, Ownable {
                 supplies,
                 _totalSupplied
             );
+
         for (uint256 i = 0; i < protocolsCache.length; i++) {
             if (redeemAmounts[i] > 0) {
                 _redeem(protocolsCache[i], _asset, redeemAmounts[i]);
             }
+        }
 
+        for (uint256 i = 0; i < protocolsCache.length; i++) {
             if (supplyAmounts[i] > 0) {
                 _supply(protocolsCache[i], _asset, supplyAmounts[i]);
             }
@@ -61,23 +64,47 @@ contract ProtocolsHandler is IProtocolsHandler, Ownable {
         uint256 _amount,
         uint256[] memory supplies,
         uint256 _totalSupplied
-    ) public onlyRouter returns (uint256 amount) {
+    ) public onlyRouter returns (uint256) {
+        uint256 balanceBefore = TransferHelper.balanceOf(_asset, address(this));
         redeemAndSupply(_asset, supplies, _totalSupplied + _amount);
+        uint256 balanceAfter = TransferHelper.balanceOf(_asset, address(this));
+
+        emit Supplied(_asset, balanceBefore - balanceAfter);
         return _amount;
     }
 
+    // protocols may redeem token less than requested therefore using
+    // _amount as the amount use for calculation,
+    // amount as the actual amount redeemed from protocols
     function redeem(
         address _asset,
         uint256 _amount,
         uint256[] memory supplies,
         uint256 _totalSupplied,
         address _to
-    ) public onlyRouter returns (uint256 amount) {
-        // expect revert if _amount > _totalSupplied
-        redeemAndSupply(_asset, supplies, _totalSupplied - _amount);
-        TransferHelper.transfer(_asset, _to, _amount);
+    ) public onlyRouter returns (uint256, uint256) {
+        if (_amount > _totalSupplied) {
+            _amount = _totalSupplied;
+        }
 
-        return _amount;
+        if (_amount > 0) {
+            uint256 balanceBefore = TransferHelper.balanceOf(
+                _asset,
+                address(this)
+            );
+            redeemAndSupply(_asset, supplies, _totalSupplied - _amount);
+            uint256 balanceAfter = TransferHelper.balanceOf(
+                _asset,
+                address(this)
+            );
+
+            uint256 amount = balanceAfter - balanceBefore;
+            TransferHelper.safeTransfer(_asset, _to, amount, 0);
+            emit Redeemed(_asset, amount);
+            return (_amount, amount);
+        }
+
+        return (0, 0);
     }
 
     function borrow(Types.UserAssetParams memory _params)
@@ -103,7 +130,14 @@ contract ProtocolsHandler is IProtocolsHandler, Ownable {
             }
         }
 
-        TransferHelper.transfer(_params.asset, _params.to, _params.amount);
+        TransferHelper.safeTransfer(
+            _params.asset,
+            _params.to,
+            _params.amount,
+            0
+        );
+
+        emit Borrowed(_params.asset, _params.amount);
 
         return _params.amount;
     }
@@ -116,48 +150,54 @@ contract ProtocolsHandler is IProtocolsHandler, Ownable {
         (, uint256 total) = totalBorrowed(_params.asset);
         _params.amount = Utils.minOf(_params.amount, total);
 
-        IProtocol[] memory protocolsCache = protocols;
-        uint256[] memory amounts = strategy.getRepayStrategy(
-            protocolsCache,
-            _params.asset,
-            _params.amount
-        );
+        if (_params.amount > 0) {
+            IProtocol[] memory protocolsCache = protocols;
+            uint256[] memory amounts = strategy.getRepayStrategy(
+                protocolsCache,
+                _params.asset,
+                _params.amount
+            );
 
-        for (uint256 i = 0; i < protocolsCache.length; i++) {
-            if (amounts[i] > 0) {
-                Types.ProtocolData memory data = protocolsCache[i].getRepayData(
-                    _params.asset,
-                    amounts[i]
-                );
+            for (uint256 i = 0; i < protocolsCache.length; i++) {
+                if (amounts[i] > 0) {
+                    Types.ProtocolData memory data = protocolsCache[i]
+                        .getRepayData(_params.asset, amounts[i]);
 
-                if (data.approveTo == address(0)) {
-                    Utils.lowLevelCall(
-                        data.target,
-                        data.encodedData,
-                        amounts[i]
-                    );
-                } else {
-                    if (data.weth != address(0)) {
-                        IWETH(data.weth).deposit{value: amounts[i]}();
-                        TransferHelper.approve(
-                            data.weth,
-                            data.approveTo,
+                    if (data.approveTo == address(0)) {
+                        Utils.lowLevelCall(
+                            data.target,
+                            data.encodedData,
                             amounts[i]
                         );
                     } else {
-                        TransferHelper.approve(
-                            _params.asset,
-                            data.approveTo,
-                            amounts[i]
-                        );
-                    }
+                        if (data.weth != address(0)) {
+                            IWETH(data.weth).deposit{value: amounts[i]}();
+                            TransferHelper.approve(
+                                data.weth,
+                                data.approveTo,
+                                amounts[i]
+                            );
+                        } else {
+                            TransferHelper.approve(
+                                _params.asset,
+                                data.approveTo,
+                                amounts[i]
+                            );
+                        }
 
-                    Utils.lowLevelCall(data.target, data.encodedData, 0);
+                        Utils.lowLevelCall(data.target, data.encodedData, 0);
+                    }
                 }
             }
+
+            emit Repayed(_params.asset, _params.amount);
         }
 
         return _params.amount;
+    }
+
+    function getProtocols() public view override returns (IProtocol[] memory) {
+        return protocols;
     }
 
     function totalSupplied(address asset)
@@ -214,7 +254,9 @@ contract ProtocolsHandler is IProtocolsHandler, Ownable {
         (, uint256 borrowed) = totalBorrowed(_asset);
         (, uint256 supplied) = totalSupplied(_asset);
 
-        totalLending = _totalLending + (interestDelta * borrowed) / supplied;
+        totalLending = supplied > 0
+            ? _totalLending + (interestDelta * borrowed) / supplied
+            : _totalLending;
     }
 
     function simulateSupply(address _asset, uint256 _totalLending)
@@ -297,11 +339,11 @@ contract ProtocolsHandler is IProtocolsHandler, Ownable {
         }
     }
 
-    function getProtocols() public view override returns (IProtocol[] memory) {
-        return protocols;
+    // admin functions
+    function setRouter(address _router) external override onlyOwner {
+        router = _router;
     }
 
-    // admin functions
     function addProtocol(IProtocol _protocol) external override onlyOwner {
         protocols.push(_protocol);
     }

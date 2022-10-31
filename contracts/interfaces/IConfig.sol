@@ -4,6 +4,8 @@ pragma solidity ^0.8.14;
 import "../libraries/Types.sol";
 
 interface IConfig {
+    function setRouter(address _router) external;
+
     function setBorrowConfig(address _token, Types.BorrowConfig memory _config)
         external;
 

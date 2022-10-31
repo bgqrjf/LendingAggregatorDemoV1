@@ -54,15 +54,25 @@ contract AAVELogic is IProtocol {
 
     function setInitialized(address _underlying) external override {
         initialized[_underlying] = msg.sender;
+        emit TokenInitialized(msg.sender, _underlying);
     }
 
     function updateSupplyShare(address _underlying, uint256 _amount)
         external
         override
     {
-        lastSimulatedSupply[_underlying][msg.sender] = SimulateData(
+        SimulateData memory data = SimulateData(
             _amount,
             pool.getReserveNormalizedIncome(_underlying)
+        );
+
+        lastSimulatedSupply[_underlying][msg.sender] = data;
+
+        emit SupplyShareUpdated(
+            msg.sender,
+            _underlying,
+            _amount,
+            abi.encode(data)
         );
     }
 
@@ -70,9 +80,18 @@ contract AAVELogic is IProtocol {
         external
         override
     {
-        lastSimulatedBorrow[_underlying][msg.sender] = SimulateData(
+        SimulateData memory data = SimulateData(
             _amount,
             pool.getReserveNormalizedVariableDebt(_underlying)
+        );
+
+        lastSimulatedBorrow[_underlying][msg.sender] = data;
+
+        emit BorrowShareUpdated(
+            msg.sender,
+            _underlying,
+            _amount,
+            abi.encode(data)
         );
     }
 
@@ -83,6 +102,10 @@ contract AAVELogic is IProtocol {
         returns (uint256)
     {
         SimulateData memory data = lastSimulatedSupply[_underlying][_account];
+        if (data.index == 0) {
+            return 0;
+        }
+
         uint256 deltaIndex = pool.getReserveNormalizedIncome(_underlying) -
             data.index;
         return (deltaIndex * data.amount) / data.index;
@@ -95,6 +118,10 @@ contract AAVELogic is IProtocol {
         returns (uint256)
     {
         SimulateData memory data = lastSimulatedBorrow[_underlying][_account];
+        if (data.index == 0) {
+            return 0;
+        }
+
         uint256 deltaIndex = pool.getReserveNormalizedVariableDebt(
             _underlying
         ) - data.index;
@@ -170,7 +197,7 @@ contract AAVELogic is IProtocol {
             pool.withdraw.selector,
             _underlying,
             underlyingValue > 0
-                ? (_amount * aTokenSupply) / underlyingValue
+                ? (_amount * aTokenSupply).divCeil(underlyingValue)
                 : 0,
             msg.sender
         );

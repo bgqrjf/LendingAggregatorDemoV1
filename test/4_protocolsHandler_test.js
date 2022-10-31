@@ -59,20 +59,18 @@ describe("ProtocolsHandler tests", function () {
     let ProtocolsHandler = await ethers.getContractFactory("ProtocolsHandler");
     let protocolsHandler = await ProtocolsHandler.deploy(
       [aaveHandler.address, compoundHandler.address],
-      strategy.address,
-      aaveContracts.signer.address
+      strategy.address
     );
+
+    await protocolsHandler.setRouter(aaveContracts.signer.address);
 
     return {
       deployer: aaveContracts.signer,
       aPool: aPool,
-      //   aOracle: aOracle,
       aaveHandler: aaveHandler,
-      //   comptroller: comptroller,
       cToken0: cToken0,
       cUSDT: cUSDT,
       cETH: cETH,
-      //   comp: comp,
       compoundHandler: compoundHandler,
       token0: token0,
       usdt: usdt,
@@ -295,5 +293,19 @@ describe("ProtocolsHandler tests", function () {
     );
 
     expect(lendings).to.equal(ethers.BigNumber.from("500000091898806961"));
+  });
+
+  it("should addProtocol properly", async () => {
+    const deploys = await loadFixture(ProtocolsHandlerTestFixture);
+
+    let protocolsHandler = deploys.protocolsHandler;
+    let deployer = deploys.deployer;
+
+    await protocolsHandler.addProtocol(deployer.address);
+
+    let protocols = await protocolsHandler.getProtocols();
+
+    expect(protocols.length).to.equal(3);
+    expect(protocols[2]).to.equal(deployer.address);
   });
 });

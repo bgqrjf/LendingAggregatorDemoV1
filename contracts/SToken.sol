@@ -2,31 +2,25 @@
 pragma solidity ^0.8.14;
 
 import "./interfaces/ISToken.sol";
-// import "./interfaces/IRouter.sol";
+import "./interfaces/IRouter.sol";
 
-import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "./libraries/TransferHelper.sol";
 
-import "./Router.sol";
-
 // Supply Token
-contract SToken is ISToken, ERC20 {
-    Router public immutable router;
+// owner is router
+contract SToken is ISToken, OwnableUpgradeable, ERC20Upgradeable {
     address public override underlying;
 
-    modifier onlyRouter() {
-        require(msg.sender == address(router), "SToken: OnlyRouter");
-        _;
-    }
-
-    constructor(
-        address _router,
+    function initialize(
         address _underlying,
         string memory name,
         string memory symbol
-    ) ERC20(name, symbol) {
-        router = Router(payable(_router));
+    ) external initializer {
+        __Ownable_init();
+        __ERC20_init(name, symbol);
+
         underlying = _underlying;
     }
 
@@ -34,7 +28,7 @@ contract SToken is ISToken, ERC20 {
         address _account,
         uint256 _amountOfUnderlying,
         uint256 _totalUnderlying
-    ) external override onlyRouter returns (uint256 amount) {
+    ) external override onlyOwner returns (uint256 amount) {
         amount = totalSupply() > 0
             ? (_amountOfUnderlying * totalSupply()) / _totalUnderlying
             : _amountOfUnderlying;
@@ -45,7 +39,7 @@ contract SToken is ISToken, ERC20 {
         address _from,
         uint256 _amountOfUnderlying,
         uint256 _totalUnderlying
-    ) external override onlyRouter returns (uint256 amount) {
+    ) external override onlyOwner returns (uint256 amount) {
         amount = totalSupply() > 0
             ? (_amountOfUnderlying * totalSupply()) / _totalUnderlying
             : _amountOfUnderlying;
@@ -68,14 +62,12 @@ contract SToken is ISToken, ERC20 {
         returns (uint256)
     {
         uint256 totalSupply = totalSupply();
-        (, uint256 totalSupplied) = router.protocols().totalSupplied(
-            underlying
-        );
+        uint256 totalSupplied = IRouter(owner()).totalSupplied(underlying);
         return totalSupply > 0 ? (_amount * totalSupplied) / totalSupply : 0;
     }
 
     function scaledTotalSupply() public view override returns (uint256 amount) {
-        (, amount) = router.protocols().totalSupplied(underlying);
+        return IRouter(owner()).totalSupplied(underlying);
     }
 
     function userShare(address _account)

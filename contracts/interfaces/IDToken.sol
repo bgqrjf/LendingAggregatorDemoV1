@@ -1,9 +1,16 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.14;
 
-// import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
 interface IDToken {
+    event Mint(address indexed account, uint256 amount);
+    event Burn(address indexed account, uint256 amount);
+
+    function initialize(
+        address _underlying,
+        string memory _name,
+        string memory _symbol
+    ) external;
+
     function mint(
         address _account,
         uint256 _amountOfUnderlying,

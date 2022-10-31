@@ -1,10 +1,16 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.14;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "../libraries/Types.sol";
 
-interface ISToken is IERC20 {
+interface ISToken is IERC20Upgradeable {
+    function initialize(
+        address _underlying,
+        string memory name,
+        string memory symbol
+    ) external;
+
     function mint(
         address _account,
         uint256 _amountOfUnderlying,

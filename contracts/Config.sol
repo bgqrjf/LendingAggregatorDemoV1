@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "./libraries/UserAssetBitMap.sol";
 
 contract Config is IConfig, Ownable {
-    address public immutable router;
+    address public router;
 
     // mapping underlying token to borrowConfig
     mapping(address => Types.BorrowConfig) private _borrowConfigs;
@@ -16,29 +16,23 @@ contract Config is IConfig, Ownable {
     // using asset ID as bit map key of the value
     mapping(address => uint256) public userDebtAndCollateral;
 
-    modifier onlyRouterOrOwner() {
-        require(
-            msg.sender == router || msg.sender == owner(),
-            "Config: Only Router/Owner"
-        );
-        _;
-    }
-
     modifier onlyRouter() {
         require(msg.sender == router, "Config: Only Router");
         _;
     }
 
-    constructor(address _owner, address _router) {
-        transferOwnership(_owner);
+    function setRouter(address _router) external override onlyOwner {
         router = _router;
     }
 
     function setBorrowConfig(address _token, Types.BorrowConfig memory _config)
         external
         override
-        onlyRouterOrOwner
     {
+        require(
+            msg.sender == router || msg.sender == owner(),
+            "Config: Only Router/Owner"
+        );
         _borrowConfigs[_token] = _config;
     }
 

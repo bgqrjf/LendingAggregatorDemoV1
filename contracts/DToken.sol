@@ -4,10 +4,12 @@ pragma solidity ^0.8.14;
 import "./interfaces/IDToken.sol";
 import "./interfaces/IRouter.sol";
 
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+
 import "./libraries/Math.sol";
 
-// DebtTOken
-contract DToken is IDToken {
+// DebtToken
+contract DToken is IDToken, OwnableUpgradeable {
     using Math for uint256;
 
     string public name;
@@ -16,24 +18,15 @@ contract DToken is IDToken {
     uint256 public totalSupply;
     mapping(address => uint256) public balanceOf;
 
-    IRouter public immutable router;
     address public override underlying;
 
-    event Mint(address indexed account, uint256 amount);
-    event Burn(address indexed account, uint256 amount);
-
-    modifier onlyRouter() {
-        require(msg.sender == address(router), "DToken: OnlyRouter");
-        _;
-    }
-
-    constructor(
-        address _router,
+    function initialize(
         address _underlying,
         string memory _name,
         string memory _symbol
-    ) {
-        router = IRouter(payable(_router));
+    ) external initializer {
+        __Ownable_init();
+
         underlying = _underlying;
         name = _name;
         symbol = _symbol;
@@ -43,9 +36,9 @@ contract DToken is IDToken {
         address _account,
         uint256 _amountOfUnderlying,
         uint256 _totalUnderlying
-    ) external override onlyRouter returns (uint256 amount) {
+    ) external override onlyOwner returns (uint256 amount) {
         amount = totalSupply > 0
-            ? (_amountOfUnderlying * totalSupply) / _totalUnderlying
+            ? (_amountOfUnderlying * totalSupply).divCeil(_totalUnderlying)
             : _amountOfUnderlying;
         _mint(_account, amount);
     }
@@ -54,7 +47,7 @@ contract DToken is IDToken {
         address _account,
         uint256 _amountOfUnderlying,
         uint256 _totalUnderlying
-    ) external override onlyRouter returns (uint256 amount) {
+    ) external override onlyOwner returns (uint256 amount) {
         amount = totalSupply > 0
             ? (_amountOfUnderlying * totalSupply) / _totalUnderlying
             : _amountOfUnderlying;
@@ -76,9 +69,8 @@ contract DToken is IDToken {
         override
         returns (uint256)
     {
-        (, uint256 totalBorrowed) = router.protocols().totalBorrowed(
-            underlying
-        );
+        uint256 totalBorrowed = IRouter(owner()).totalBorrowed(underlying);
+
         return
             totalSupply > 0
                 ? (_amount * totalBorrowed).divCeil(totalSupply)
@@ -86,7 +78,7 @@ contract DToken is IDToken {
     }
 
     function totalDebt() public view override returns (uint256 totalBorrowed) {
-        (, totalBorrowed) = router.protocols().totalBorrowed(underlying);
+        return IRouter(owner()).totalBorrowed(underlying);
     }
 
     function _mint(address account, uint256 amount) internal virtual {

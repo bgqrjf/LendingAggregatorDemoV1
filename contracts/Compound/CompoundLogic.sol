@@ -49,7 +49,10 @@ contract CompoundLogic is IProtocol {
 
     receive() external payable {}
 
-    function setInitialized(address _underlying) external override {}
+    function setInitialized(address _underlying) external override {
+        // emit event to unify with other contract
+        emit TokenInitialized(msg.sender, _underlying);
+    }
 
     function updateSupplyShare(address _underlying, uint256 _amount)
         external
@@ -57,9 +60,18 @@ contract CompoundLogic is IProtocol {
     {
         CTokenInterface cToken = CTokenInterface(cTokens[_underlying]);
 
-        lastSimulatedSupply[_underlying][msg.sender] = SimulateData(
+        SimulateData memory data = SimulateData(
             _amount,
             getSupplyIndex(_underlying, cToken)
+        );
+
+        lastSimulatedSupply[_underlying][msg.sender] = data;
+
+        emit SupplyShareUpdated(
+            msg.sender,
+            _underlying,
+            _amount,
+            abi.encode(data)
         );
     }
 
@@ -70,9 +82,16 @@ contract CompoundLogic is IProtocol {
         CTokenInterface cToken = CTokenInterface(cTokens[_underlying]);
 
         (, , , uint256 borrowIndex) = accrueInterest(_underlying, cToken);
-        lastSimulatedBorrow[_underlying][msg.sender] = SimulateData(
+
+        SimulateData memory data = SimulateData(_amount, borrowIndex);
+
+        lastSimulatedBorrow[_underlying][msg.sender] = data;
+
+        emit BorrowShareUpdated(
+            msg.sender,
+            _underlying,
             _amount,
-            borrowIndex
+            abi.encode(data)
         );
     }
 
@@ -84,6 +103,10 @@ contract CompoundLogic is IProtocol {
     {
         CTokenInterface cToken = CTokenInterface(cTokens[_underlying]);
         SimulateData memory data = lastSimulatedSupply[_underlying][_account];
+        if (data.index == 0) {
+            return 0;
+        }
+
         uint256 deltaIndex = getSupplyIndex(_underlying, cToken) - data.index;
 
         return (deltaIndex * data.amount) / data.index;
@@ -97,6 +120,9 @@ contract CompoundLogic is IProtocol {
     {
         CTokenInterface cToken = CTokenInterface(cTokens[_underlying]);
         SimulateData memory data = lastSimulatedBorrow[_underlying][_account];
+        if (data.index == 0) {
+            return 0;
+        }
 
         (, , , uint256 borrowIndex) = accrueInterest(_underlying, cToken);
         uint256 deltaIndex = borrowIndex - data.index;

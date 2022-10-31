@@ -21,7 +21,7 @@ interface IProtocolsHandler {
         uint256[] memory supplies,
         uint256 _totalSupplied,
         address _to
-    ) external returns (uint256 amount);
+    ) external returns (uint256, uint256);
 
     function borrow(Types.UserAssetParams memory _params)
         external
@@ -49,6 +49,8 @@ interface IProtocolsHandler {
     function simulateSupply(address _asset, uint256 _totalLending) external;
 
     function simulateBorrow(address _asset, uint256 _totalLending) external;
+
+    function setRouter(address _router) external;
 
     function addProtocol(IProtocol _protocol) external;
 
