@@ -169,7 +169,7 @@ describe("Router tests", function () {
         maxLTV: 700000,
         liquidateLTV: 750000,
         maxLiquidateRatio: 500000,
-        liquidateRewardRatio: 80000,
+        liquidateRewardRatio: 1080000,
       },
     });
 
@@ -185,7 +185,7 @@ describe("Router tests", function () {
         maxLTV: 700000,
         liquidateLTV: 750000,
         maxLiquidateRatio: 500000,
-        liquidateRewardRatio: 80000,
+        liquidateRewardRatio: 1080000,
       },
     });
 
@@ -201,7 +201,7 @@ describe("Router tests", function () {
         maxLTV: 700000,
         liquidateLTV: 750000,
         maxLiquidateRatio: 500000,
-        liquidateRewardRatio: 80000,
+        liquidateRewardRatio: 1080000,
       },
     });
 
@@ -218,16 +218,7 @@ describe("Router tests", function () {
       token0: token0,
       usdt: usdt,
       wETH: wETH,
-
-      // aPool: aPool,
-      // aaveHandler: aaveHandler,
       cToken0: cToken0,
-      // cUSDT: cUSDT,
-      // cETH: cETH,
-      // compoundHandler: compoundHandler,
-
-      // strategy: strategy,
-      // protocolsHandler: protocolsHandler,
     };
   }
 
@@ -293,6 +284,9 @@ describe("Router tests", function () {
     expect(await config.userDebtAndCollateral(deployer.address)).to.equal(2);
 
     await expect(tx)
+      .to.emit(token0, "Transfer")
+      .withArgs(deployer.address, protocolsHandler.address, supplyAmount);
+    await expect(tx)
       .to.emit(sToken, "Transfer")
       .withArgs(ethers.constants.AddressZero, deployer.address, supplyAmount);
     await expect(tx)
@@ -341,6 +335,7 @@ describe("Router tests", function () {
       true
     );
 
+    let balanceBefore = await token0.balanceOf(deployer.address);
     let tx = await router.redeem(
       {
         asset: token0.address,
@@ -349,6 +344,9 @@ describe("Router tests", function () {
       },
       false
     );
+    let balanceAfter = await token0.balanceOf(deployer.address);
+
+    expect(balanceAfter.sub(balanceBefore)).to.equal("200000001165687339");
 
     let assetToken0 = await router.assets(token0.address);
     let sToken = await ethers.getContractAt("ISToken", assetToken0.sToken);
@@ -751,5 +749,101 @@ describe("Router tests", function () {
     await expect(tx).to.not.emit(protocolsHandler, "Borrowed");
   });
 
-  it("should liquidate properly", async () => {});
+  it("should liquidate properly", async () => {
+    const deploys = await loadFixture(RouterTestFixture);
+
+    let deployer = deploys.deployer;
+    let router = deploys.router;
+    let config = deploys.config;
+    let priceOracle = deploys.priceOracle;
+    let protocolsHandler = deploys.protocolsHandler;
+    let rewards = deploys.rewards;
+    let sTokenImplement = deploys.sTokenImplement;
+    let dTokenImplement = deploys.dTokenImplement;
+    let token0 = deploys.token0;
+    let usdt = deploys.usdt;
+
+    // value of supply = 2 * value of borrow
+    let borrowAmount = ethers.BigNumber.from("100000000000000000");
+    let supplyAmount = ethers.BigNumber.from("20000000");
+
+    await usdt.mint(deployer.address, supplyAmount);
+    await usdt.approve(router.address, supplyAmount);
+
+    await router.supply(
+      { asset: usdt.address, amount: supplyAmount, to: deployer.address },
+      true
+    );
+
+    await router.borrow({
+      asset: token0.address,
+      amount: borrowAmount,
+      to: deployer.address,
+    });
+
+    await expect(
+      router.liquidate(
+        {
+          asset: usdt.address,
+          amount: supplyAmount,
+          to: deployer.address,
+        },
+        {
+          asset: token0.address,
+          amount: 0,
+          to: deployer.address,
+        }
+      )
+    ).to.be.revertedWith("Router: Liquidate not allowed");
+
+    await priceOracle.setAssetPrice(token0.address, 16000000000); // set price to 160.00
+
+    await token0.approve(router.address, borrowAmount);
+    let balanceBefore = await usdt.balanceOf(deployer.address);
+    let tx = await router.liquidate(
+      {
+        asset: token0.address,
+        amount: borrowAmount,
+        to: deployer.address,
+      },
+      {
+        asset: usdt.address,
+        amount: 0,
+        to: deployer.address,
+      }
+    );
+    let balanceAfter = await usdt.balanceOf(deployer.address);
+    expect(balanceAfter.sub(balanceBefore)).to.equal("8639998");
+
+    let assetToken0 = await router.assets(token0.address);
+    let dToken = await ethers.getContractAt("IDToken", assetToken0.dToken);
+    let dBalance = await dToken.balanceOf(deployer.address);
+    let debt = await dToken.scaledDebtOf(deployer.address);
+    expect(dBalance.sub(borrowAmount.div(2))).to.within(0, 1);
+    expect(debt).to.equal("50000002402017205");
+
+    let assetUSDT = await router.assets(usdt.address);
+    let sToken = await ethers.getContractAt("ISToken", assetUSDT.sToken);
+    let sBalance = await sToken.balanceOf(deployer.address);
+    let balance = await sToken.scaledBalanceOf(deployer.address);
+
+    expect(sBalance).to.equal("11360002");
+    expect(balance).to.equal("11360003");
+
+    await expect(tx)
+      .to.emit(dToken, "Burn")
+      .withArgs(deployer.address, borrowAmount.div(2).sub(1));
+    await expect(tx)
+      .to.emit(sToken, "Transfer")
+      .withArgs(deployer.address, ethers.constants.AddressZero, "8639998");
+    await expect(tx)
+      .to.emit(router, "TotalLendingsUpdated")
+      .withArgs(token0.address, 0, 0);
+    await expect(tx)
+      .to.emit(router, "Repayed")
+      .withArgs(deployer.address, token0.address, "50000002402017204");
+    await expect(tx)
+      .to.emit(router, "Redeemed")
+      .withArgs(deployer.address, usdt.address, "8639998");
+  });
 });

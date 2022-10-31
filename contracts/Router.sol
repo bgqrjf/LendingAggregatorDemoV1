@@ -282,10 +282,7 @@ contract Router is IRouter, OwnableUpgradeable {
         Types.UserAssetParams memory _redeemParams
     ) public payable {
         Types.BorrowConfig memory bc = config.borrowConfigs(_repayParams.asset);
-        require(
-            liquidateAllowed(_repayParams, bc),
-            "Router: liquidate not allowed"
-        );
+        _repayParams.amount = validateLiquidatation(_repayParams, bc);
 
         repay(_repayParams);
 
@@ -297,10 +294,12 @@ contract Router is IRouter, OwnableUpgradeable {
             _redeemParams.asset,
             _repayParams.amount
         );
-        uint256 redeemAmount = Utils.minOf(
+
+        _redeemParams.amount = Utils.minOf(
             (assetValue * bc.liquidateRewardRatio) / Utils.MILLION,
             sToken.balanceOf(_repayParams.to)
         );
+
         (uint256[] memory supplies, uint256 protocolsSupplies) = protocolsCache
             .totalSupplied(_redeemParams.asset);
         uint256 totalLending = protocolsCache.simulateLendings(
@@ -309,7 +308,7 @@ contract Router is IRouter, OwnableUpgradeable {
         );
         uint256 sTokenAmount = sToken.burn(
             _repayParams.to,
-            redeemAmount,
+            _redeemParams.amount,
             protocolsSupplies + totalLending
         );
         _redeem(
@@ -337,20 +336,24 @@ contract Router is IRouter, OwnableUpgradeable {
         return _params.amount + debtsValue < borrowLimit;
     }
 
-    function liquidateAllowed(
+    function validateLiquidatation(
         Types.UserAssetParams memory _params,
         Types.BorrowConfig memory _bc
-    ) internal view returns (bool) {
+    ) internal view returns (uint256) {
         (uint256 collateralValue, uint256 debtsValue) = userStatus(
             _params.to,
             _params.asset
+        );
+
+        require(
+            debtsValue * Utils.MILLION > _bc.liquidateLTV * collateralValue,
+            "Router: Liquidate not allowed"
         );
         uint256 maxLiquidation = (debtsValue * _bc.maxLiquidateRatio) /
             Utils.MILLION;
 
         return
-            debtsValue * Utils.MILLION > _bc.liquidateLTV * collateralValue &&
-            _params.amount < maxLiquidation;
+            _params.amount < maxLiquidation ? _params.amount : maxLiquidation;
     }
 
     function updatetotalLendings(address _asset, uint256 _new) internal {
