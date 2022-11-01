@@ -339,12 +339,12 @@ contract ProtocolsHandler is IProtocolsHandler, Ownable {
         }
     }
 
+    function addProtocol(IProtocol _protocol) external override onlyRouter {
+        protocols.push(_protocol);
+    }
+
     // admin functions
     function setRouter(address _router) external override onlyOwner {
         router = _router;
-    }
-
-    function addProtocol(IProtocol _protocol) external override onlyOwner {
-        protocols.push(_protocol);
     }
 }

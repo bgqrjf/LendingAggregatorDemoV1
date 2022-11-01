@@ -22,10 +22,9 @@ contract CompoundLogic is IProtocol {
     uint256 public immutable BLOCK_PER_YEAR = 2102400;
 
     ComptrollerInterface public comptroller;
-    address public compTokenAddress;
+    address public rewardToken;
 
     mapping(address => address) public cTokens;
-    mapping(address => uint256) public underlyingUnit;
 
     mapping(address => address) public initialized;
     mapping(address => mapping(address => SimulateData))
@@ -42,9 +41,8 @@ contract CompoundLogic is IProtocol {
         (bool isListed, , ) = comptroller.markets(_cETH);
         require(isListed, "CompoundLogic: cToken Not Listed");
         cTokens[TransferHelper.ETH] = _cETH;
-        underlyingUnit[_cETH] = 1e18;
 
-        compTokenAddress = _compTokenAddress;
+        rewardToken = _compTokenAddress;
     }
 
     receive() external payable {}
@@ -133,6 +131,7 @@ contract CompoundLogic is IProtocol {
     function getAddAssetData(address _underlying)
         external
         view
+        override
         returns (Types.ProtocolData memory data)
     {
         address[] memory underlyings = new address[](1);
@@ -144,7 +143,6 @@ contract CompoundLogic is IProtocol {
         );
     }
 
-    // call by delegates public functions
     function getSupplyData(address _underlying, uint256 _amount)
         external
         view
@@ -234,87 +232,8 @@ contract CompoundLogic is IProtocol {
         }
     }
 
-    function getClaimRewardData(address _rewardToken)
-        external
-        view
-        override
-        returns (Types.ProtocolData memory data)
-    {
-        data.target = address(comptroller);
-        data.encodedData = abi.encodeWithSelector(
-            ComptrollerInterface.claimComp.selector,
-            msg.sender
-        );
-    }
-
-    function getClaimUserRewardData(
-        address _underlying,
-        Types.UserShare memory _share,
-        bytes memory _user,
-        bytes memory _router
-    )
-        external
-        view
-        override
-        returns (
-            bytes memory,
-            bytes memory,
-            address,
-            uint256
-        )
-    {
-        CTokenInterface cToken = CTokenInterface(cTokens[_underlying]);
-        Types.UserCompRewardData memory userRewardData = abi.decode(
-            _user,
-            (Types.UserCompRewardData)
-        );
-        Types.RouterCompRewardData memory routerRewardData = abi.decode(
-            _router,
-            (Types.RouterCompRewardData)
-        );
-
-        routerRewardData = newSupplyReward(
-            cToken,
-            routerRewardData,
-            _share.total
-        );
-        routerRewardData = newBorrowReward(
-            cToken,
-            routerRewardData,
-            _share.total
-        );
-
-        userRewardData.supply.rewardAccured +=
-            (routerRewardData.supply.rewardPerShare -
-                userRewardData.supply.rewardPerShare) *
-            _share.amount;
-        userRewardData.supply.rewardPerShare = routerRewardData
-            .supply
-            .rewardPerShare;
-        userRewardData.borrow.rewardAccured +=
-            (routerRewardData.borrow.rewardPerShare -
-                userRewardData.borrow.rewardPerShare) *
-            _share.amount;
-        userRewardData.borrow.rewardPerShare = routerRewardData
-            .borrow
-            .rewardPerShare;
-
-        uint256 amount = userRewardData.supply.rewardAccured -
-            userRewardData.supply.rewardCollected +
-            userRewardData.borrow.rewardAccured -
-            userRewardData.borrow.rewardCollected;
-        userRewardData.supply.rewardCollected = userRewardData
-            .supply
-            .rewardAccured;
-        userRewardData.borrow.rewardCollected = userRewardData
-            .borrow
-            .rewardAccured;
-        return (
-            abi.encode(userRewardData),
-            abi.encode(routerRewardData),
-            compTokenAddress,
-            amount
-        );
+    function claimRewards(address _account) external override {
+        comptroller.claimComp(_account);
     }
 
     // return underlying Token
@@ -490,47 +409,59 @@ contract CompoundLogic is IProtocol {
         return abi.encode(params);
     }
 
-    function updateCTokenList(address _cToken, uint256 _decimals) external {
+    function updateCTokenList(address _cToken) external {
         (bool isListed, , ) = comptroller.markets(address(_cToken));
         require(isListed, "CompoundLogic: cToken Not Listed");
         cTokens[CTokenInterface(_cToken).underlying()] = _cToken;
-        underlyingUnit[_cToken] = 10**_decimals;
     }
 
-    function getAccountSnapshot(CTokenInterface cToken, address account)
-        internal
-        view
-        returns (
-            uint256,
-            uint256,
-            uint256
-        )
-    {
-        address underlying;
-        if (address(cToken) == cTokens[TransferHelper.ETH]) {
-            underlying == TransferHelper.ETH;
-        } else {
-            underlying == cToken.underlying();
-        }
+    function totalRewards(
+        address _underlying,
+        address _account,
+        bool _isSupply
+    ) external view override returns (uint256 rewards) {
+        CTokenInterface cToken = CTokenInterface(cTokens[_underlying]);
 
-        (
-            uint256 totalCash,
-            uint256 totalBorrows,
-            uint256 totalReserves,
-            uint256 _borrowIndexCurrent
-        ) = accrueInterest(underlying, cToken);
-        uint256 totalSupply = cToken.totalSupply();
-
-        return (
-            cToken.balanceOf(account),
-            (cToken.borrowBalanceStored(account) * _borrowIndexCurrent) /
-                cToken.borrowIndex(),
-            totalSupply > 0
-                ? ((totalCash + totalBorrows - totalReserves) *
-                    Utils.QUINTILLION) / totalSupply
-                : 0
-        );
+        return
+            _isSupply
+                ? getSupplyReward(cToken, _account)
+                : getBorrowReward(cToken, _account);
     }
+
+    // function getAccountSnapshot(CTokenInterface cToken, address account)
+    //     internal
+    //     view
+    //     returns (
+    //         uint256,
+    //         uint256,
+    //         uint256
+    //     )
+    // {
+    //     address underlying;
+    //     if (address(cToken) == cTokens[TransferHelper.ETH]) {
+    //         underlying == TransferHelper.ETH;
+    //     } else {
+    //         underlying == cToken.underlying();
+    //     }
+
+    //     (
+    //         uint256 totalCash,
+    //         uint256 totalBorrows,
+    //         uint256 totalReserves,
+    //         uint256 _borrowIndexCurrent
+    //     ) = accrueInterest(underlying, cToken);
+    //     uint256 totalSupply = cToken.totalSupply();
+
+    //     return (
+    //         cToken.balanceOf(account),
+    //         (cToken.borrowBalanceStored(account) * _borrowIndexCurrent) /
+    //             cToken.borrowIndex(),
+    //         totalSupply > 0
+    //             ? ((totalCash + totalBorrows - totalReserves) *
+    //                 Utils.QUINTILLION) / totalSupply
+    //             : 0
+    //     );
+    // }
 
     function accrueInterest(address _underlying, CTokenInterface _cToken)
         internal
@@ -590,88 +521,61 @@ contract CompoundLogic is IProtocol {
                 BLOCK_PER_YEAR) / BASE;
     }
 
-    function getRewardSupplyData(
-        address _underlying,
-        Types.UserShare memory _share,
-        bytes memory _user,
-        bytes memory _router
-    ) external view override returns (bytes memory, bytes memory) {
-        Types.RouterCompRewardData memory routerRewardData = newSupplyReward(
-            CTokenInterface(cTokens[_underlying]),
-            abi.decode(_router, (Types.RouterCompRewardData)),
-            _share.total
-        );
+    function getSupplyReward(CTokenInterface _cToken, address _account)
+        internal
+        view
+        returns (uint256 rewards)
+    {
+        (uint256 supplyIndex, uint256 blockNumber) = comptroller
+            .compSupplyState(address(_cToken));
+        uint256 deltaBlocks = block.number - blockNumber;
 
-        Types.UserCompRewardData memory userRewardData;
-        if (_share.amount > 0) {
-            userRewardData = abi.decode(_user, (Types.UserCompRewardData));
+        uint256 supplySpeed = comptroller.compSupplySpeeds(address(_cToken));
+        if (deltaBlocks > 0 && supplySpeed > 0) {
+            uint256 totalSupply = _cToken.totalSupply();
+            uint256 compAccrued = deltaBlocks * supplySpeed;
+            uint256 ratio = totalSupply > 0
+                ? (compAccrued * 1e36) / totalSupply
+                : 0;
+            supplyIndex += ratio;
         }
 
-        userRewardData.supply.rewardAccured +=
-            (routerRewardData.supply.rewardPerShare -
-                userRewardData.supply.rewardPerShare) *
-            _share.amount;
-        userRewardData.supply.rewardPerShare = routerRewardData
-            .supply
-            .rewardPerShare;
+        uint256 supplierIndex = 1e36;
 
-        return (abi.encode(userRewardData), abi.encode(routerRewardData));
+        uint256 deltaIndex = supplyIndex - supplierIndex;
+
+        uint256 supplierTokens = _cToken.balanceOf(_account);
+        rewards = (supplierTokens * deltaIndex) / 1e36;
     }
 
-    function getRouterRewardSupplyData(
-        address _underlying,
-        uint256 _totalShare,
-        bytes memory _router
-    ) external view override returns (bytes memory) {
-        return
-            abi.encode(
-                newSupplyReward(
-                    CTokenInterface(cTokens[_underlying]),
-                    abi.decode(_router, (Types.RouterCompRewardData)),
-                    _totalShare
-                )
-            );
-    }
+    function getBorrowReward(CTokenInterface _cToken, address _account)
+        internal
+        view
+        returns (uint256 rewards)
+    {
+        (uint256 borrowIndex, uint256 blockNumber) = comptroller
+            .compBorrowState(address(_cToken));
 
-    function getRewardBorrowData(
-        address _underlying,
-        Types.UserShare memory _share,
-        bytes memory _user,
-        bytes memory _router
-    ) external view override returns (bytes memory, bytes memory) {
-        Types.RouterCompRewardData memory routerRewardData = newBorrowReward(
-            CTokenInterface(cTokens[_underlying]),
-            abi.decode(_router, (Types.RouterCompRewardData)),
-            _share.total
-        );
-
-        Types.UserCompRewardData memory userRewardData;
-        if (_share.amount > 0) {
-            userRewardData = abi.decode(_user, (Types.UserCompRewardData));
+        uint256 deltaBlocks = block.number - blockNumber;
+        uint256 borrowSpeed = comptroller.compBorrowSpeeds(address(_cToken));
+        if (deltaBlocks > 0 && borrowSpeed > 0) {
+            uint256 totalBorrow = (_cToken.totalBorrows() * 1e36) /
+                _cToken.borrowIndex();
+            uint256 compAccrued = (deltaBlocks * borrowSpeed) / 1e36;
+            uint256 ratio = totalBorrow > 0
+                ? (compAccrued * 1e36) / totalBorrow
+                : 0;
+            borrowIndex += ratio;
         }
 
-        userRewardData.borrow.rewardAccured +=
-            (routerRewardData.borrow.rewardPerShare -
-                userRewardData.borrow.rewardPerShare) *
-            _share.amount;
-        userRewardData.borrow.rewardPerShare = routerRewardData
-            .borrow
-            .rewardPerShare;
+        uint256 borrowerIndex = 1e36;
 
-        return (abi.encode(userRewardData), abi.encode(routerRewardData));
-    }
+        uint256 deltaIndex = borrowIndex - borrowerIndex;
 
-    function newSupplyReward(
-        CTokenInterface cToken,
-        Types.RouterCompRewardData memory _params,
-        uint256 _totalShare
-    ) internal view returns (Types.RouterCompRewardData memory) {
-        (uint256 supplyIndex, ) = comptroller.compSupplyState(address(cToken));
-        uint256 amount = (cToken.balanceOf(msg.sender) *
-            (supplyIndex - _params.supply.index)) / Utils.UNDECILLION;
-        _params.supply.index = supplyIndex;
-        _params.supply.rewardPerShare += amount / _totalShare;
-        return _params;
+        (, , uint256 borrowBalance, ) = _cToken.getAccountSnapshot(_account);
+        uint256 borrowAmount = (borrowBalance * 1e36) / _cToken.borrowIndex();
+
+        rewards = (borrowAmount * deltaIndex) / 1e36;
     }
 
     function newBorrowReward(

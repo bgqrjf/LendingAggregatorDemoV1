@@ -8,24 +8,30 @@ interface IRewards {
     function startMiningSupplyReward(
         address asset,
         address account,
-        uint256 amount
+        uint256 amount,
+        uint256 _totalShare
     ) external;
 
     function stopMiningSupplyReward(
         address asset,
         address account,
-        uint256 amount
+        uint256 amount,
+        uint256 _totalShare
     ) external;
 
     function startMiningBorrowReward(
         address asset,
         address account,
-        uint256 amount
+        uint256 amount,
+        uint256 _totalShare
     ) external;
 
     function stopMiningBorrowReward(
         address asset,
         address account,
-        uint256 amount
+        uint256 amount,
+        uint256 _totalShare
     ) external;
+
+    function addProtocol(IProtocol _protocol) external;
 }

@@ -41,4 +41,16 @@ interface ComptrollerInterface {
         external
         view
         returns (uint256 speed);
+
+    function compSupplierIndex(address cToken, address account)
+        external
+        view
+        returns (uint256);
+
+    function compBorrowerIndex(address cToken, address account)
+        external
+        view
+        returns (uint256);
+
+    function compBorrowSpeeds(address cToken) external view returns (uint256);
 }

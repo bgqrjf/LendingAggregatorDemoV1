@@ -50,8 +50,8 @@ describe("Strategy tests", function () {
       { gasLimit: 5000000 }
     );
 
-    await compoundHandler.updateCTokenList(cToken0.address, 18);
-    await compoundHandler.updateCTokenList(cUSDT.address, 6);
+    await compoundHandler.updateCTokenList(cToken0.address);
+    await compoundHandler.updateCTokenList(cUSDT.address);
 
     let Strategy = await ethers.getContractFactory("Strategy");
     let strategy = await Strategy.deploy(700000);

@@ -75,6 +75,8 @@ interface IRouter {
     function totalBorrowed(address _underlying) external view returns (uint256);
 
     // --- admin functions
+    function addProtocol(IProtocol _protocol) external;
+
     function addAsset(Types.NewAssetParams memory _newAsset)
         external
         returns (Types.Asset memory asset);

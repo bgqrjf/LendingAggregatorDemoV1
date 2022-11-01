@@ -46,26 +46,6 @@ interface IProtocol {
         view
         returns (Types.ProtocolData memory data);
 
-    function getClaimRewardData(address _rewardToken)
-        external
-        view
-        returns (Types.ProtocolData memory data);
-
-    function getClaimUserRewardData(
-        address _underlying,
-        Types.UserShare memory _share,
-        bytes memory _user,
-        bytes memory _router
-    )
-        external
-        view
-        returns (
-            bytes memory,
-            bytes memory,
-            address,
-            uint256
-        );
-
     function getCurrentSupplyRate(address _underlying)
         external
         view
@@ -76,30 +56,18 @@ interface IProtocol {
         view
         returns (uint256);
 
+    function totalRewards(
+        address _underlying,
+        address _account,
+        bool _isSupply
+    ) external view returns (uint256 rewards);
+
+    function claimRewards(address _account) external;
+
     function getUsageParams(address _underlying, uint256 _suppliesToRedeem)
         external
         view
         returns (bytes memory);
-
-    function getRewardSupplyData(
-        address _underlying,
-        Types.UserShare memory _share,
-        bytes memory _user,
-        bytes memory _router
-    ) external view returns (bytes memory, bytes memory);
-
-    function getRouterRewardSupplyData(
-        address _underlying,
-        uint256 totalShare,
-        bytes memory _router
-    ) external view returns (bytes memory);
-
-    function getRewardBorrowData(
-        address _underlying,
-        Types.UserShare memory _share,
-        bytes memory _user,
-        bytes memory _router
-    ) external view returns (bytes memory, bytes memory);
 
     function supplyOf(address _underlying, address _account)
         external
@@ -135,4 +103,6 @@ interface IProtocol {
         external
         view
         returns (uint256);
+
+    function rewardToken() external view returns (address);
 }

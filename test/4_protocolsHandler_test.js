@@ -50,19 +50,18 @@ describe("ProtocolsHandler tests", function () {
       { gasLimit: 5000000 }
     );
 
-    await compoundHandler.updateCTokenList(cToken0.address, 18);
-    await compoundHandler.updateCTokenList(cUSDT.address, 6);
+    await compoundHandler.updateCTokenList(cToken0.address);
+    await compoundHandler.updateCTokenList(cUSDT.address);
 
     let Strategy = await ethers.getContractFactory("Strategy");
     let strategy = await Strategy.deploy(700000);
 
     let ProtocolsHandler = await ethers.getContractFactory("ProtocolsHandler");
-    let protocolsHandler = await ProtocolsHandler.deploy(
-      [aaveHandler.address, compoundHandler.address],
-      strategy.address
-    );
+    let protocolsHandler = await ProtocolsHandler.deploy([], strategy.address);
 
     await protocolsHandler.setRouter(aaveContracts.signer.address);
+    await protocolsHandler.addProtocol(aaveHandler.address);
+    await protocolsHandler.addProtocol(compoundHandler.address);
 
     return {
       deployer: aaveContracts.signer,

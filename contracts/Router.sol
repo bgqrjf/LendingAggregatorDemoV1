@@ -91,7 +91,8 @@ contract Router is IRouter, OwnableUpgradeable {
         rewards.startMiningSupplyReward(
             _params.asset,
             _params.to,
-            sTokenAmount
+            sTokenAmount,
+            asset.sToken.totalSupply()
         );
 
         protocolsCache.simulateSupply(_params.asset, totalLending);
@@ -112,6 +113,8 @@ contract Router is IRouter, OwnableUpgradeable {
             totalLendings[_params.asset]
         );
 
+        uint256 totalSupply = asset.sToken.totalSupply();
+
         uint256 balance = asset.sToken.scaledBalanceOf(msg.sender);
         if (_params.amount > balance) {
             _params.amount = balance;
@@ -127,6 +130,7 @@ contract Router is IRouter, OwnableUpgradeable {
         _redeem(
             _params,
             sTokenAmount,
+            totalSupply,
             supplies,
             protocolsSupplies,
             totalLending
@@ -137,6 +141,7 @@ contract Router is IRouter, OwnableUpgradeable {
     function _redeem(
         Types.UserAssetParams memory _params,
         uint256 _sTokenAmount,
+        uint256 _sTokenTotalSupply,
         uint256[] memory _supplies,
         uint256 _protocolsSupplies,
         uint256 _totalLending
@@ -167,7 +172,8 @@ contract Router is IRouter, OwnableUpgradeable {
         rewards.stopMiningSupplyReward(
             _params.asset,
             msg.sender,
-            _sTokenAmount
+            _sTokenAmount,
+            _sTokenTotalSupply
         );
 
         protocolsCache.simulateSupply(_params.asset, _totalLending);
@@ -215,7 +221,8 @@ contract Router is IRouter, OwnableUpgradeable {
         rewards.startMiningBorrowReward(
             _params.asset,
             _params.to,
-            dTokenAmount
+            dTokenAmount,
+            asset.dToken.totalSupply()
         );
 
         updatetotalLendings(_params.asset, totalLending);
@@ -248,6 +255,8 @@ contract Router is IRouter, OwnableUpgradeable {
             _params.asset,
             totalLendings[_params.asset]
         );
+
+        uint256 totalSupply = asset.dToken.totalSupply();
         uint256 dTokenAmount = asset.dToken.burn(
             _params.to,
             _params.amount,
@@ -270,7 +279,12 @@ contract Router is IRouter, OwnableUpgradeable {
         }
 
         updatetotalLendings(_params.asset, totalLending);
-        rewards.stopMiningBorrowReward(_params.asset, _params.to, dTokenAmount);
+        rewards.stopMiningBorrowReward(
+            _params.asset,
+            _params.to,
+            dTokenAmount,
+            totalSupply
+        );
 
         protocolsCache.simulateBorrow(_params.asset, totalLending);
 
@@ -314,11 +328,14 @@ contract Router is IRouter, OwnableUpgradeable {
         _redeem(
             _redeemParams,
             sTokenAmount,
+            sToken.totalSupply(),
             supplies,
             protocolsSupplies,
             totalLending
         );
     }
+
+    function claimRewards() external {}
 
     function borrowAllowed(Types.UserAssetParams memory _params)
         internal
@@ -446,6 +463,11 @@ contract Router is IRouter, OwnableUpgradeable {
     }
 
     //  admin functions
+    function addProtocol(IProtocol _protocol) external override onlyOwner {
+        protocols.addProtocol(_protocol);
+        rewards.addProtocol(_protocol);
+    }
+
     function addAsset(Types.NewAssetParams memory _newAsset)
         external
         override

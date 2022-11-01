@@ -30,6 +30,7 @@ contract AAVELogic is IProtocol {
     uint256 public immutable BASE = 1e21;
     address payable public wrappedNative;
     address public aaveTokenAddress;
+    address public rewardToken;
     IAAVEPool public pool;
 
     // mapping underlying to msg.sender;
@@ -131,6 +132,7 @@ contract AAVELogic is IProtocol {
     function getAddAssetData(address _underlying)
         external
         view
+        override
         returns (Types.ProtocolData memory data)
     {
         // _underlying = replaceNative(_underlying);
@@ -283,28 +285,7 @@ contract AAVELogic is IProtocol {
         );
     }
 
-    function getClaimRewardData(address _rewardToken)
-        external
-        view
-        override
-        returns (Types.ProtocolData memory data)
-    {}
-
-    function getClaimUserRewardData(
-        address _underlying,
-        Types.UserShare memory _share,
-        bytes memory _user,
-        bytes memory _router
-    )
-        external
-        view
-        returns (
-            bytes memory,
-            bytes memory,
-            address,
-            uint256
-        )
-    {}
+    function claimRewards(address _account) external override {}
 
     function supplyOf(address _underlying, address _account)
         external
@@ -431,6 +412,7 @@ contract AAVELogic is IProtocol {
     function borrowToTargetBorrowRate(uint256 _targetRate, bytes memory _params)
         external
         pure
+        override
         returns (int256)
     {
         Types.AAVEUsageParams memory params = abi.decode(
@@ -462,6 +444,12 @@ contract AAVELogic is IProtocol {
 
         return int256(borrow) - int256(params.totalBorrowed);
     }
+
+    function totalRewards(
+        address _underlying,
+        address _account,
+        bool _isSupply
+    ) external view override returns (uint256 rewards) {}
 
     function getUsageParams(address _underlying, uint256 _suppliesToRedeem)
         external
@@ -526,6 +514,7 @@ contract AAVELogic is IProtocol {
     function getCurrentSupplyRate(address _underlying)
         external
         view
+        override
         returns (uint256)
     {
         return
@@ -537,6 +526,7 @@ contract AAVELogic is IProtocol {
     function getCurrentBorrowRate(address _underlying)
         external
         view
+        override
         returns (uint256)
     {
         return
@@ -544,26 +534,6 @@ contract AAVELogic is IProtocol {
                 .getReserveData(replaceNative(_underlying))
                 .currentVariableBorrowRate / BASE;
     }
-
-    function getRewardSupplyData(
-        address _underlying,
-        Types.UserShare memory _share,
-        bytes memory _user,
-        bytes memory _router
-    ) external view returns (bytes memory, bytes memory) {}
-
-    function getRouterRewardSupplyData(
-        address _underlying,
-        uint256 _totalShare,
-        bytes memory _router
-    ) external view override returns (bytes memory) {}
-
-    function getRewardBorrowData(
-        address _underlying,
-        Types.UserShare memory _share,
-        bytes memory _user,
-        bytes memory _router
-    ) external view returns (bytes memory, bytes memory) {}
 
     function replaceNative(address _underlying)
         internal

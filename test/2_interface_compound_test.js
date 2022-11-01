@@ -32,8 +32,8 @@ describe("Protocol Interfaces tests", function () {
       { gasLimit: 5000000 }
     );
 
-    await compoundHandler.updateCTokenList(cToken0.address, 18);
-    await compoundHandler.updateCTokenList(cUSDT.address, 6);
+    await compoundHandler.updateCTokenList(cToken0.address);
+    await compoundHandler.updateCTokenList(cUSDT.address);
 
     return {
       deployer: compoundContracts.deployer,
@@ -61,7 +61,7 @@ describe("Protocol Interfaces tests", function () {
       expect((await compoundHandler.comptroller()).toLowerCase()).to.equal(
         comptroller.address.toLowerCase()
       );
-      expect((await compoundHandler.compTokenAddress()).toLowerCase()).to.equal(
+      expect((await compoundHandler.rewardToken()).toLowerCase()).to.equal(
         comp.address.toLowerCase()
       );
     });
