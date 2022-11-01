@@ -335,7 +335,43 @@ contract Router is IRouter, OwnableUpgradeable {
         );
     }
 
-    function claimRewards() external {}
+    function claimRewards(address _account) external {
+        uint256 userConfig = config.userDebtAndCollateral(_account);
+        uint256[] memory rewardsToClaim;
+
+        for (uint256 i = 0; i < underlyings.length; i++) {
+            if (UserAssetBitMap.isUsingAsCollateralOrBorrowing(userConfig, i)) {
+                Types.Asset memory asset = assets[underlyings[i]];
+
+                if (UserAssetBitMap.isUsingAsCollateral(userConfig, i)) {
+                    address underlying = asset.sToken.underlying();
+                    uint256[] memory amounts = rewards.claim(
+                        underlying,
+                        _account,
+                        asset.sToken.totalSupply()
+                    );
+
+                    for (uint256 j = 0; j < amounts.length; j++) {
+                        rewardsToClaim[j] += amounts[j];
+                    }
+                }
+
+                if (UserAssetBitMap.isBorrowing(userConfig, i)) {
+                    address underlying = asset.dToken.underlying();
+                    uint256[] memory amounts = rewards.claim(
+                        underlying,
+                        _account,
+                        asset.dToken.totalSupply()
+                    );
+                    for (uint256 j = 0; j < amounts.length; j++) {
+                        rewardsToClaim[j] += amounts[j];
+                    }
+                }
+            }
+        }
+
+        protocols.claimRewards(_account, rewardsToClaim);
+    }
 
     function borrowAllowed(Types.UserAssetParams memory _params)
         internal

@@ -52,6 +52,8 @@ interface IProtocolsHandler {
 
     function setRouter(address _router) external;
 
+    function claimRewards(address _account, uint256[] memory _amounts) external;
+
     function addProtocol(IProtocol _protocol) external;
 
     function getProtocols() external view returns (IProtocol[] memory);

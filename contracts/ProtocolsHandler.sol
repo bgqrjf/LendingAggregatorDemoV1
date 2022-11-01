@@ -343,6 +343,17 @@ contract ProtocolsHandler is IProtocolsHandler, Ownable {
         protocols.push(_protocol);
     }
 
+    function claimRewards(address _account, uint256[] memory _amounts)
+        external
+        override
+        onlyRouter
+    {
+        for (uint256 i = 0; i < protocols.length; i++) {
+            address token = protocols[i].rewardToken();
+            TransferHelper.safeTransfer(token, _account, _amounts[i], 0);
+        }
+    }
+
     // admin functions
     function setRouter(address _router) external override onlyOwner {
         router = _router;

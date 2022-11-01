@@ -33,5 +33,11 @@ interface IRewards {
         uint256 _totalShare
     ) external;
 
+    function claim(
+        address _asset,
+        address _account,
+        uint256 _totalShare
+    ) external returns (uint256[] memory rewardsToCollect);
+
     function addProtocol(IProtocol _protocol) external;
 }

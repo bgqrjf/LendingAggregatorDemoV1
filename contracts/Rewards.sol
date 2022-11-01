@@ -175,7 +175,7 @@ contract Rewards is IRewards, Ownable {
         address _asset,
         address _account,
         uint256 _totalShare
-    ) external onlyOwner returns (uint256[] memory rewardsToCollect) {
+    ) external override onlyOwner returns (uint256[] memory rewardsToCollect) {
         stopMiningSupplyReward(_asset, _account, 0, _totalShare);
         stopMiningBorrowReward(_asset, _account, 0, _totalShare);
 
