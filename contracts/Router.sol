@@ -17,9 +17,7 @@ contract Router is IRouter, OwnableUpgradeable {
     IRewards public rewards;
     address public sTokenImplement;
     address public dTokenImplement;
-
     address[] public underlyings;
-
     mapping(address => Types.Asset) public assets;
     mapping(address => uint256) public totalLendings;
     mapping(address => uint256) public userSupplied;
@@ -101,6 +99,7 @@ contract Router is IRouter, OwnableUpgradeable {
         emit Supplied(_params.to, _params.asset, _params.amount);
     }
 
+    // use LPToken
     function redeem(Types.UserAssetParams memory _params, bool _collateralable)
         public
     {
@@ -245,13 +244,6 @@ contract Router is IRouter, OwnableUpgradeable {
         Types.Asset memory asset = assets[_params.asset];
         uint256 userDebts = asset.dToken.scaledDebtOf(_params.to);
         if (_params.amount > userDebts) {
-            if (_params.asset == TransferHelper.ETH) {
-                TransferHelper.transferETH(
-                    msg.sender,
-                    _params.amount - userDebts,
-                    0
-                );
-            }
             _params.amount = userDebts;
         }
 
@@ -262,6 +254,14 @@ contract Router is IRouter, OwnableUpgradeable {
             _params.amount,
             0
         );
+
+        if (_params.asset == TransferHelper.ETH && msg.value > _params.amount) {
+            TransferHelper.transferETH(
+                msg.sender,
+                _params.amount - userDebts,
+                0
+            );
+        }
 
         uint256 totalLending = protocolsCache.simulateLendings(
             _params.asset,
@@ -420,6 +420,7 @@ contract Router is IRouter, OwnableUpgradeable {
             debtsValue * Utils.MILLION > _bc.liquidateLTV * collateralValue,
             "Router: Liquidate not allowed"
         );
+
         uint256 maxLiquidation = (debtsValue * _bc.maxLiquidateRatio) /
             Utils.MILLION;
 

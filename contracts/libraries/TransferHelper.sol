@@ -51,7 +51,7 @@ library TransferHelper {
         uint256 _gasLimit
     ) internal {
         if (_token != ETH) {
-            safeTransferFrom(_token, _from, _to, _amount);
+            IERC20(_token).safeTransferFrom(_from, _to, _amount);
         } else {
             require(
                 msg.value == _amount,

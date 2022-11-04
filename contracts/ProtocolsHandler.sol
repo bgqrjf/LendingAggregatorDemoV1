@@ -12,11 +12,6 @@ contract ProtocolsHandler is IProtocolsHandler, Ownable {
     IStrategy public strategy;
     IProtocol[] public protocols;
 
-    event Supplied(address indexed asset, uint256 amount);
-    event Redeemed(address indexed asset, uint256 amount);
-    event Borrowed(address indexed asset, uint256 amount);
-    event Repayed(address indexed asset, uint256 amount);
-
     modifier onlyRouter() {
         require(msg.sender == router, "ProtocolsHandler: OnlyRouter");
         _;
@@ -29,6 +24,8 @@ contract ProtocolsHandler is IProtocolsHandler, Ownable {
         }
         strategy = IStrategy(_strategy);
     }
+
+    receive() external payable {}
 
     function redeemAndSupply(
         address _asset,

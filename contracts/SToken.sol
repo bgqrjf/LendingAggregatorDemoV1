@@ -69,13 +69,4 @@ contract SToken is ISToken, OwnableUpgradeable, ERC20Upgradeable {
     function scaledTotalSupply() public view override returns (uint256 amount) {
         return IRouter(owner()).totalSupplied(underlying);
     }
-
-    function userShare(address _account)
-        public
-        view
-        override
-        returns (Types.UserShare memory share)
-    {
-        share = Types.UserShare(balanceOf(_account), totalSupply());
-    }
 }

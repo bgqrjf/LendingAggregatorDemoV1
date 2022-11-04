@@ -31,9 +31,4 @@ interface ISToken is IERC20Upgradeable {
 
     // external state-getters
     function underlying() external view returns (address);
-
-    function userShare(address _account)
-        external
-        view
-        returns (Types.UserShare memory share);
 }

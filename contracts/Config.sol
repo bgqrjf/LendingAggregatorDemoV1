@@ -6,6 +6,7 @@ import "./interfaces/IConfig.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./libraries/UserAssetBitMap.sol";
 
+// proxy
 contract Config is IConfig, Ownable {
     address public router;
 

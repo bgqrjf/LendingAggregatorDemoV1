@@ -8,6 +8,11 @@ import "./IWETH.sol";
 import "../libraries/Types.sol";
 
 interface IProtocolsHandler {
+    event Supplied(address indexed asset, uint256 amount);
+    event Redeemed(address indexed asset, uint256 amount);
+    event Borrowed(address indexed asset, uint256 amount);
+    event Repayed(address indexed asset, uint256 amount);
+
     function supply(
         address _asset,
         uint256 _amount,
