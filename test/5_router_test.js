@@ -294,7 +294,7 @@ describe("Router tests", function () {
       .to.emit(protocolsHandler, "Supplied")
       .withArgs(token0.address, supplyAmount);
     await expect(tx)
-      .to.emit(router, "TotalLendingsUpdated")
+      .to.not.emit(router, "TotalLendingsUpdated")
       .withArgs(token0.address, 0, 0);
     await expect(tx)
       .to.emit(router, "Supplied")
@@ -365,7 +365,7 @@ describe("Router tests", function () {
       .to.emit(protocolsHandler, "Redeemed")
       .withArgs(token0.address, "200000001165687381");
     await expect(tx)
-      .to.emit(router, "TotalLendingsUpdated")
+      .to.not.emit(router, "TotalLendingsUpdated")
       .withArgs(token0.address, 0, 0);
     await expect(tx)
       .to.emit(router, "Redeemed")
@@ -419,7 +419,7 @@ describe("Router tests", function () {
       .to.emit(protocolsHandler, "Borrowed")
       .withArgs(token0.address, borrowAmount);
     await expect(tx)
-      .to.emit(router, "TotalLendingsUpdated")
+      .to.not.emit(router, "TotalLendingsUpdated")
       .withArgs(token0.address, 0, 0);
     await expect(tx)
       .to.emit(router, "Borrowed")
@@ -481,7 +481,7 @@ describe("Router tests", function () {
       .to.emit(protocolsHandler, "Repayed")
       .withArgs(token0.address, "100000002402017246");
     await expect(tx)
-      .to.emit(router, "TotalLendingsUpdated")
+      .to.not.emit(router, "TotalLendingsUpdated")
       .withArgs(token0.address, 0, 0);
     await expect(tx)
       .to.emit(router, "Repayed")
@@ -837,9 +837,6 @@ describe("Router tests", function () {
     await expect(tx)
       .to.emit(sToken, "Transfer")
       .withArgs(deployer.address, ethers.constants.AddressZero, "8639998");
-    await expect(tx)
-      .to.emit(router, "TotalLendingsUpdated")
-      .withArgs(token0.address, 0, 0);
     await expect(tx)
       .to.emit(router, "Repayed")
       .withArgs(deployer.address, token0.address, "50000002402017246");

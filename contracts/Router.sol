@@ -73,7 +73,11 @@ contract Router is IRouter, OwnableUpgradeable {
         );
 
         uint256 repayed = protocolsCache.repay(_params);
-        totalLending += repayed;
+        if (repayed > 0) {
+            totalLending += repayed;
+            updatetotalLendings(_params.asset, totalLending);
+            protocolsCache.simulateSupply(_params.asset, totalLending);
+        }
 
         if (_params.amount > repayed) {
             protocolsCache.supply(
@@ -87,15 +91,12 @@ contract Router is IRouter, OwnableUpgradeable {
         // store on strategy aToken and cToken amount
         config.setUsingAsCollateral(_params.to, asset.index, _collateralable);
 
-        updatetotalLendings(_params.asset, totalLending);
         rewards.startMiningSupplyReward(
             _params.asset,
             _params.to,
             sTokenAmount,
             asset.sToken.totalSupply()
         );
-
-        protocolsCache.simulateSupply(_params.asset, totalLending);
 
         emit Supplied(_params.to, _params.asset, _params.amount);
     }
@@ -166,9 +167,10 @@ contract Router is IRouter, OwnableUpgradeable {
             // expect revert if totalLending < borrowed which means insufficient supplies, which should not occur;
             _totalLending -= borrowed;
             redeemed += borrowed;
+            updatetotalLendings(_params.asset, _totalLending);
+            protocolsCache.simulateSupply(_params.asset, _totalLending);
         }
 
-        updatetotalLendings(_params.asset, _totalLending);
         rewards.stopMiningSupplyReward(
             _params.asset,
             msg.sender,
@@ -176,7 +178,6 @@ contract Router is IRouter, OwnableUpgradeable {
             _sTokenTotalSupply
         );
 
-        protocolsCache.simulateSupply(_params.asset, _totalLending);
         emit Redeemed(msg.sender, _params.asset, redeemed);
     }
 
@@ -185,14 +186,15 @@ contract Router is IRouter, OwnableUpgradeable {
 
         IProtocolsHandler protocolsCache = protocols;
         Types.Asset memory asset = assets[_params.asset];
-
-        (, uint256 protocolsBorrows) = protocolsCache.totalBorrowed(
-            _params.asset
-        );
         uint256 totalLending = protocolsCache.simulateLendings(
             _params.asset,
             totalLendings[_params.asset]
         );
+
+        (, uint256 protocolsBorrows) = protocolsCache.totalBorrowed(
+            _params.asset
+        );
+
         uint256 dTokenAmount = asset.dToken.mint(
             msg.sender,
             _params.amount,
@@ -203,15 +205,24 @@ contract Router is IRouter, OwnableUpgradeable {
 
         (uint256[] memory supplies, uint256 protocolsSupplies) = protocolsCache
             .totalSupplied(_params.asset);
-        (uint256 protocolsRedeemed, uint256 borrowed) = protocolsCache.redeem(
-            _params.asset,
-            _params.amount,
-            supplies,
-            protocolsSupplies,
-            _params.to
-        );
 
-        totalLending += borrowed;
+        uint256 protocolsRedeemed;
+        uint256 borrowed;
+        if (protocolsSupplies > 0) {
+            (protocolsRedeemed, borrowed) = protocolsCache.redeem(
+                _params.asset,
+                _params.amount,
+                supplies,
+                protocolsSupplies,
+                _params.to
+            );
+
+            if (borrowed > 0) {
+                totalLending += borrowed;
+                updatetotalLendings(_params.asset, totalLending);
+                protocolsCache.simulateBorrow(_params.asset, totalLending);
+            }
+        }
 
         if (_params.amount > protocolsRedeemed) {
             _params.amount -= protocolsRedeemed;
@@ -225,9 +236,6 @@ contract Router is IRouter, OwnableUpgradeable {
             asset.dToken.totalSupply()
         );
 
-        updatetotalLendings(_params.asset, totalLending);
-        protocolsCache.simulateBorrow(_params.asset, totalLending);
-
         emit Borrowed(msg.sender, _params.asset, _params.amount);
     }
 
@@ -237,6 +245,13 @@ contract Router is IRouter, OwnableUpgradeable {
         Types.Asset memory asset = assets[_params.asset];
         uint256 userDebts = asset.dToken.scaledDebtOf(_params.to);
         if (_params.amount > userDebts) {
+            if (_params.asset == TransferHelper.ETH) {
+                TransferHelper.transferETH(
+                    msg.sender,
+                    _params.amount - userDebts,
+                    0
+                );
+            }
             _params.amount = userDebts;
         }
 
@@ -248,12 +263,13 @@ contract Router is IRouter, OwnableUpgradeable {
             0
         );
 
-        (, uint256 protocolsBorrows) = protocolsCache.totalBorrowed(
-            _params.asset
-        );
         uint256 totalLending = protocolsCache.simulateLendings(
             _params.asset,
             totalLendings[_params.asset]
+        );
+
+        (, uint256 protocolsBorrows) = protocolsCache.totalBorrowed(
+            _params.asset
         );
 
         uint256 totalSupply = asset.dToken.totalSupply();
@@ -275,18 +291,20 @@ contract Router is IRouter, OwnableUpgradeable {
                 supplies,
                 protocolsSupplies
             );
-            totalLending -= supplied;
+
+            if (supplied > 0) {
+                totalLending -= supplied;
+                updatetotalLendings(_params.asset, totalLending);
+                protocolsCache.simulateBorrow(_params.asset, totalLending);
+            }
         }
 
-        updatetotalLendings(_params.asset, totalLending);
         rewards.stopMiningBorrowReward(
             _params.asset,
             _params.to,
             dTokenAmount,
             totalSupply
         );
-
-        protocolsCache.simulateBorrow(_params.asset, totalLending);
 
         emit Repayed(_params.to, _params.asset, _params.amount);
     }

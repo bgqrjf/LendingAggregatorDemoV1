@@ -3,6 +3,6 @@
 /package-lock.json
 .DS_Store
 /artifacts/
-/hardhat.config.js
 /.vscode/
 /coverage/
+.env

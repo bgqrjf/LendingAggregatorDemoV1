@@ -291,7 +291,7 @@ describe("ProtocolsHandler tests", function () {
       supplyAmount
     );
 
-    expect(lendings).to.equal(ethers.BigNumber.from("500000091898806961"));
+    expect(lendings).to.equal(ethers.BigNumber.from("500000205306291327"));
   });
 
   it("should addProtocol properly", async () => {

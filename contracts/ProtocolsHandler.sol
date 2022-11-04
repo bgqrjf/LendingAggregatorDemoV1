@@ -255,7 +255,10 @@ contract ProtocolsHandler is IProtocolsHandler, Ownable {
         (, uint256 supplied) = totalSupplied(_asset);
 
         totalLending = supplied > 0
-            ? _totalLending + (interestDelta * borrowed) / supplied
+            ? _totalLending +
+                supplyInterest +
+                (interestDelta * borrowed) /
+                supplied
             : _totalLending;
     }
 
