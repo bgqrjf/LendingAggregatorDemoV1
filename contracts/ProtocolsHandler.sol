@@ -3,9 +3,10 @@ pragma solidity ^0.8.14;
 
 import "./interfaces/IProtocolsHandler.sol";
 
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "./libraries/TransferHelper.sol";
 import "./libraries/Utils.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "./libraries/Math.sol";
 
 contract ProtocolsHandler is IProtocolsHandler, Ownable {
     address public router;
@@ -226,6 +227,7 @@ contract ProtocolsHandler is IProtocolsHandler, Ownable {
     function simulateLendings(address _asset, uint256 _totalLending)
         public
         view
+        override
         returns (uint256 totalLending)
     {
         IProtocol[] memory protocolsCache = protocols;
@@ -233,12 +235,12 @@ contract ProtocolsHandler is IProtocolsHandler, Ownable {
         uint256 borrowInterest;
 
         for (uint256 i = 0; i < protocolsCache.length; i++) {
-            supplyInterest = protocolsCache[i].lastSupplyInterest(
+            supplyInterest += protocolsCache[i].lastSupplyInterest(
                 _asset,
                 address(this)
             );
 
-            borrowInterest = protocolsCache[i].lastBorrowInterest(
+            borrowInterest += protocolsCache[i].lastBorrowInterest(
                 _asset,
                 address(this)
             );
@@ -251,12 +253,26 @@ contract ProtocolsHandler is IProtocolsHandler, Ownable {
         (, uint256 borrowed) = totalBorrowed(_asset);
         (, uint256 supplied) = totalSupplied(_asset);
 
-        totalLending = supplied > 0
-            ? _totalLending +
-                supplyInterest +
-                (interestDelta * borrowed) /
-                supplied
-            : _totalLending;
+        // solve equation for totalLending
+        // totalLending =
+        //     _totalLending +
+        //     supplyInterest +
+        //     (interestDelta * (borrowed + totalLending)) /
+        //     (supplied + totalLending);
+
+        uint256 c = supplied *
+            (_totalLending + supplyInterest) +
+            interestDelta *
+            borrowed;
+
+        uint256 b = _totalLending + supplyInterest + interestDelta;
+        if (b > supplied) {
+            b -= supplied;
+            totalLending = (Math.sqrt(4 * c + b * b) + b) / 2;
+        } else {
+            b = supplied - b;
+            totalLending = (Math.sqrt(4 * c + b * b) - b) / 2;
+        }
     }
 
     function simulateSupply(address _asset, uint256 _totalLending)

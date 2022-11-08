@@ -19,7 +19,7 @@ interface ISToken is IERC20Upgradeable {
 
     function burn(
         address _account,
-        uint256 _amountOfUnderlying,
+        uint256 _amount,
         uint256 _totalUnderlying
     ) external returns (uint256);
 
@@ -28,6 +28,8 @@ interface ISToken is IERC20Upgradeable {
     function scaledAmount(uint256 _amount) external view returns (uint256);
 
     function scaledTotalSupply() external view returns (uint256);
+
+    function unscaledAmount(uint256 _amount) external view returns (uint256);
 
     // external state-getters
     function underlying() external view returns (address);

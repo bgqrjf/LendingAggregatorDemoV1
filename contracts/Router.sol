@@ -99,7 +99,7 @@ contract Router is IRouter, OwnableUpgradeable {
         emit Supplied(_params.to, _params.asset, _params.amount);
     }
 
-    // use LPToken
+    // _params.amount is LPToken
     function redeem(Types.UserAssetParams memory _params, bool _collateralable)
         public
     {
@@ -115,16 +115,19 @@ contract Router is IRouter, OwnableUpgradeable {
 
         uint256 totalSupply = asset.sToken.totalSupply();
 
-        uint256 balance = asset.sToken.scaledBalanceOf(msg.sender);
-        if (_params.amount > balance) {
-            _params.amount = balance;
+        uint256 sTokenBalance = asset.sToken.balanceOf(msg.sender);
+        if (_params.amount > sTokenBalance) {
+            _params.amount = sTokenBalance;
         }
 
-        uint256 sTokenAmount = asset.sToken.burn(
+        uint256 underlyingAmount = asset.sToken.burn(
             msg.sender,
             _params.amount,
-            protocolsSupplies + totalLendings[_params.asset]
+            protocolsSupplies + totalLending
         );
+
+        uint256 sTokenAmount;
+        (_params.amount, sTokenAmount) = (underlyingAmount, _params.amount);
 
         // pay in protocol
         _redeem(
@@ -163,8 +166,10 @@ contract Router is IRouter, OwnableUpgradeable {
         if (_params.amount > protocolsRedeemed) {
             _params.amount -= protocolsRedeemed;
             uint256 borrowed = protocolsCache.borrow(_params);
-            // expect revert if totalLending < borrowed which means insufficient supplies, which should not occur;
-            _totalLending -= borrowed;
+            _totalLending = _totalLending > borrowed
+                ? _totalLending - borrowed
+                : 0;
+
             redeemed += borrowed;
             updatetotalLendings(_params.asset, _totalLending);
             protocolsCache.simulateSupply(_params.asset, _totalLending);
@@ -276,7 +281,7 @@ contract Router is IRouter, OwnableUpgradeable {
         uint256 dTokenAmount = asset.dToken.burn(
             _params.to,
             _params.amount,
-            protocolsBorrows + totalLendings[_params.asset]
+            protocolsBorrows + totalLending
         );
 
         uint256 repayed = protocolsCache.repay(_params);
@@ -329,7 +334,7 @@ contract Router is IRouter, OwnableUpgradeable {
 
         _redeemParams.amount = Utils.minOf(
             (assetValue * bc.liquidateRewardRatio) / Utils.MILLION,
-            sToken.balanceOf(_repayParams.to)
+            sToken.scaledBalanceOf(_repayParams.to)
         );
 
         (uint256[] memory supplies, uint256 protocolsSupplies) = protocolsCache
@@ -338,11 +343,19 @@ contract Router is IRouter, OwnableUpgradeable {
             _redeemParams.asset,
             totalLendings[_redeemParams.asset]
         );
-        uint256 sTokenAmount = sToken.burn(
+
+        uint256 underlyingAmount = sToken.burn(
             _repayParams.to,
-            _redeemParams.amount,
+            sToken.unscaledAmount(_redeemParams.amount),
             protocolsSupplies + totalLending
         );
+
+        uint256 sTokenAmount;
+        (_redeemParams.amount, sTokenAmount) = (
+            underlyingAmount,
+            _redeemParams.amount
+        );
+
         _redeem(
             _redeemParams,
             sTokenAmount,
