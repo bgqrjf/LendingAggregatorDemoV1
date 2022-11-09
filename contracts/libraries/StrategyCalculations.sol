@@ -9,7 +9,7 @@ import "../interfaces/IProtocol.sol";
 
 library StrategyCalculations {
     using Math for uint256;
-    uint256 constant precision = 1;
+    uint256 constant PRECISION = 1;
 
     function calculateAmountsToSupply(
         Types.StrategyParams memory _params,
@@ -17,7 +17,7 @@ library StrategyCalculations {
     ) internal pure returns (uint256[] memory amounts) {
         amounts = new uint256[](_protocols.length);
         uint256 totalAmountToSupply;
-        while (_params.maxRate - _params.minRate > precision) {
+        while (_params.maxRate - _params.minRate > PRECISION) {
             totalAmountToSupply = 0;
             uint128 targetRate = (_params.maxRate + _params.minRate) / 2;
             for (uint256 i = 0; i < _protocols.length; i++) {
@@ -89,7 +89,7 @@ library StrategyCalculations {
 
         uint256 totalAmountToBorrow;
         while (
-            _params.maxRate > _params.minRate + precision ||
+            _params.maxRate > _params.minRate + PRECISION ||
             _params.maxRate == 0
         ) {
             totalAmountToBorrow = 0;
@@ -147,7 +147,7 @@ library StrategyCalculations {
         uint256 totalAmountToRepay;
         uint256 totalAmount;
 
-        while (_params.maxRate - _params.minRate > precision) {
+        while (_params.maxRate - _params.minRate > PRECISION) {
             totalAmountToRepay = 0;
             totalAmount = 0;
             uint128 targetRate = (_params.maxRate + _params.minRate) / 2;

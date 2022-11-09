@@ -332,11 +332,6 @@ contract Router is IRouter, OwnableUpgradeable {
             _repayParams.amount
         );
 
-        _redeemParams.amount = Utils.minOf(
-            (assetValue * bc.liquidateRewardRatio) / Utils.MILLION,
-            sToken.scaledBalanceOf(_repayParams.to)
-        );
-
         (uint256[] memory supplies, uint256 protocolsSupplies) = protocolsCache
             .totalSupplied(_redeemParams.asset);
         uint256 totalLending = protocolsCache.simulateLendings(
@@ -344,10 +339,17 @@ contract Router is IRouter, OwnableUpgradeable {
             totalLendings[_redeemParams.asset]
         );
 
+        uint256 supplied = protocolsSupplies + totalLending;
+
+        _redeemParams.amount = Utils.minOf(
+            (assetValue * bc.liquidateRewardRatio) / Utils.MILLION,
+            sToken.scaledBalanceOf(_repayParams.to)
+        );
+
         uint256 underlyingAmount = sToken.burn(
             _repayParams.to,
-            sToken.unscaledAmount(_redeemParams.amount),
-            protocolsSupplies + totalLending
+            sToken.unscaledAmount(_redeemParams.amount, supplied),
+            supplied
         );
 
         uint256 sTokenAmount;

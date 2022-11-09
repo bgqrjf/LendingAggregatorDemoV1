@@ -29,7 +29,10 @@ interface ISToken is IERC20Upgradeable {
 
     function scaledTotalSupply() external view returns (uint256);
 
-    function unscaledAmount(uint256 _amount) external view returns (uint256);
+    function unscaledAmount(uint256 _amount, uint256 _totalSupplied)
+        external
+        view
+        returns (uint256);
 
     // external state-getters
     function underlying() external view returns (address);

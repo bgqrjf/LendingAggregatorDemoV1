@@ -67,16 +67,15 @@ contract SToken is ISToken, OwnableUpgradeable, ERC20Upgradeable {
         return totalSupply > 0 ? (_amount * totalSupplied) / totalSupply : 0;
     }
 
-    function unscaledAmount(uint256 _amount)
+    function unscaledAmount(uint256 _amount, uint256 _totalSupplied)
         public
         view
         override
         returns (uint256)
     {
         uint256 totalSupply = totalSupply();
-        uint256 totalSupplied = IRouter(owner()).totalSupplied(underlying);
         return
-            totalSupplied > 0 ? (_amount * totalSupply) / (totalSupplied) : 0;
+            _totalSupplied > 0 ? (_amount * totalSupply) / (_totalSupplied) : 0;
     }
 
     function scaledTotalSupply() public view override returns (uint256 amount) {

@@ -5,6 +5,17 @@ import "./IProtocol.sol";
 import "./IRouter.sol";
 
 interface IRewards {
+    struct UserReward {
+        uint256 lastReward;
+        uint256 lastRewardPerShare;
+        uint256 claimed;
+    }
+
+    struct UserData {
+        uint256 shares;
+        UserReward[] rewards;
+    }
+
     function startMiningSupplyReward(
         address asset,
         address account,
