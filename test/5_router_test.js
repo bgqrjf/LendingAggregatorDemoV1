@@ -85,7 +85,36 @@ describe("Router tests", function () {
 
     // protocolsHandler
     let ProtocolsHandler = await ethers.getContractFactory("ProtocolsHandler");
-    let protocolsHandler = await ProtocolsHandler.deploy([], strategy.address);
+    let protocolsHandlerImplementation = await ProtocolsHandler.deploy();
+
+    let Admin = await ethers.getContractFactory(
+      ProxyAdmin.abi,
+      ProxyAdmin.bytecode
+    );
+
+    let proxyAdmin = await Admin.deploy();
+
+    const Proxy = await ethers.getContractFactory(
+      TransparentUpgradeableProxy.abi,
+      TransparentUpgradeableProxy.bytecode
+    );
+
+    let protocolsHandlerInitializeData =
+      protocolsHandlerImplementation.interface.encodeFunctionData(
+        "initialize",
+        [[], strategy.address]
+      );
+
+    let protocolsHandlerProxy = await Proxy.deploy(
+      protocolsHandlerImplementation.address,
+      proxyAdmin.address,
+      protocolsHandlerInitializeData
+    );
+
+    let protocolsHandler = await ethers.getContractAt(
+      "ProtocolsHandler",
+      protocolsHandlerProxy.address
+    );
 
     // priceOracle
     let PriceOracle = await ethers.getContractFactory("MockPriceOracle");
@@ -117,30 +146,16 @@ describe("Router tests", function () {
     let Router = await ethers.getContractFactory("Router");
     let routerImplementation = await Router.deploy();
 
-    let Admin = await ethers.getContractFactory(
-      ProxyAdmin.abi,
-      ProxyAdmin.bytecode
-    );
-
-    let proxyAdmin = await Admin.deploy();
-
-    let RouterInitializeABI = [
-      "function initialize(address,address,address,address,address,address)",
-    ];
-
-    let interface = new ethers.utils.Interface(RouterInitializeABI);
-    let initializeData = interface.encodeFunctionData("initialize", [
-      protocolsHandler.address,
-      priceOracle.address,
-      config.address,
-      rewards.address,
-      sToken.address,
-      dToken.address,
-    ]);
-
-    const Proxy = await ethers.getContractFactory(
-      TransparentUpgradeableProxy.abi,
-      TransparentUpgradeableProxy.bytecode
+    let initializeData = routerImplementation.interface.encodeFunctionData(
+      "initialize",
+      [
+        protocolsHandler.address,
+        priceOracle.address,
+        config.address,
+        rewards.address,
+        sToken.address,
+        dToken.address,
+      ]
     );
 
     let proxy = await Proxy.deploy(
@@ -347,7 +362,7 @@ describe("Router tests", function () {
     );
     let balanceAfter = await token0.balanceOf(deployer.address);
 
-    expect(balanceAfter.sub(balanceBefore)).to.equal("200000001165687381");
+    expect(balanceAfter.sub(balanceBefore)).to.equal("200000001165687394");
 
     let assetToken0 = await router.assets(token0.address);
     let sToken = await ethers.getContractAt("ISToken", assetToken0.sToken);
@@ -363,13 +378,13 @@ describe("Router tests", function () {
       .withArgs(deployer.address, ethers.constants.AddressZero, supplyAmount);
     await expect(tx)
       .to.emit(protocolsHandler, "Redeemed")
-      .withArgs(token0.address, "200000001165687381");
+      .withArgs(token0.address, "200000001165687394");
     await expect(tx)
       .to.not.emit(router, "TotalLendingsUpdated")
       .withArgs(token0.address, 0, 0);
     await expect(tx)
       .to.emit(router, "Redeemed")
-      .withArgs(deployer.address, token0.address, "200000001165687381");
+      .withArgs(deployer.address, token0.address, "200000001165687394");
     await expect(tx).to.not.emit(protocolsHandler, "Borrowed");
   });
 
@@ -479,13 +494,13 @@ describe("Router tests", function () {
       .withArgs(deployer.address, borrowAmount);
     await expect(tx)
       .to.emit(protocolsHandler, "Repayed")
-      .withArgs(token0.address, "100000002402017246");
+      .withArgs(token0.address, "100000002402017260");
     await expect(tx)
       .to.not.emit(router, "TotalLendingsUpdated")
       .withArgs(token0.address, 0, 0);
     await expect(tx)
       .to.emit(router, "Repayed")
-      .withArgs(deployer.address, token0.address, "100000002402017246");
+      .withArgs(deployer.address, token0.address, "100000002402017260");
     await expect(tx).to.not.emit(protocolsHandler, "Supplied");
   });
 
@@ -626,13 +641,13 @@ describe("Router tests", function () {
       .withArgs(deployer.address, ethers.constants.AddressZero, borrowAmount);
     await expect(tx)
       .to.emit(protocolsHandler, "Borrowed")
-      .withArgs(token0.address, "100000000729589982");
+      .withArgs(token0.address, "100000000729589990");
     await expect(tx)
       .to.emit(router, "TotalLendingsUpdated")
-      .withArgs(token0.address, "100000000588657575", 0);
+      .withArgs(token0.address, "100000000588657583", 0);
     await expect(tx)
       .to.emit(router, "Redeemed")
-      .withArgs(deployer.address, token0.address, "100000000729589982");
+      .withArgs(deployer.address, token0.address, "100000000729589990");
     // 1 token left while borrowing by redeem, which triggers protocols to redeem this 1 token.  fixed is required.
     // await expect(tx).to.not.emit(protocolsHandler, "Redeemed");
   });
@@ -684,10 +699,10 @@ describe("Router tests", function () {
       .withArgs(deployer.address, borrowAmount);
     await expect(tx)
       .to.emit(protocolsHandler, "Redeemed")
-      .withArgs(token0.address, borrowAmount.sub(2));
+      .withArgs(token0.address, borrowAmount.sub(1));
     await expect(tx)
       .to.emit(router, "TotalLendingsUpdated")
-      .withArgs(token0.address, 0, borrowAmount.sub(2));
+      .withArgs(token0.address, 0, borrowAmount.sub(1));
     await expect(tx)
       .to.emit(router, "Borrowed")
       .withArgs(deployer.address, token0.address, borrowAmount);
@@ -747,13 +762,13 @@ describe("Router tests", function () {
       .withArgs(deployer.address, borrowAmount);
     await expect(tx)
       .to.emit(protocolsHandler, "Supplied")
-      .withArgs(token0.address, "100000000105699303");
+      .withArgs(token0.address, "100000000105699304");
     await expect(tx)
       .to.emit(router, "TotalLendingsUpdated")
-      .withArgs(token0.address, borrowAmount.sub(2), 0);
+      .withArgs(token0.address, borrowAmount.sub(1), 0);
     await expect(tx)
       .to.emit(router, "Repayed")
-      .withArgs(deployer.address, token0.address, "100000000105699303");
+      .withArgs(deployer.address, token0.address, "100000000105699304");
     await expect(tx).to.not.emit(protocolsHandler, "Borrowed");
   });
 
@@ -828,7 +843,7 @@ describe("Router tests", function () {
     let dBalance = await dToken.balanceOf(deployer.address);
     let debt = await dToken.scaledDebtOf(deployer.address);
     expect(dBalance.sub(borrowAmount.div(2))).to.within(0, 1);
-    expect(debt).to.equal("50000002402017247");
+    expect(debt).to.equal("50000002402017261");
 
     let assetUSDT = await router.assets(usdt.address);
     let sToken = await ethers.getContractAt("ISToken", assetUSDT.sToken);
@@ -836,7 +851,7 @@ describe("Router tests", function () {
     let balance = await sToken.scaledBalanceOf(deployer.address);
 
     expect(sBalance).to.equal("11360002");
-    expect(balance).to.equal("11360004");
+    expect(balance).to.equal("11360005");
 
     await expect(tx)
       .to.emit(dToken, "Burn")
@@ -846,7 +861,7 @@ describe("Router tests", function () {
       .withArgs(deployer.address, ethers.constants.AddressZero, "8639998");
     await expect(tx)
       .to.emit(router, "Repayed")
-      .withArgs(deployer.address, token0.address, "50000002402017246");
+      .withArgs(deployer.address, token0.address, "50000002402017260");
     await expect(tx)
       .to.emit(router, "Redeemed")
       .withArgs(deployer.address, usdt.address, "8639997");

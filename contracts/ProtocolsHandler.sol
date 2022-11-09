@@ -3,12 +3,12 @@ pragma solidity ^0.8.14;
 
 import "./interfaces/IProtocolsHandler.sol";
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "./libraries/TransferHelper.sol";
 import "./libraries/Utils.sol";
 import "./libraries/Math.sol";
 
-contract ProtocolsHandler is IProtocolsHandler, Ownable {
+contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
     address public router;
     IStrategy public strategy;
     IProtocol[] public protocols;
@@ -18,7 +18,12 @@ contract ProtocolsHandler is IProtocolsHandler, Ownable {
         _;
     }
 
-    constructor(address[] memory _protocols, address _strategy) {
+    function initialize(address[] memory _protocols, address _strategy)
+        external
+        initializer
+    {
+        __Ownable_init();
+
         protocols = new IProtocol[](_protocols.length);
         for (uint256 i = 0; i < _protocols.length; i++) {
             protocols[i] = IProtocol(_protocols[i]);
