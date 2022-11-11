@@ -362,7 +362,7 @@ describe("Router tests", function () {
     );
     let balanceAfter = await token0.balanceOf(deployer.address);
 
-    expect(balanceAfter.sub(balanceBefore)).to.equal("200000001165687394");
+    expect(balanceAfter.sub(balanceBefore)).to.equal("200000001165687396");
 
     let assetToken0 = await router.assets(token0.address);
     let sToken = await ethers.getContractAt("ISToken", assetToken0.sToken);
@@ -378,13 +378,13 @@ describe("Router tests", function () {
       .withArgs(deployer.address, ethers.constants.AddressZero, supplyAmount);
     await expect(tx)
       .to.emit(protocolsHandler, "Redeemed")
-      .withArgs(token0.address, "200000001165687394");
+      .withArgs(token0.address, "200000001165687396");
     await expect(tx)
       .to.not.emit(router, "TotalLendingsUpdated")
       .withArgs(token0.address, 0, 0);
     await expect(tx)
       .to.emit(router, "Redeemed")
-      .withArgs(deployer.address, token0.address, "200000001165687394");
+      .withArgs(deployer.address, token0.address, "200000001165687396");
     await expect(tx).to.not.emit(protocolsHandler, "Borrowed");
   });
 
@@ -537,12 +537,6 @@ describe("Router tests", function () {
 
     await token0.approve(router.address, borrowAmount);
 
-    // let totalLending = await router.totalLendings(token0.address);
-    // console.log(totalLending);
-    // console.log(
-    //   await protocolsHandler.simulateLendings(token0.address, totalLending)
-    // );
-
     let tx = await router.supply(
       {
         asset: token0.address,
@@ -613,12 +607,6 @@ describe("Router tests", function () {
       to: deployer.address,
     });
 
-    // should be 0 after fix on redeem
-    m.log(
-      "protocols totalSupplies:",
-      (await protocolsHandler.totalSupplied(token0.address)).totalAmount
-    );
-
     let tx = await router.redeem(
       {
         asset: token0.address,
@@ -632,24 +620,27 @@ describe("Router tests", function () {
     let sToken = await ethers.getContractAt("ISToken", assetToken0.sToken);
     let sBalance = await sToken.balanceOf(deployer.address);
     let balance = await sToken.scaledBalanceOf(deployer.address);
+    let protocolsHandlerBalance = await token0.balanceOf(
+      protocolsHandler.address
+    );
 
     expect(sBalance).to.equal(0);
     expect(balance).to.equal(0);
+    expect(protocolsHandlerBalance).to.equal(0);
 
     await expect(tx)
       .to.emit(sToken, "Transfer")
       .withArgs(deployer.address, ethers.constants.AddressZero, borrowAmount);
     await expect(tx)
       .to.emit(protocolsHandler, "Borrowed")
-      .withArgs(token0.address, "100000000729589990");
+      .withArgs(token0.address, "100000000729589992");
     await expect(tx)
       .to.emit(router, "TotalLendingsUpdated")
-      .withArgs(token0.address, "100000000588657583", 0);
+      .withArgs(token0.address, "100000000588657585", 0);
     await expect(tx)
       .to.emit(router, "Redeemed")
-      .withArgs(deployer.address, token0.address, "100000000729589990");
-    // 1 token left while borrowing by redeem, which triggers protocols to redeem this 1 token.  fixed is required.
-    // await expect(tx).to.not.emit(protocolsHandler, "Redeemed");
+      .withArgs(deployer.address, token0.address, "100000000729589992");
+    await expect(tx).to.not.emit(protocolsHandler, "Redeemed");
   });
 
   it("should borrow by redeem properly", async () => {
@@ -692,24 +683,24 @@ describe("Router tests", function () {
     let balance = await dToken.scaledDebtOf(deployer.address);
 
     expect(dBalance).to.equal(borrowAmount);
-    expect(borrowAmount.sub(balanceAfter.sub(balanceBefore))).to.within(0, 2);
+    expect(balanceAfter.sub(balanceBefore)).to.equal(borrowAmount);
 
     await expect(tx)
       .to.emit(dToken, "Mint")
       .withArgs(deployer.address, borrowAmount);
     await expect(tx)
       .to.emit(protocolsHandler, "Redeemed")
-      .withArgs(token0.address, borrowAmount.sub(1));
+      .withArgs(token0.address, borrowAmount);
     await expect(tx)
       .to.emit(router, "TotalLendingsUpdated")
-      .withArgs(token0.address, 0, borrowAmount.sub(1));
+      .withArgs(token0.address, 0, borrowAmount);
     await expect(tx)
       .to.emit(router, "Borrowed")
       .withArgs(deployer.address, token0.address, borrowAmount);
     await expect(tx).to.not.emit(protocolsHandler, "Borrowed");
   });
 
-  it("should repay by supply propeerly", async () => {
+  it("should repay by supply properly", async () => {
     const deploys = await loadFixture(RouterTestFixture);
 
     let deployer = deploys.deployer;
@@ -762,13 +753,13 @@ describe("Router tests", function () {
       .withArgs(deployer.address, borrowAmount);
     await expect(tx)
       .to.emit(protocolsHandler, "Supplied")
-      .withArgs(token0.address, "100000000105699304");
+      .withArgs(token0.address, "100000000105699305");
     await expect(tx)
       .to.emit(router, "TotalLendingsUpdated")
-      .withArgs(token0.address, borrowAmount.sub(1), 0);
+      .withArgs(token0.address, borrowAmount, 0);
     await expect(tx)
       .to.emit(router, "Repayed")
-      .withArgs(deployer.address, token0.address, "100000000105699304");
+      .withArgs(deployer.address, token0.address, "100000000105699305");
     await expect(tx).to.not.emit(protocolsHandler, "Borrowed");
   });
 
@@ -836,7 +827,10 @@ describe("Router tests", function () {
       }
     );
     let balanceAfter = await usdt.balanceOf(deployer.address);
-    expect(balanceAfter.sub(balanceBefore)).to.equal("8639997");
+
+    // console.log(await usdt.balanceOf(protocolsHandler.address));
+
+    expect(balanceAfter.sub(balanceBefore)).to.equal("8639999");
 
     let assetToken0 = await router.assets(token0.address);
     let dToken = await ethers.getContractAt("IDToken", assetToken0.dToken);
@@ -850,20 +844,23 @@ describe("Router tests", function () {
     let sBalance = await sToken.balanceOf(deployer.address);
     let balance = await sToken.scaledBalanceOf(deployer.address);
 
-    expect(sBalance).to.equal("11360002");
-    expect(balance).to.equal("11360005");
+    expect(sBalance).to.equal("11360003");
+    expect(balance).to.equal("11360004");
 
     await expect(tx)
       .to.emit(dToken, "Burn")
       .withArgs(deployer.address, borrowAmount.div(2).sub(1));
     await expect(tx)
       .to.emit(sToken, "Transfer")
-      .withArgs(deployer.address, ethers.constants.AddressZero, "8639998");
+      .withArgs(deployer.address, ethers.constants.AddressZero, "8639997");
     await expect(tx)
       .to.emit(router, "Repayed")
       .withArgs(deployer.address, token0.address, "50000002402017260");
     await expect(tx)
+      .to.emit(protocolsHandler, "Redeemed")
+      .withArgs(usdt.address, "8639999");
+    await expect(tx)
       .to.emit(router, "Redeemed")
-      .withArgs(deployer.address, usdt.address, "8639997");
+      .withArgs(deployer.address, usdt.address, "8639999");
   });
 });

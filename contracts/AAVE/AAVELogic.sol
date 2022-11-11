@@ -134,15 +134,7 @@ contract AAVELogic is IProtocol {
         view
         override
         returns (Types.ProtocolData memory data)
-    {
-        // _underlying = replaceNative(_underlying);
-        // data.target = address(pool);
-        // data.encodedData = abi.encodeWithSelector(
-        //     pool.setUserUseReserveAsCollateral.selector,
-        //     _underlying,
-        //     true
-        // );
-    }
+    {}
 
     function getSupplyData(address _underlying, uint256 _amount)
         external
@@ -188,19 +180,10 @@ contract AAVELogic is IProtocol {
             data.weth = payable(_underlying);
         }
 
-        AAVEDataTypes.ReserveData memory reserve = pool.getReserveData(
-            _underlying
-        );
-        uint256 aTokenSupply = IAToken(reserve.aTokenAddress)
-            .scaledTotalSupply();
-        uint256 underlyingValue = IERC20(reserve.aTokenAddress).totalSupply();
-
         data.encodedData = abi.encodeWithSelector(
             pool.withdraw.selector,
             _underlying,
-            underlyingValue > 0
-                ? (_amount * aTokenSupply).divCeil(underlyingValue)
-                : 0,
+            _amount,
             msg.sender
         );
     }

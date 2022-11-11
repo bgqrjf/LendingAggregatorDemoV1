@@ -171,18 +171,10 @@ contract CompoundLogic is IProtocol {
         returns (Types.ProtocolData memory data)
     {
         data.target = cTokens[_underlying];
-        uint256 cTokenSupply = CTokenInterface(data.target).totalSupply();
-        (
-            uint256 totalCash,
-            uint256 totalBorrows,
-            uint256 totalReserves,
-
-        ) = accrueInterest(_underlying, CTokenInterface(data.target));
-        uint256 underlyingValue = totalCash + totalBorrows - totalReserves;
 
         data.encodedData = abi.encodeWithSelector(
-            CERC20Interface.redeem.selector,
-            underlyingValue > 0 ? (_amount * cTokenSupply) / underlyingValue : 0
+            CERC20Interface.redeemUnderlying.selector,
+            _amount
         );
     }
 
@@ -195,7 +187,7 @@ contract CompoundLogic is IProtocol {
         data.target = cTokens[_underlying];
         data.encodedData = abi.encodeWithSelector(
             CERC20Interface.redeem.selector,
-            CERC20Interface(data.target).balanceOf(address(this))
+            CERC20Interface(data.target).balanceOf(msg.sender)
         );
     }
 
@@ -255,7 +247,7 @@ contract CompoundLogic is IProtocol {
         return
             cTokentotalSupply > 0
                 ? ((totalCash + totalBorrows - totalReserves) *
-                    cToken.balanceOf(_account)) / cTokentotalSupply
+                    cToken.balanceOf(_account)).divCeil(cTokentotalSupply)
                 : 0;
     }
 
@@ -487,15 +479,13 @@ contract CompoundLogic is IProtocol {
             uint256 simpleInterestFactor = borrowRateMantissa * blockDelta;
             uint256 interestAccumulated = (simpleInterestFactor *
                 totalBorrows) / Utils.QUINTILLION;
-            totalBorrows = interestAccumulated + totalBorrows;
-            totalReserves =
+            totalBorrows += interestAccumulated;
+            totalReserves +=
                 (_cToken.reserveFactorMantissa() * interestAccumulated) /
-                Utils.QUINTILLION +
-                totalReserves;
-            borrowIndex =
+                Utils.QUINTILLION;
+            borrowIndex +=
                 (simpleInterestFactor * borrowIndex) /
-                Utils.QUINTILLION +
-                borrowIndex;
+                Utils.QUINTILLION;
         }
     }
 

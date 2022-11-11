@@ -151,10 +151,9 @@ contract Router is IRouter, OwnableUpgradeable {
     ) internal {
         IProtocolsHandler protocolsCache = protocols;
 
-        uint256 protocolsRedeemed;
         uint256 redeemed;
         if (_protocolsSupplies > 0) {
-            (protocolsRedeemed, redeemed) = protocolsCache.redeem(
+            redeemed = protocolsCache.redeem(
                 _params.asset,
                 _params.amount,
                 _supplies,
@@ -163,8 +162,8 @@ contract Router is IRouter, OwnableUpgradeable {
             );
         }
 
-        if (_params.amount > protocolsRedeemed) {
-            _params.amount -= protocolsRedeemed;
+        if (_params.amount > redeemed) {
+            _params.amount -= redeemed;
             uint256 borrowed = protocolsCache.borrow(_params);
             _totalLending = _totalLending > borrowed
                 ? _totalLending - borrowed
@@ -210,10 +209,9 @@ contract Router is IRouter, OwnableUpgradeable {
         (uint256[] memory supplies, uint256 protocolsSupplies) = protocolsCache
             .totalSupplied(_params.asset);
 
-        uint256 protocolsRedeemed;
         uint256 borrowed;
         if (protocolsSupplies > 0) {
-            (protocolsRedeemed, borrowed) = protocolsCache.redeem(
+            (borrowed) = protocolsCache.redeem(
                 _params.asset,
                 _params.amount,
                 supplies,
@@ -228,8 +226,8 @@ contract Router is IRouter, OwnableUpgradeable {
             }
         }
 
-        if (_params.amount > protocolsRedeemed) {
-            _params.amount -= protocolsRedeemed;
+        if (_params.amount > borrowed) {
+            _params.amount -= borrowed;
             borrowed += protocolsCache.borrow(_params);
         }
 
@@ -324,14 +322,7 @@ contract Router is IRouter, OwnableUpgradeable {
         repay(_repayParams);
 
         IProtocolsHandler protocolsCache = protocols;
-        ISToken sToken = assets[_redeemParams.asset].sToken;
-
-        uint256 assetValue = priceOracle.valueOfAsset(
-            _repayParams.asset,
-            _redeemParams.asset,
-            _repayParams.amount
-        );
-
+        Types.Asset memory asset = assets[_redeemParams.asset];
         (uint256[] memory supplies, uint256 protocolsSupplies) = protocolsCache
             .totalSupplied(_redeemParams.asset);
         uint256 totalLending = protocolsCache.simulateLendings(
@@ -341,27 +332,40 @@ contract Router is IRouter, OwnableUpgradeable {
 
         uint256 supplied = protocolsSupplies + totalLending;
 
-        _redeemParams.amount = Utils.minOf(
-            (assetValue * bc.liquidateRewardRatio) / Utils.MILLION,
-            sToken.scaledBalanceOf(_repayParams.to)
+        uint256 totalSupply = asset.sToken.totalSupply();
+
+        uint256 assetValue = priceOracle.valueOfAsset(
+            _repayParams.asset,
+            _redeemParams.asset,
+            _repayParams.amount
         );
 
-        uint256 underlyingAmount = sToken.burn(
-            _repayParams.to,
-            sToken.unscaledAmount(_redeemParams.amount, supplied),
+        ISToken sToken = assets[_redeemParams.asset].sToken;
+
+        _redeemParams.amount =
+            (assetValue * bc.liquidateRewardRatio) /
+            Utils.MILLION;
+
+        uint256 sTokenAmount = sToken.unscaledAmount(
+            _redeemParams.amount,
             supplied
         );
 
-        uint256 sTokenAmount;
-        (_redeemParams.amount, sTokenAmount) = (
-            underlyingAmount,
-            _redeemParams.amount
+        uint256 sTokenBalance = sToken.balanceOf(_repayParams.to);
+        if (sTokenAmount > sTokenBalance) {
+            sTokenAmount = sTokenBalance;
+        }
+
+        _redeemParams.amount = sToken.burn(
+            _repayParams.to,
+            sTokenAmount,
+            supplied
         );
 
         _redeem(
             _redeemParams,
             sTokenAmount,
-            sToken.totalSupply(),
+            totalSupply,
             supplies,
             protocolsSupplies,
             totalLending

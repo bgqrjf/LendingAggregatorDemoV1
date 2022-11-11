@@ -26,7 +26,7 @@ interface IProtocolsHandler {
         uint256[] memory supplies,
         uint256 _totalSupplied,
         address _to
-    ) external returns (uint256, uint256);
+    ) external returns (uint256);
 
     function borrow(Types.UserAssetParams memory _params)
         external

@@ -37,17 +37,17 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         address _asset,
         uint256[] memory supplies,
         uint256 _totalSupplied
-    ) internal {
+    )
+        internal
+        returns (uint256[] memory supplyAmounts, uint256[] memory redeemAmounts)
+    {
         IProtocol[] memory protocolsCache = protocols;
-        (
-            uint256[] memory supplyAmounts,
-            uint256[] memory redeemAmounts
-        ) = strategy.getSupplyStrategy(
-                protocolsCache,
-                _asset,
-                supplies,
-                _totalSupplied
-            );
+        (supplyAmounts, redeemAmounts) = strategy.getSupplyStrategy(
+            protocolsCache,
+            _asset,
+            supplies,
+            _totalSupplied
+        );
 
         for (uint256 i = 0; i < protocolsCache.length; i++) {
             if (redeemAmounts[i] > 0) {
@@ -76,38 +76,26 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         return _amount;
     }
 
-    // protocols may redeem token less than requested therefore using
-    // _amount as the amount use for calculation,
-    // amount as the actual amount redeemed from protocols
     function redeem(
         address _asset,
         uint256 _amount,
         uint256[] memory supplies,
         uint256 _totalSupplied,
         address _to
-    ) public onlyRouter returns (uint256, uint256) {
+    ) public onlyRouter returns (uint256) {
         if (_amount > _totalSupplied) {
             _amount = _totalSupplied;
         }
 
         if (_amount > 0) {
-            uint256 balanceBefore = TransferHelper.balanceOf(
-                _asset,
-                address(this)
-            );
             redeemAndSupply(_asset, supplies, _totalSupplied - _amount);
-            uint256 balanceAfter = TransferHelper.balanceOf(
-                _asset,
-                address(this)
-            );
 
-            uint256 amount = balanceAfter - balanceBefore;
-            TransferHelper.safeTransfer(_asset, _to, amount, 0);
-            emit Redeemed(_asset, amount);
-            return (_amount, amount);
+            TransferHelper.safeTransfer(_asset, _to, _amount, 0);
+            emit Redeemed(_asset, _amount);
+            return _amount;
         }
 
-        return (0, 0);
+        return 0;
     }
 
     function borrow(Types.UserAssetParams memory _params)

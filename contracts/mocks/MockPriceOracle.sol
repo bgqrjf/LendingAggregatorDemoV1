@@ -8,8 +8,6 @@ contract MockPriceOracle is IPriceOracle {
     mapping(address => uint256) public price;
     mapping(address => uint256) public units;
 
-    // uint constant public unit = 100000000;
-
     function addAsset(address _asset, uint256 _decimals) external {
         units[_asset] = 10**_decimals;
     }
