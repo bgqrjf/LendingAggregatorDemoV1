@@ -3,15 +3,26 @@ pragma solidity ^0.8.14;
 
 import "./interfaces/IStrategy.sol";
 
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "./libraries/StrategyCalculations.sol";
 
-contract Strategy is IStrategy {
+contract Strategy is IStrategy, Ownable {
     using StrategyCalculations for Types.StrategyParams;
 
-    uint256 public maxLTV;
+    mapping(address => uint256) public maxLTVs;
 
-    constructor(uint256 _maxLTV) {
-        maxLTV = _maxLTV;
+    function setMaxLTV(address[] memory _assets, uint256[] memory _maxLTVs)
+        external
+        onlyOwner
+    {
+        require(
+            _assets.length == _maxLTVs.length,
+            "Strategy: wrong length of _maxLTVs"
+        );
+
+        for (uint256 i = 0; i < _assets.length; i++) {
+            maxLTVs[_assets[i]] = _maxLTVs[i];
+        }
     }
 
     function getSupplyStrategy(
@@ -172,7 +183,8 @@ contract Strategy is IStrategy {
     ) public view override returns (uint256 amount) {
         (uint256 collateral, uint256 borrowed) = _protocol
             .totalColletralAndBorrow(_account, _underlying);
-        uint256 minCollateralNeeded = (borrowed * Utils.MILLION) / maxLTV;
+        uint256 minCollateralNeeded = (borrowed * Utils.MILLION) /
+            maxLTVs[_underlying];
         return
             minCollateralNeeded > collateral
                 ? minCollateralNeeded - collateral
@@ -186,7 +198,8 @@ contract Strategy is IStrategy {
     ) public view override returns (uint256 amount) {
         (uint256 collateral, uint256 borrowed) = _protocol
             .totalColletralAndBorrow(_account, _underlying);
-        uint256 minCollateralNeeded = (borrowed * Utils.MILLION) / maxLTV;
+        uint256 minCollateralNeeded = (borrowed * Utils.MILLION) /
+            maxLTVs[_underlying];
         return
             minCollateralNeeded < collateral
                 ? Utils.minOf(
@@ -203,7 +216,8 @@ contract Strategy is IStrategy {
     ) public view override returns (uint256 amount) {
         (uint256 collateral, uint256 borrowed) = _protocol
             .totalColletralAndBorrow(_account, _underlying);
-        uint256 maxDebtAllowed = (collateral * maxLTV) / Utils.MILLION;
+        uint256 maxDebtAllowed = (collateral * maxLTVs[_underlying]) /
+            Utils.MILLION;
         return maxDebtAllowed > borrowed ? maxDebtAllowed - borrowed : 0;
     }
 
@@ -214,7 +228,8 @@ contract Strategy is IStrategy {
     ) public view override returns (uint256 amount) {
         (uint256 collateral, uint256 borrowed) = _protocol
             .totalColletralAndBorrow(_account, _underlying);
-        uint256 maxDebtAllowed = (collateral * maxLTV) / Utils.MILLION;
+        uint256 maxDebtAllowed = (collateral * maxLTVs[_underlying]) /
+            Utils.MILLION;
         return maxDebtAllowed < borrowed ? borrowed - maxDebtAllowed : 0;
     }
 }

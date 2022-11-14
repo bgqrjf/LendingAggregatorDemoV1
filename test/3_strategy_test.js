@@ -54,7 +54,11 @@ describe("Strategy tests", function () {
     await compoundHandler.updateCTokenList(cUSDT.address);
 
     let Strategy = await ethers.getContractFactory("Strategy");
-    let strategy = await Strategy.deploy(700000);
+    let strategy = await Strategy.deploy();
+    await strategy.setMaxLTV(
+      [token0.address, ETHAddress, usdt.address],
+      [700000, 700000, 700000]
+    );
 
     return {
       deployer: aaveContracts.signer,
@@ -79,7 +83,9 @@ describe("Strategy tests", function () {
 
     let strategy = deploys.strategy;
 
-    expect(await strategy.maxLTV()).to.equal(700000);
+    expect(await strategy.maxLTVs(deploys.token0.address)).to.equal(700000);
+    expect(await strategy.maxLTVs(ETHAddress)).to.equal(700000);
+    expect(await strategy.maxLTVs(deploys.usdt.address)).to.equal(700000);
   });
 
   it("should call minSupplyNeeded correctly", async () => {});

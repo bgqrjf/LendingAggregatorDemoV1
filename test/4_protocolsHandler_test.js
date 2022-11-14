@@ -56,7 +56,11 @@ describe("ProtocolsHandler tests", function () {
     await compoundHandler.updateCTokenList(cUSDT.address);
 
     let Strategy = await ethers.getContractFactory("Strategy");
-    let strategy = await Strategy.deploy(700000);
+    let strategy = await Strategy.deploy();
+    await strategy.setMaxLTV(
+      [token0.address, ETHAddress, usdt.address],
+      [700000, 700000, 700000]
+    );
 
     let ProtocolsHandler = await ethers.getContractFactory("ProtocolsHandler");
     let protocolsHandlerImplementation = await ProtocolsHandler.deploy();
