@@ -20,8 +20,9 @@ interface ISToken is IERC20Upgradeable {
     function burn(
         address _account,
         uint256 _amount,
-        uint256 _totalUnderlying
-    ) external returns (uint256);
+        uint256 _totalUnderlying,
+        uint256 _totalUncollectedFee
+    ) external returns (uint256 amount, uint256 fee);
 
     function scaledBalanceOf(address _account) external view returns (uint256);
 

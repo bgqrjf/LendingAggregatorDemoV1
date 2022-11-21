@@ -636,13 +636,13 @@ describe("Router tests", function () {
       .withArgs(deployer.address, ethers.constants.AddressZero, borrowAmount);
     await expect(tx)
       .to.emit(protocolsHandler, "Borrowed")
-      .withArgs(token0.address, "100000000729589998");
+      .withArgs(token0.address, "100000000728180674");
     await expect(tx)
       .to.emit(router, "TotalLendingsUpdated")
       .withArgs(token0.address, 0);
     await expect(tx)
       .to.emit(router, "Redeemed")
-      .withArgs(deployer.address, token0.address, "100000000729589998");
+      .withArgs(deployer.address, token0.address, "100000000728180674");
     await expect(tx).to.not.emit(protocolsHandler, "Redeemed");
   });
 

@@ -434,26 +434,19 @@ contract Router is RouterStorage, OwnableUpgradeable {
             _params.amount = sTokenBalance;
             _collateralable = false;
         }
-        uint256 totalSupply = asset.sToken.totalSupply();
 
-        underlyingAmount = asset.sToken.burn(
+        (underlyingAmount, fee) = asset.sToken.burn(
             msg.sender,
             _params.amount,
-            totalSupplies
-        );
-
-        fee = asset.sToken.scaledAmount(
-            _params.amount,
+            totalSupplies,
             accFee - collectedFees[_params.asset]
         );
-
-        underlyingAmount -= fee;
 
         rewards.stopMiningSupplyReward(
             _params.asset,
             msg.sender,
             _params.amount,
-            totalSupply
+            asset.sToken.totalSupply() + _params.amount
         );
 
         config.setUsingAsCollateral(msg.sender, asset.index, _collateralable);
@@ -569,14 +562,10 @@ contract Router is RouterStorage, OwnableUpgradeable {
             config.setUsingAsCollateral(msg.sender, asset.index, false);
         }
 
-        underlyingAmount = assets[_params.asset].sToken.burn(
+        (underlyingAmount, fee) = assets[_params.asset].sToken.burn(
             _params.to,
             sTokenAmount,
-            totalSupplies
-        );
-
-        fee = asset.sToken.scaledAmount(
-            sTokenAmount,
+            totalSupplies,
             accFees[_params.asset] - collectedFees[_params.asset]
         );
 

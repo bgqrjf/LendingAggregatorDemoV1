@@ -41,9 +41,14 @@ contract SToken is ISToken, OwnableUpgradeable, ERC20Upgradeable {
     function burn(
         address _from,
         uint256 _amount,
-        uint256 _totalUnderlying
-    ) external override onlyOwner returns (uint256 amount) {
-        amount = (_amount * _totalUnderlying) / totalSupply();
+        uint256 _totalUnderlying,
+        uint256 _totalUncollectedFee
+    ) external override onlyOwner returns (uint256 amount, uint256 fee) {
+        uint256 totalSupply = totalSupply();
+
+        fee = (_amount * _totalUncollectedFee) / totalSupply;
+        amount = (_amount * _totalUnderlying) / totalSupply - fee;
+
         _burn(_from, _amount);
     }
 
