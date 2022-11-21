@@ -1,2 +1,5 @@
-contracts/mocks/aave-core
-contracts/mocks/comp-protocol
+/node_modules
+
+/contracts/mocks/aave-core
+
+/contracts/mocks/comp-protocol

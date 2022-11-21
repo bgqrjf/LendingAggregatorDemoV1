@@ -11,20 +11,6 @@ contract Strategy is IStrategy, Ownable {
 
     mapping(address => uint256) public maxLTVs;
 
-    function setMaxLTV(address[] memory _assets, uint256[] memory _maxLTVs)
-        external
-        onlyOwner
-    {
-        require(
-            _assets.length == _maxLTVs.length,
-            "Strategy: wrong length of _maxLTVs"
-        );
-
-        for (uint256 i = 0; i < _assets.length; i++) {
-            maxLTVs[_assets[i]] = _maxLTVs[i];
-        }
-    }
-
     function getSupplyStrategy(
         IProtocol[] memory _protocols,
         address _asset,
@@ -231,5 +217,19 @@ contract Strategy is IStrategy, Ownable {
         uint256 maxDebtAllowed = (collateral * maxLTVs[_underlying]) /
             Utils.MILLION;
         return maxDebtAllowed < borrowed ? borrowed - maxDebtAllowed : 0;
+    }
+
+    function setMaxLTVs(address[] memory _assets, uint256[] memory _maxLTVs)
+        external
+        onlyOwner
+    {
+        require(
+            _assets.length == _maxLTVs.length,
+            "Strategy: wrong length of _maxLTVs"
+        );
+
+        for (uint256 i = 0; i < _assets.length; i++) {
+            maxLTVs[_assets[i]] = _maxLTVs[i];
+        }
     }
 }

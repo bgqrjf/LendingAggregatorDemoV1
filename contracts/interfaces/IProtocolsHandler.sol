@@ -49,7 +49,7 @@ interface IProtocolsHandler {
     function simulateLendings(address _asset, uint256 _totalLending)
         external
         view
-        returns (uint256 totalLending);
+        returns (uint256 totalLending, uint256 newInterest);
 
     function simulateSupply(address _asset, uint256 _totalLending) external;
 

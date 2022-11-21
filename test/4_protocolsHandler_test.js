@@ -57,7 +57,7 @@ describe("ProtocolsHandler tests", function () {
 
     let Strategy = await ethers.getContractFactory("Strategy");
     let strategy = await Strategy.deploy();
-    await strategy.setMaxLTV(
+    await strategy.setMaxLTVs(
       [token0.address, ETHAddress, usdt.address],
       [700000, 700000, 700000]
     );
@@ -326,10 +326,16 @@ describe("ProtocolsHandler tests", function () {
 
     lendings = await protocolsHandler.simulateLendings(
       token0.address,
+
       supplyAmount
     );
 
-    expect(lendings).to.equal(ethers.BigNumber.from("500000414990810440"));
+    expect(lendings.totalLending).to.equal(
+      ethers.BigNumber.from("500000414990810440")
+    );
+    expect(lendings.newInterest).to.equal(
+      ethers.BigNumber.from("414990810440")
+    );
   });
 
   it("should addProtocol properly", async () => {

@@ -10,6 +10,7 @@ library Types {
         uint256 liquidateLTV;
         uint256 maxLiquidateRatio;
         uint256 liquidateRewardRatio;
+        uint256 feeRate;
     }
 
     struct Asset {
@@ -70,17 +71,6 @@ library Types {
         bytes encodedData;
     }
 
-    struct UserCompRewardData {
-        UserCompReward supply;
-        UserCompReward borrow;
-    }
-
-    struct UserCompReward {
-        uint256 rewardPerShare;
-        uint256 rewardAccured;
-        uint256 rewardCollected;
-    }
-
     struct RouterCompRewardData {
         RouterCompReward supply;
         RouterCompReward borrow;
@@ -89,11 +79,6 @@ library Types {
     struct RouterCompReward {
         uint256 rewardPerShare;
         uint256 index;
-    }
-
-    struct UserShare {
-        uint256 amount;
-        uint256 total;
     }
 
     struct StrategyParams {

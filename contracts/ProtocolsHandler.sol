@@ -221,7 +221,7 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         public
         view
         override
-        returns (uint256 totalLending)
+        returns (uint256 totalLending, uint256 newInterest)
     {
         IProtocol[] memory protocolsCache = protocols;
         uint256 supplyInterest;
@@ -266,6 +266,8 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
             b = supplied - b;
             totalLending = (Math.sqrt(4 * c + b * b) - b) / 2;
         }
+
+        newInterest = totalLending - _totalLending;
     }
 
     function simulateSupply(address _asset, uint256 _totalLending)

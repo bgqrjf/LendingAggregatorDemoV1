@@ -1,26 +1,18 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.14;
 
-import "./interfaces/IRouter.sol";
+import "./storages/RouterStorage.sol";
 
 import "./libraries/TransferHelper.sol";
 import "./libraries/UserAssetBitMap.sol";
 import "./libraries/Utils.sol";
+import "./libraries/Math.sol";
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
 
-contract Router is IRouter, OwnableUpgradeable {
-    IConfig public config;
-    IPriceOracle public priceOracle;
-    IProtocolsHandler public protocols;
-    IRewards public rewards;
-    address public sTokenImplement;
-    address public dTokenImplement;
-    address[] public underlyings;
-    mapping(address => Types.Asset) public assets;
-    mapping(address => uint256) public totalLendings;
-    mapping(address => uint256) public userSupplied;
+contract Router is RouterStorage, OwnableUpgradeable {
+    using Math for uint256;
 
     receive() external payable {}
 
@@ -30,7 +22,8 @@ contract Router is IRouter, OwnableUpgradeable {
         address _config,
         address _rewards,
         address _sToken,
-        address _dToken
+        address _dToken,
+        address payable _feeCollector
     ) external initializer {
         __Ownable_init();
 
@@ -40,19 +33,17 @@ contract Router is IRouter, OwnableUpgradeable {
         rewards = IRewards(_rewards);
         sTokenImplement = _sToken;
         dTokenImplement = _dToken;
+        feeCollector = _feeCollector;
     }
 
     function supply(Types.UserAssetParams memory _params, bool _collateralable)
-        public
+        external
         payable
     {
         IProtocolsHandler protocolsCache = protocols;
-        Types.Asset memory asset = assets[_params.asset];
 
-        uint256 totalLending = protocolsCache.simulateLendings(
-            _params.asset,
-            totalLendings[_params.asset]
-        );
+        (uint256 totalLending, uint256 newInterest) = protocolsCache
+            .simulateLendings(_params.asset, totalLendings[_params.asset]);
 
         TransferHelper.collect(
             _params.asset,
@@ -64,12 +55,15 @@ contract Router is IRouter, OwnableUpgradeable {
 
         (uint256[] memory supplies, uint256 protocolsSupplies) = protocolsCache
             .totalSupplied(_params.asset);
-        uint256 sTokenAmount = asset.sToken.mint(
-            _params.to,
-            _params.amount,
-            protocolsSupplies + totalLending
+
+        recordSupply(
+            _params,
+            protocolsSupplies + totalLending,
+            newInterest,
+            _collateralable
         );
 
+        // execute supply
         uint256 repayed = protocolsCache.repay(_params);
         if (repayed > 0) {
             totalLending += repayed;
@@ -86,68 +80,43 @@ contract Router is IRouter, OwnableUpgradeable {
             );
         }
 
-        // store on strategy aToken and cToken amount
-        config.setUsingAsCollateral(_params.to, asset.index, _collateralable);
-
-        rewards.startMiningSupplyReward(
-            _params.asset,
-            _params.to,
-            sTokenAmount,
-            asset.sToken.totalSupply()
-        );
-
         emit Supplied(_params.to, _params.asset, _params.amount);
     }
 
     // _params.amount is LPToken
     function redeem(Types.UserAssetParams memory _params, bool _collateralable)
-        public
+        external
     {
         IProtocolsHandler protocolsCache = protocols;
-        Types.Asset memory asset = assets[_params.asset];
         (uint256[] memory supplies, uint256 protocolsSupplies) = protocolsCache
             .totalSupplied(_params.asset);
 
-        uint256 totalLending = protocolsCache.simulateLendings(
-            _params.asset,
-            totalLendings[_params.asset]
+        (uint256 totalLending, uint256 newInterest) = protocolsCache
+            .simulateLendings(_params.asset, totalLendings[_params.asset]);
+
+        uint256 uncollectedFee;
+        (_params.amount, uncollectedFee) = recordRedeem(
+            _params,
+            protocolsSupplies + totalLending,
+            newInterest,
+            _collateralable
         );
 
-        uint256 totalSupply = asset.sToken.totalSupply();
-
-        uint256 sTokenBalance = asset.sToken.balanceOf(msg.sender);
-        if (_params.amount > sTokenBalance) {
-            _params.amount = sTokenBalance;
-        }
-
-        uint256 underlyingAmount = asset.sToken.burn(
-            msg.sender,
-            _params.amount,
-            protocolsSupplies + totalLending
-        );
-
-        uint256 sTokenAmount;
-        (_params.amount, sTokenAmount) = (underlyingAmount, _params.amount);
-
-        // pay in protocol
         _redeem(
             _params,
-            sTokenAmount,
-            totalSupply,
             supplies,
             protocolsSupplies,
-            totalLending
+            totalLending,
+            uncollectedFee
         );
-        config.setUsingAsCollateral(msg.sender, asset.index, _collateralable);
     }
 
     function _redeem(
         Types.UserAssetParams memory _params,
-        uint256 _sTokenAmount,
-        uint256 _sTokenTotalSupply,
         uint256[] memory _supplies,
         uint256 _protocolsSupplies,
-        uint256 _totalLending
+        uint256 _totalLending,
+        uint256 _uncollectedFee
     ) internal {
         IProtocolsHandler protocolsCache = protocols;
 
@@ -165,8 +134,9 @@ contract Router is IRouter, OwnableUpgradeable {
         if (_params.amount > redeemed) {
             _params.amount -= redeemed;
             uint256 borrowed = protocolsCache.borrow(_params);
-            _totalLending = _totalLending > borrowed
-                ? _totalLending - borrowed
+            uint256 totalLendingDelta = borrowed + _uncollectedFee;
+            _totalLending = _totalLending > totalLendingDelta
+                ? _totalLending - totalLendingDelta
                 : 0;
 
             redeemed += borrowed;
@@ -174,41 +144,28 @@ contract Router is IRouter, OwnableUpgradeable {
             protocolsCache.simulateSupply(_params.asset, _totalLending);
         }
 
-        rewards.stopMiningSupplyReward(
-            _params.asset,
-            msg.sender,
-            _sTokenAmount,
-            _sTokenTotalSupply
-        );
-
         emit Redeemed(msg.sender, _params.asset, redeemed);
     }
 
-    function borrow(Types.UserAssetParams memory _params) public {
-        require(borrowAllowed(_params), "Router: borrow not allowed");
+    function borrow(Types.UserAssetParams memory _params) external {
+        require(_params.amount > 0, "Router: Borrow 0 token is not allowed");
+        require(borrowAllowed(_params), "Router: Insufficient collateral");
 
         IProtocolsHandler protocolsCache = protocols;
-        Types.Asset memory asset = assets[_params.asset];
-        uint256 totalLending = protocolsCache.simulateLendings(
-            _params.asset,
-            totalLendings[_params.asset]
-        );
+
+        (uint256 totalLending, uint256 newInterest) = protocolsCache
+            .simulateLendings(_params.asset, totalLendings[_params.asset]);
 
         (, uint256 protocolsBorrows) = protocolsCache.totalBorrowed(
             _params.asset
         );
 
-        uint256 dTokenAmount = asset.dToken.mint(
-            msg.sender,
-            _params.amount,
-            protocolsBorrows + totalLendings[_params.asset]
-        );
-
-        config.setBorrowing(msg.sender, asset.index, true);
-
         (uint256[] memory supplies, uint256 protocolsSupplies) = protocolsCache
             .totalSupplied(_params.asset);
 
+        recordBorrow(_params, newInterest, protocolsBorrows + totalLending);
+
+        // execute Brorrow
         uint256 borrowed;
         if (protocolsSupplies > 0) {
             (borrowed) = protocolsCache.redeem(
@@ -231,56 +188,66 @@ contract Router is IRouter, OwnableUpgradeable {
             borrowed += protocolsCache.borrow(_params);
         }
 
-        rewards.startMiningBorrowReward(
-            _params.asset,
-            _params.to,
-            dTokenAmount,
-            asset.dToken.totalSupply()
-        );
-
         emit Borrowed(msg.sender, _params.asset, _params.amount);
     }
 
-    function repay(Types.UserAssetParams memory _params) public payable {
+    function repay(Types.UserAssetParams memory _params) external payable {
+        _repay(_params);
+    }
+
+    function _repay(Types.UserAssetParams memory _params) internal {
         IProtocolsHandler protocolsCache = protocols;
-
-        Types.Asset memory asset = assets[_params.asset];
-        uint256 userDebts = asset.dToken.scaledDebtOf(_params.to);
-        if (_params.amount > userDebts) {
-            _params.amount = userDebts;
-        }
-
-        TransferHelper.collect(
-            _params.asset,
-            msg.sender,
-            address(protocolsCache),
-            _params.amount,
-            0
-        );
-
-        if (_params.asset == TransferHelper.ETH && msg.value > _params.amount) {
-            TransferHelper.transferETH(
-                msg.sender,
-                _params.amount - userDebts,
-                0
-            );
-        }
-
-        uint256 totalLending = protocolsCache.simulateLendings(
-            _params.asset,
-            totalLendings[_params.asset]
-        );
 
         (, uint256 protocolsBorrows) = protocolsCache.totalBorrowed(
             _params.asset
         );
 
-        uint256 totalSupply = asset.dToken.totalSupply();
-        uint256 dTokenAmount = asset.dToken.burn(
-            _params.to,
-            _params.amount,
+        (uint256 totalLending, uint256 newInterest) = protocolsCache
+            .simulateLendings(_params.asset, totalLendings[_params.asset]);
+
+        uint256 fee;
+        (_params.amount, fee) = recordRepay(
+            _params,
+            newInterest,
             protocolsBorrows + totalLending
         );
+
+        // handle transfer
+        {
+            TransferHelper.collect(
+                _params.asset,
+                msg.sender,
+                address(protocolsCache),
+                _params.amount - fee,
+                0
+            );
+
+            TransferHelper.collect(
+                _params.asset,
+                msg.sender,
+                feeCollector,
+                fee,
+                0
+            );
+            emit FeeCollected(_params.asset, feeCollector, fee);
+
+            // transfer over provided ETH back to user
+            if (
+                _params.asset == TransferHelper.ETH &&
+                msg.value > _params.amount
+            ) {
+                TransferHelper.transferETH(
+                    msg.sender,
+                    msg.value - _params.amount,
+                    0
+                );
+            }
+        }
+
+        // execute repay
+        uint256 repayAmount = _params.amount;
+        _params.amount -= fee;
+        totalLending = totalLending > fee ? totalLending - fee : 0;
 
         uint256 repayed = protocolsCache.repay(_params);
         if (_params.amount > repayed) {
@@ -288,6 +255,7 @@ contract Router is IRouter, OwnableUpgradeable {
                 uint256[] memory supplies,
                 uint256 protocolsSupplies
             ) = protocolsCache.totalSupplied(_params.asset);
+
             uint256 supplied = protocolsCache.supply(
                 _params.asset,
                 _params.amount - repayed,
@@ -302,73 +270,51 @@ contract Router is IRouter, OwnableUpgradeable {
             }
         }
 
-        rewards.stopMiningBorrowReward(
-            _params.asset,
-            _params.to,
-            dTokenAmount,
-            totalSupply
-        );
-
-        emit Repayed(_params.to, _params.asset, _params.amount);
+        emit Repayed(_params.to, _params.asset, repayAmount);
     }
 
     function liquidate(
         Types.UserAssetParams memory _repayParams,
         Types.UserAssetParams memory _redeemParams
-    ) public payable {
+    ) external payable {
         Types.BorrowConfig memory bc = config.borrowConfigs(_repayParams.asset);
         _repayParams.amount = validateLiquidatation(_repayParams, bc);
 
-        repay(_repayParams);
+        _repay(_repayParams);
 
         IProtocolsHandler protocolsCache = protocols;
-        Types.Asset memory asset = assets[_redeemParams.asset];
         (uint256[] memory supplies, uint256 protocolsSupplies) = protocolsCache
             .totalSupplied(_redeemParams.asset);
-        uint256 totalLending = protocolsCache.simulateLendings(
+
+        (uint256 totalLending, ) = protocolsCache.simulateLendings(
             _redeemParams.asset,
             totalLendings[_redeemParams.asset]
         );
 
-        uint256 supplied = protocolsSupplies + totalLending;
+        // preprocessing data
+        {
+            uint256 assetValue = priceOracle.valueOfAsset(
+                _repayParams.asset,
+                _redeemParams.asset,
+                _repayParams.amount
+            );
 
-        uint256 totalSupply = asset.sToken.totalSupply();
-
-        uint256 assetValue = priceOracle.valueOfAsset(
-            _repayParams.asset,
-            _redeemParams.asset,
-            _repayParams.amount
-        );
-
-        ISToken sToken = assets[_redeemParams.asset].sToken;
-
-        _redeemParams.amount =
-            (assetValue * bc.liquidateRewardRatio) /
-            Utils.MILLION;
-
-        uint256 sTokenAmount = sToken.unscaledAmount(
-            _redeemParams.amount,
-            supplied
-        );
-
-        uint256 sTokenBalance = sToken.balanceOf(_repayParams.to);
-        if (sTokenAmount > sTokenBalance) {
-            sTokenAmount = sTokenBalance;
+            _redeemParams.amount =
+                (assetValue * bc.liquidateRewardRatio) /
+                Utils.MILLION;
         }
-
-        _redeemParams.amount = sToken.burn(
-            _repayParams.to,
-            sTokenAmount,
-            supplied
+        uint256 uncollectedFee;
+        (_redeemParams.amount, uncollectedFee) = recordLiquidateRedeem(
+            _redeemParams,
+            protocolsSupplies + totalLending
         );
 
         _redeem(
             _redeemParams,
-            sTokenAmount,
-            totalSupply,
             supplies,
             protocolsSupplies,
-            totalLending
+            totalLending,
+            uncollectedFee
         );
     }
 
@@ -421,8 +367,7 @@ contract Router is IRouter, OwnableUpgradeable {
             _params.asset
         );
 
-        uint256 borrowLimit = (collateralValue * bc.liquidateLTV) /
-            Utils.MILLION;
+        uint256 borrowLimit = (collateralValue * bc.maxLTV) / Utils.MILLION;
         return _params.amount + debtsValue < borrowLimit;
     }
 
@@ -447,10 +392,263 @@ contract Router is IRouter, OwnableUpgradeable {
             _params.amount < maxLiquidation ? _params.amount : maxLiquidation;
     }
 
+    // record actions
+    function recordSupply(
+        Types.UserAssetParams memory _params,
+        uint256 totalSupplies,
+        uint256 newInterest,
+        bool _collateralable
+    ) internal {
+        Types.Asset memory asset = assets[_params.asset];
+
+        updateAccFee(_params.asset, newInterest);
+
+        uint256 sTokenAmount = asset.sToken.mint(
+            _params.to,
+            _params.amount,
+            totalSupplies
+        );
+
+        rewards.startMiningSupplyReward(
+            _params.asset,
+            _params.to,
+            sTokenAmount,
+            asset.sToken.totalSupply()
+        );
+
+        config.setUsingAsCollateral(_params.to, asset.index, _collateralable);
+    }
+
+    function recordRedeem(
+        Types.UserAssetParams memory _params,
+        uint256 totalSupplies,
+        uint256 newInterest,
+        bool _collateralable
+    ) internal returns (uint256 underlyingAmount, uint256 fee) {
+        Types.Asset memory asset = assets[_params.asset];
+
+        uint256 accFee = updateAccFee(_params.asset, newInterest);
+
+        uint256 sTokenBalance = asset.sToken.balanceOf(msg.sender);
+        if (_params.amount > sTokenBalance) {
+            _params.amount = sTokenBalance;
+            _collateralable = false;
+        }
+        uint256 totalSupply = asset.sToken.totalSupply();
+
+        underlyingAmount = asset.sToken.burn(
+            msg.sender,
+            _params.amount,
+            totalSupplies
+        );
+
+        fee = asset.sToken.scaledAmount(
+            _params.amount,
+            accFee - collectedFees[_params.asset]
+        );
+
+        underlyingAmount -= fee;
+
+        rewards.stopMiningSupplyReward(
+            _params.asset,
+            msg.sender,
+            _params.amount,
+            totalSupply
+        );
+
+        config.setUsingAsCollateral(msg.sender, asset.index, _collateralable);
+    }
+
+    function recordBorrow(
+        Types.UserAssetParams memory _params,
+        uint256 newInterest,
+        uint256 totalBorrows
+    ) internal {
+        Types.Asset memory asset = assets[_params.asset];
+
+        uint256 accFee = updateAccFee(_params.asset, newInterest);
+
+        uint256 dTokenTotalSupply = asset.dToken.totalSupply();
+        uint256 feeIndex = updateFeeIndex(
+            _params.asset,
+            dTokenTotalSupply,
+            accFee + accFeeOffsets[_params.asset]
+        );
+
+        uint256 dTokenAmount = asset.dToken.mint(
+            msg.sender,
+            _params.amount,
+            totalBorrows
+        );
+
+        updateUserFeeIndex(
+            _params.asset,
+            msg.sender,
+            asset.dToken.balanceOf(msg.sender),
+            dTokenAmount,
+            feeIndex
+        );
+        updateAccFeeOffset(_params.asset, feeIndex, dTokenAmount);
+
+        rewards.startMiningBorrowReward(
+            _params.asset,
+            msg.sender,
+            dTokenAmount,
+            dTokenTotalSupply
+        );
+
+        config.setBorrowing(msg.sender, asset.index, true);
+    }
+
+    function recordRepay(
+        Types.UserAssetParams memory _params,
+        uint256 newInterest,
+        uint256 totalBorrows
+    ) internal returns (uint256 repayAmount, uint256 fee) {
+        Types.Asset memory asset = assets[_params.asset];
+
+        uint256 dTokenTotalSupply = asset.dToken.totalSupply();
+        uint256 userDebts = asset.dToken.scaledAmount(
+            asset.dToken.balanceOf(_params.to),
+            totalBorrows
+        );
+
+        if (_params.amount >= userDebts) {
+            _params.amount = userDebts;
+            config.setBorrowing(_params.to, asset.index, false);
+        }
+        repayAmount = _params.amount;
+
+        uint256 dTokenAmount = asset.dToken.burn(
+            _params.to,
+            _params.amount,
+            totalBorrows
+        );
+
+        uint256 accFee = updateAccFee(_params.asset, newInterest);
+        uint256 feeIndex = updateFeeIndex(
+            _params.asset,
+            dTokenTotalSupply,
+            accFee + accFeeOffsets[_params.asset]
+        );
+
+        fee =
+            ((feeIndex - userFeeIndexes[_params.to][_params.asset]) *
+                dTokenAmount) /
+            Utils.QUINTILLION;
+
+        collectedFees[_params.asset] += fee;
+
+        rewards.stopMiningBorrowReward(
+            _params.asset,
+            _params.to,
+            dTokenAmount,
+            dTokenTotalSupply
+        );
+    }
+
+    function recordLiquidateRedeem(
+        Types.UserAssetParams memory _params,
+        uint256 totalSupplies
+    ) internal returns (uint256 underlyingAmount, uint256 fee) {
+        Types.Asset memory asset = assets[_params.asset];
+
+        uint256 totalSupply = asset.sToken.totalSupply();
+
+        uint256 sTokenAmount = assets[_params.asset].sToken.unscaledAmount(
+            _params.amount,
+            totalSupplies
+        );
+
+        uint256 sTokenBalance = assets[_params.asset].sToken.balanceOf(
+            _params.to
+        );
+
+        if (sTokenAmount > sTokenBalance) {
+            sTokenAmount = sTokenBalance;
+            config.setUsingAsCollateral(msg.sender, asset.index, false);
+        }
+
+        underlyingAmount = assets[_params.asset].sToken.burn(
+            _params.to,
+            sTokenAmount,
+            totalSupplies
+        );
+
+        fee = asset.sToken.scaledAmount(
+            sTokenAmount,
+            accFees[_params.asset] - collectedFees[_params.asset]
+        );
+
+        rewards.stopMiningSupplyReward(
+            _params.asset,
+            msg.sender,
+            underlyingAmount,
+            totalSupply
+        );
+    }
+
+    function updateAccFee(address _asset, uint256 _newInterest)
+        internal
+        returns (uint256 accFee)
+    {
+        accFee =
+            accFees[_asset] +
+            (_newInterest * config.borrowConfigs(_asset).feeRate) /
+            Utils.MILLION;
+
+        accFees[_asset] = accFee;
+
+        emit AccFeeUpdated(_asset, accFee);
+    }
+
     function updatetotalLendings(address _asset, uint256 _new) internal {
-        uint256 old = totalLendings[_asset];
         totalLendings[_asset] = _new;
-        emit TotalLendingsUpdated(_asset, old, _new);
+        emit TotalLendingsUpdated(_asset, _new);
+    }
+
+    function updateFeeIndex(
+        address _underlying,
+        uint256 _totalSupply,
+        uint256 _accFee
+    ) internal returns (uint256 newIndex) {
+        newIndex = _totalSupply > 0
+            ? (_accFee * Utils.QUINTILLION) / _totalSupply
+            : 0;
+
+        feeIndexes[_underlying] = newIndex;
+
+        emit FeeIndexUpdated(_underlying, newIndex);
+    }
+
+    function updateUserFeeIndex(
+        address _underlying,
+        address _account,
+        uint256 _dTokenBalance,
+        uint256 _newAmount,
+        uint256 _feeIndex
+    ) internal returns (uint256 newIndex) {
+        newIndex =
+            (((_feeIndex - userFeeIndexes[_account][_underlying]) *
+                (_dTokenBalance - _newAmount)) + (_feeIndex * _newAmount)) /
+            _dTokenBalance;
+
+        userFeeIndexes[_account][_underlying] = newIndex;
+
+        emit UserFeeIndexUpdated(_account, _underlying, newIndex);
+    }
+
+    function updateAccFeeOffset(
+        address _asset,
+        uint256 _feeIndex,
+        uint256 _newOffset
+    ) internal {
+        uint256 newFeeOffset = accFeeOffsets[_asset] +
+            (_feeIndex * _newOffset).divCeil(Utils.QUINTILLION);
+
+        accFeeOffsets[_asset] = newFeeOffset;
+
+        emit AccFeeOffsetUpdated(_asset, newFeeOffset);
     }
 
     function userStatus(address _account, address _quote)
@@ -484,12 +682,17 @@ contract Router is IRouter, OwnableUpgradeable {
         }
     }
 
-    function getUnderlyings() public view override returns (address[] memory) {
+    function getUnderlyings()
+        external
+        view
+        override
+        returns (address[] memory)
+    {
         return underlyings;
     }
 
     function getAssets()
-        public
+        external
         view
         override
         returns (Types.Asset[] memory _assets)
@@ -501,7 +704,7 @@ contract Router is IRouter, OwnableUpgradeable {
     }
 
     function totalSupplied(address _underlying)
-        public
+        external
         view
         override
         returns (uint256)
@@ -510,16 +713,18 @@ contract Router is IRouter, OwnableUpgradeable {
         (, uint256 protocolsSupplies) = protocolsCache.totalSupplied(
             _underlying
         );
-        uint256 totalLending = protocolsCache.simulateLendings(
+        (uint256 totalLending, ) = protocolsCache.simulateLendings(
             _underlying,
             totalLendings[_underlying]
         );
 
-        return protocolsSupplies + totalLending;
+        uint256 fee = accFees[_underlying] - collectedFees[_underlying];
+
+        return protocolsSupplies + totalLending - fee;
     }
 
     function totalBorrowed(address _underlying)
-        public
+        external
         view
         override
         returns (uint256)
@@ -528,7 +733,7 @@ contract Router is IRouter, OwnableUpgradeable {
         (, uint256 protocolsBorrows) = protocolsCache.totalBorrowed(
             _underlying
         );
-        uint256 totalLending = protocolsCache.simulateLendings(
+        (uint256 totalLending, ) = protocolsCache.simulateLendings(
             _underlying,
             totalLendings[_underlying]
         );

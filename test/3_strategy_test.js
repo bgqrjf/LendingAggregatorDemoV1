@@ -55,7 +55,7 @@ describe("Strategy tests", function () {
 
     let Strategy = await ethers.getContractFactory("Strategy");
     let strategy = await Strategy.deploy();
-    await strategy.setMaxLTV(
+    await strategy.setMaxLTVs(
       [token0.address, ETHAddress, usdt.address],
       [700000, 700000, 700000]
     );

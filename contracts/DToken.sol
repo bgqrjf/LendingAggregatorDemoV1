@@ -5,7 +5,6 @@ import "./interfaces/IDToken.sol";
 import "./interfaces/IRouter.sol";
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-
 import "./libraries/Math.sol";
 
 // DebtToken
@@ -16,9 +15,8 @@ contract DToken is IDToken, OwnableUpgradeable {
     string public symbol;
     uint8 public decimals = 18;
     uint256 public totalSupply;
-    mapping(address => uint256) public balanceOf;
-
     address public override underlying;
+    mapping(address => uint256) public balanceOf;
 
     function initialize(
         address _underlying,
@@ -37,8 +35,9 @@ contract DToken is IDToken, OwnableUpgradeable {
         uint256 _amountOfUnderlying,
         uint256 _totalUnderlying
     ) external override onlyOwner returns (uint256 amount) {
-        amount = totalSupply > 0
-            ? (_amountOfUnderlying * totalSupply).divCeil(_totalUnderlying)
+        uint256 totalSupplyCache = totalSupply;
+        amount = totalSupplyCache > 0
+            ? (_amountOfUnderlying * totalSupplyCache).divCeil(_totalUnderlying)
             : _amountOfUnderlying;
         _mint(_account, amount);
     }
@@ -48,8 +47,8 @@ contract DToken is IDToken, OwnableUpgradeable {
         uint256 _amountOfUnderlying,
         uint256 _totalUnderlying
     ) external override onlyOwner returns (uint256 amount) {
-        amount = totalSupply > 0
-            ? (_amountOfUnderlying * totalSupply) / _totalUnderlying
+        amount = _totalUnderlying > 0
+            ? (_amountOfUnderlying * totalSupply).divCeil(_totalUnderlying)
             : _amountOfUnderlying;
         _burn(_account, amount);
     }
@@ -60,20 +59,22 @@ contract DToken is IDToken, OwnableUpgradeable {
         override
         returns (uint256)
     {
-        return scaledAmount(balanceOf[_account]);
+        return
+            scaledAmount(
+                balanceOf[_account],
+                IRouter(owner()).totalBorrowed(underlying)
+            );
     }
 
-    function scaledAmount(uint256 _amount)
+    function scaledAmount(uint256 _amount, uint256 totalBorrowed)
         public
         view
         override
         returns (uint256)
     {
-        uint256 totalBorrowed = IRouter(owner()).totalBorrowed(underlying);
-
         return
             totalSupply > 0
-                ? (_amount * totalBorrowed).divCeil(totalSupply)
+                ? (_amount * totalBorrowed) / (totalSupply)
                 : _amount;
     }
 
@@ -81,14 +82,14 @@ contract DToken is IDToken, OwnableUpgradeable {
         return IRouter(owner()).totalBorrowed(underlying);
     }
 
-    function _mint(address account, uint256 amount) internal virtual {
+    function _mint(address account, uint256 amount) internal {
         require(account != address(0), "ERC20: mint to the zero address");
         totalSupply += amount;
         balanceOf[account] += amount;
         emit Mint(account, amount);
     }
 
-    function _burn(address account, uint256 amount) internal virtual {
+    function _burn(address account, uint256 amount) internal {
         require(account != address(0), "ERC20: burn from the zero address");
 
         uint256 accountBalance = balanceOf[account];

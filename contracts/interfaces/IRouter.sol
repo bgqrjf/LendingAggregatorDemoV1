@@ -31,20 +31,25 @@ interface IRouter {
         uint256 amount
     );
 
-    event TotalLendingsUpdated(
+    event FeeCollected(
         address indexed asset,
-        uint256 oldLending,
-        uint256 newLending
+        address indexed collector,
+        uint256 amount
     );
 
-    function initialize(
-        address _protocolsHandler,
-        address _priceOracle,
-        address _config,
-        address _rewards,
-        address _sToken,
-        address _dToken
-    ) external;
+    event TotalLendingsUpdated(address indexed asset, uint256 newLending);
+
+    event AccFeeUpdated(address indexed asset, uint256 newAccFee);
+
+    event FeeIndexUpdated(address indexed asset, uint256 newIndex);
+
+    event UserFeeIndexUpdated(
+        address indexed account,
+        address indexed asset,
+        uint256 newIndex
+    );
+
+    event AccFeeOffsetUpdated(address indexed asset, uint256 newIndex);
 
     function supply(Types.UserAssetParams memory, bool) external payable;
 

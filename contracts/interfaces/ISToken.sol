@@ -25,7 +25,10 @@ interface ISToken is IERC20Upgradeable {
 
     function scaledBalanceOf(address _account) external view returns (uint256);
 
-    function scaledAmount(uint256 _amount) external view returns (uint256);
+    function scaledAmount(uint256 _amount, uint256 scaledAmount)
+        external
+        view
+        returns (uint256);
 
     function scaledTotalSupply() external view returns (uint256);
 

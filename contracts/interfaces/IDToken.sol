@@ -25,7 +25,10 @@ interface IDToken {
 
     function scaledDebtOf(address _account) external view returns (uint256);
 
-    function scaledAmount(uint256 _amount) external view returns (uint256);
+    function scaledAmount(uint256 _amount, uint256 scaledAmount)
+        external
+        view
+        returns (uint256);
 
     // external state-getters
     function underlying() external view returns (address);
