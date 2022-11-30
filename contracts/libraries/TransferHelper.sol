@@ -54,8 +54,8 @@ library TransferHelper {
             IERC20(_token).safeTransferFrom(_from, _to, _amount);
         } else {
             require(
-                msg.value == _amount,
-                "TransferHelper: incorrect eth value received"
+                msg.value >= _amount,
+                "TransferHelper: insufficient eth value received"
             );
             if (_to != address(this)) {
                 transferETH(_to, _amount, _gasLimit);

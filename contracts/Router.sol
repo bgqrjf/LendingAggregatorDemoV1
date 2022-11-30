@@ -67,8 +67,8 @@ contract Router is RouterStorage, OwnableUpgradeable {
         uint256 repayed = protocolsCache.repay(_params);
         if (repayed > 0) {
             totalLending += repayed;
-            updatetotalLendings(_params.asset, totalLending);
-            protocolsCache.simulateSupply(_params.asset, totalLending);
+            updateTotalLendings(_params.asset, totalLending);
+            protocolsCache.updateSimulates(_params.asset, totalLending);
         }
 
         if (_params.amount > repayed) {
@@ -140,8 +140,8 @@ contract Router is RouterStorage, OwnableUpgradeable {
                 : 0;
 
             redeemed += borrowed;
-            updatetotalLendings(_params.asset, _totalLending);
-            protocolsCache.simulateSupply(_params.asset, _totalLending);
+            updateTotalLendings(_params.asset, _totalLending);
+            protocolsCache.updateSimulates(_params.asset, _totalLending);
         }
 
         emit Redeemed(msg.sender, _params.asset, redeemed);
@@ -178,8 +178,8 @@ contract Router is RouterStorage, OwnableUpgradeable {
 
             if (borrowed > 0) {
                 totalLending += borrowed;
-                updatetotalLendings(_params.asset, totalLending);
-                protocolsCache.simulateBorrow(_params.asset, totalLending);
+                updateTotalLendings(_params.asset, totalLending);
+                protocolsCache.updateSimulates(_params.asset, totalLending);
             }
         }
 
@@ -236,11 +236,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
                 _params.asset == TransferHelper.ETH &&
                 msg.value > _params.amount
             ) {
-                TransferHelper.transferETH(
-                    msg.sender,
-                    msg.value - _params.amount,
-                    0
-                );
+                refundETH(msg.value - _params.amount);
             }
         }
 
@@ -265,8 +261,8 @@ contract Router is RouterStorage, OwnableUpgradeable {
 
             if (supplied > 0) {
                 totalLending -= supplied;
-                updatetotalLendings(_params.asset, totalLending);
-                protocolsCache.simulateBorrow(_params.asset, totalLending);
+                updateTotalLendings(_params.asset, totalLending);
+                protocolsCache.updateSimulates(_params.asset, totalLending);
             }
         }
 
@@ -278,7 +274,12 @@ contract Router is RouterStorage, OwnableUpgradeable {
         Types.UserAssetParams memory _redeemParams
     ) external payable {
         Types.BorrowConfig memory bc = config.borrowConfigs(_repayParams.asset);
-        _repayParams.amount = validateLiquidatation(_repayParams, bc);
+
+        _repayParams.amount = validateLiquidatation(
+            _repayParams,
+            _redeemParams,
+            bc
+        );
 
         _repay(_repayParams);
 
@@ -368,16 +369,31 @@ contract Router is RouterStorage, OwnableUpgradeable {
         );
 
         uint256 borrowLimit = (collateralValue * bc.maxLTV) / Utils.MILLION;
-        return _params.amount + debtsValue < borrowLimit;
+        return _params.amount + debtsValue <= borrowLimit;
     }
 
     function validateLiquidatation(
-        Types.UserAssetParams memory _params,
+        Types.UserAssetParams memory _repayParams,
+        Types.UserAssetParams memory _redeemParams,
         Types.BorrowConfig memory _bc
     ) internal view returns (uint256) {
         (uint256 collateralValue, uint256 debtsValue) = userStatus(
-            _params.to,
-            _params.asset
+            _repayParams.to,
+            _repayParams.asset
+        );
+
+        uint256 userConfig = config.userDebtAndCollateral(_repayParams.to);
+        Types.Asset memory repayAsset = assets[_repayParams.asset];
+        Types.Asset memory redeemAsset = assets[_redeemParams.asset];
+
+        require(
+            UserAssetBitMap.isUsingAsCollateral(userConfig, redeemAsset.index),
+            "Router: Token is not using as collateral"
+        );
+
+        require(
+            UserAssetBitMap.isBorrowing(userConfig, repayAsset.index),
+            "Router: Token is not borrowing"
         );
 
         require(
@@ -389,7 +405,9 @@ contract Router is RouterStorage, OwnableUpgradeable {
             Utils.MILLION;
 
         return
-            _params.amount < maxLiquidation ? _params.amount : maxLiquidation;
+            _repayParams.amount < maxLiquidation
+                ? _repayParams.amount
+                : maxLiquidation;
     }
 
     // record actions
@@ -430,7 +448,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
         uint256 accFee = updateAccFee(_params.asset, newInterest);
 
         uint256 sTokenBalance = asset.sToken.balanceOf(msg.sender);
-        if (_params.amount > sTokenBalance) {
+        if (_params.amount >= sTokenBalance) {
             _params.amount = sTokenBalance;
             _collateralable = false;
         }
@@ -506,15 +524,15 @@ contract Router is RouterStorage, OwnableUpgradeable {
             totalBorrows
         );
 
-        if (_params.amount >= userDebts) {
-            _params.amount = userDebts;
+        repayAmount = _params.amount;
+        if (repayAmount >= userDebts) {
+            repayAmount = userDebts;
             config.setBorrowing(_params.to, asset.index, false);
         }
-        repayAmount = _params.amount;
 
         uint256 dTokenAmount = asset.dToken.burn(
             _params.to,
-            _params.amount,
+            repayAmount,
             totalBorrows
         );
 
@@ -577,21 +595,30 @@ contract Router is RouterStorage, OwnableUpgradeable {
         );
     }
 
+    function sync(address _asset) external override {
+        (uint256 totalLending, uint256 newInterest) = protocols
+            .simulateLendings(_asset, totalLendings[_asset]);
+
+        updateTotalLendings(_asset, totalLending);
+        updateAccFee(_asset, newInterest);
+    }
+
     function updateAccFee(address _asset, uint256 _newInterest)
         internal
         returns (uint256 accFee)
     {
-        accFee =
-            accFees[_asset] +
-            (_newInterest * config.borrowConfigs(_asset).feeRate) /
-            Utils.MILLION;
+        accFee = accFees[_asset];
+        if (_newInterest > 0) {
+            accFee +=
+                (_newInterest * config.borrowConfigs(_asset).feeRate) /
+                Utils.MILLION;
 
-        accFees[_asset] = accFee;
-
-        emit AccFeeUpdated(_asset, accFee);
+            accFees[_asset] = accFee;
+            emit AccFeeUpdated(_asset, accFee);
+        }
     }
 
-    function updatetotalLendings(address _asset, uint256 _new) internal {
+    function updateTotalLendings(address _asset, uint256 _new) internal {
         totalLendings[_asset] = _new;
         emit TotalLendingsUpdated(_asset, _new);
     }
@@ -601,13 +628,13 @@ contract Router is RouterStorage, OwnableUpgradeable {
         uint256 _totalSupply,
         uint256 _accFee
     ) internal returns (uint256 newIndex) {
-        newIndex = _totalSupply > 0
-            ? (_accFee * Utils.QUINTILLION) / _totalSupply
-            : 0;
-
-        feeIndexes[_underlying] = newIndex;
-
-        emit FeeIndexUpdated(_underlying, newIndex);
+        if (_totalSupply > 0) {
+            newIndex = (_accFee * Utils.QUINTILLION) / _totalSupply;
+            feeIndexes[_underlying] = newIndex;
+            emit FeeIndexUpdated(_underlying, newIndex);
+        } else {
+            newIndex = feeIndexes[_underlying];
+        }
     }
 
     function updateUserFeeIndex(
@@ -617,14 +644,18 @@ contract Router is RouterStorage, OwnableUpgradeable {
         uint256 _newAmount,
         uint256 _feeIndex
     ) internal returns (uint256 newIndex) {
-        newIndex =
-            (((_feeIndex - userFeeIndexes[_account][_underlying]) *
-                (_dTokenBalance - _newAmount)) + (_feeIndex * _newAmount)) /
-            _dTokenBalance;
+        if (_newAmount > 0) {
+            newIndex =
+                (((_feeIndex - userFeeIndexes[_account][_underlying]) *
+                    (_dTokenBalance - _newAmount)) + (_feeIndex * _newAmount)) /
+                _dTokenBalance;
 
-        userFeeIndexes[_account][_underlying] = newIndex;
+            userFeeIndexes[_account][_underlying] = newIndex;
 
-        emit UserFeeIndexUpdated(_account, _underlying, newIndex);
+            emit UserFeeIndexUpdated(_account, _underlying, newIndex);
+        } else {
+            newIndex = userFeeIndexes[_account][_underlying];
+        }
     }
 
     function updateAccFeeOffset(
@@ -632,12 +663,20 @@ contract Router is RouterStorage, OwnableUpgradeable {
         uint256 _feeIndex,
         uint256 _newOffset
     ) internal {
-        uint256 newFeeOffset = accFeeOffsets[_asset] +
-            (_feeIndex * _newOffset).divCeil(Utils.QUINTILLION);
+        if (_newOffset > 0) {
+            uint256 newFeeOffset = accFeeOffsets[_asset] +
+                (_feeIndex * _newOffset).divCeil(Utils.QUINTILLION);
 
-        accFeeOffsets[_asset] = newFeeOffset;
+            accFeeOffsets[_asset] = newFeeOffset;
 
-        emit AccFeeOffsetUpdated(_asset, newFeeOffset);
+            emit AccFeeOffsetUpdated(_asset, newFeeOffset);
+        }
+    }
+
+    function refundETH(uint256 _amount) internal {
+        if (address(this).balance >= _amount) {
+            TransferHelper.transferETH(msg.sender, _amount, 0);
+        }
     }
 
     function userStatus(address _account, address _quote)

@@ -270,8 +270,9 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         newInterest = totalLending - _totalLending;
     }
 
-    function simulateSupply(address _asset, uint256 _totalLending)
+    function updateSimulates(address _asset, uint256 _totalLending)
         external
+        override
         onlyRouter
     {
         IProtocol[] memory protocolsCache = protocols;
@@ -280,22 +281,15 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
             _asset,
             _totalLending
         );
-        for (uint256 i = 0; i < protocolsCache.length; i++) {
-            protocolsCache[i].updateSupplyShare(_asset, supplyAmounts[i]);
-        }
-    }
 
-    function simulateBorrow(address _asset, uint256 _totalLending)
-        external
-        onlyRouter
-    {
-        IProtocol[] memory protocolsCache = protocols;
         uint256[] memory borrowAmounts = strategy.getSimulateBorrowStrategy(
             protocolsCache,
             _asset,
             _totalLending
         );
+
         for (uint256 i = 0; i < protocolsCache.length; i++) {
+            protocolsCache[i].updateSupplyShare(_asset, supplyAmounts[i]);
             protocolsCache[i].updateBorrowShare(_asset, borrowAmounts[i]);
         }
     }

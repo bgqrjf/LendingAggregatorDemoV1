@@ -23,7 +23,9 @@ contract Config is IConfig, Ownable {
     }
 
     function setRouter(address _router) external override onlyOwner {
+        address oldRouter = router;
         router = _router;
+        emit RouterSet(oldRouter, _router);
     }
 
     function setBorrowConfig(address _token, Types.BorrowConfig memory _config)
@@ -34,14 +36,9 @@ contract Config is IConfig, Ownable {
             msg.sender == router || msg.sender == owner(),
             "Config: Only Router/Owner"
         );
+        Types.BorrowConfig memory oldConfig = _borrowConfigs[_token];
         _borrowConfigs[_token] = _config;
-    }
-
-    function setUserColletral(address _user, uint256 _config)
-        external
-        onlyRouter
-    {
-        userDebtAndCollateral[_user] = _config;
+        emit BorrowConfigSet(_token, oldConfig, _config);
     }
 
     function setUsingAsCollateral(
@@ -58,11 +55,17 @@ contract Config is IConfig, Ownable {
             "Config: ID out of range"
         );
         uint256 bit = 1 << ((_reserveIndex << 1) + 1);
+        uint256 oldUserConfig = userDebtAndCollateral[_account];
+        uint256 newUserConfig;
         if (_usingAsCollateral) {
-            userDebtAndCollateral[_account] |= bit;
+            newUserConfig = oldUserConfig | bit;
         } else {
-            userDebtAndCollateral[_account] &= ~bit;
+            newUserConfig = oldUserConfig & ~bit;
         }
+
+        userDebtAndCollateral[_account] = newUserConfig;
+
+        emit UserDebtAndCollateralSet(_account, oldUserConfig, newUserConfig);
     }
 
     function setBorrowing(
@@ -75,11 +78,17 @@ contract Config is IConfig, Ownable {
             "Config: ID out of range"
         );
         uint256 bit = 1 << (_reserveIndex << 1);
+        uint256 oldUserConfig = userDebtAndCollateral[_account];
+        uint256 newUserConfig;
         if (_borrowing) {
-            userDebtAndCollateral[_account] |= bit;
+            newUserConfig = oldUserConfig | bit;
         } else {
-            userDebtAndCollateral[_account] &= ~bit;
+            newUserConfig = oldUserConfig & ~bit;
         }
+
+        userDebtAndCollateral[_account] = newUserConfig;
+
+        emit UserDebtAndCollateralSet(_account, oldUserConfig, newUserConfig);
     }
 
     function borrowConfigs(address _token)

@@ -51,9 +51,7 @@ interface IProtocolsHandler {
         view
         returns (uint256 totalLending, uint256 newInterest);
 
-    function simulateSupply(address _asset, uint256 _totalLending) external;
-
-    function simulateBorrow(address _asset, uint256 _totalLending) external;
+    function updateSimulates(address _asset, uint256 _totalLending) external;
 
     function setRouter(address _router) external;
 

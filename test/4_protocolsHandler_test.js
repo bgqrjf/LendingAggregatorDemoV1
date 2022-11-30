@@ -314,8 +314,7 @@ describe("ProtocolsHandler tests", function () {
       deployer.address,
     ]);
 
-    await protocolsHandler.simulateSupply(token0.address, supplyAmount);
-    await protocolsHandler.simulateBorrow(token0.address, supplyAmount);
+    await protocolsHandler.updateSimulates(token0.address, supplyAmount);
 
     let lendings = await protocolsHandler.simulateLendings(
       token0.address,
@@ -331,10 +330,10 @@ describe("ProtocolsHandler tests", function () {
     );
 
     expect(lendings.totalLending).to.equal(
-      ethers.BigNumber.from("500000414990810440")
+      ethers.BigNumber.from("500000414896903393")
     );
     expect(lendings.newInterest).to.equal(
-      ethers.BigNumber.from("414990810440")
+      ethers.BigNumber.from("414896903393")
     );
   });
 

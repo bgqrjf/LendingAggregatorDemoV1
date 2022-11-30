@@ -2,8 +2,7 @@
 pragma solidity ^0.8.14;
 
 interface IDToken {
-    event Mint(address indexed account, uint256 amount);
-    event Burn(address indexed account, uint256 amount);
+    event Transfer(address indexed from, address indexed to, uint256 amount);
 
     function initialize(
         address _underlying,

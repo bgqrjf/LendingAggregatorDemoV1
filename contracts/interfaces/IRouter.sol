@@ -64,6 +64,8 @@ interface IRouter {
         Types.UserAssetParams memory
     ) external payable;
 
+    function sync(address _asset) external;
+
     function userStatus(address, address)
         external
         view

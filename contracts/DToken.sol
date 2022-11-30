@@ -86,7 +86,7 @@ contract DToken is IDToken, OwnableUpgradeable {
         require(account != address(0), "ERC20: mint to the zero address");
         totalSupply += amount;
         balanceOf[account] += amount;
-        emit Mint(account, amount);
+        emit Transfer(address(0), account, amount);
     }
 
     function _burn(address account, uint256 amount) internal {
@@ -99,6 +99,6 @@ contract DToken is IDToken, OwnableUpgradeable {
         }
         totalSupply -= amount;
 
-        emit Burn(account, amount);
+        emit Transfer(account, address(0), amount);
     }
 }
