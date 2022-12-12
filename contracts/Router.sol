@@ -64,23 +64,19 @@ contract Router is RouterStorage, OwnableUpgradeable {
         );
 
         // execute supply
-        uint256 repayed = protocolsCache.repay(_params);
-        if (repayed > 0) {
-            totalLending += repayed;
-            updateTotalLendings(_params.asset, totalLending);
-            protocolsCache.updateSimulates(_params.asset, totalLending);
+        (uint256 repayed, uint256 supplied) = protocolsCache.repayAndSupply(
+            _params.asset,
+            _params.amount,
+            supplies,
+            protocolsSupplies
+        );
+
+        if (repayed > 0 || newInterest > 0) {
+            totalLending = totalLending + repayed;
+            updateTotalLendings(protocolsCache, _params.asset, totalLending);
         }
 
-        if (_params.amount > repayed) {
-            protocolsCache.supply(
-                _params.asset,
-                _params.amount - repayed,
-                supplies,
-                protocolsSupplies
-            );
-        }
-
-        emit Supplied(_params.to, _params.asset, _params.amount);
+        emit Supplied(_params.to, _params.asset, repayed + supplied);
     }
 
     // _params.amount is LPToken
@@ -120,31 +116,23 @@ contract Router is RouterStorage, OwnableUpgradeable {
     ) internal {
         IProtocolsHandler protocolsCache = protocols;
 
-        uint256 redeemed;
-        if (_protocolsSupplies > 0) {
-            redeemed = protocolsCache.redeem(
-                _params.asset,
-                _params.amount,
-                _supplies,
-                _protocolsSupplies,
-                _params.to
-            );
-        }
+        (uint256 redeemed, uint256 borrowed) = protocolsCache.redeemAndBorrow(
+            _params.asset,
+            _params.amount,
+            _supplies,
+            _protocolsSupplies,
+            _params.to
+        );
 
-        if (_params.amount > redeemed) {
-            _params.amount -= redeemed;
-            uint256 borrowed = protocolsCache.borrow(_params);
+        if (borrowed > 0 || _uncollectedFee > 0) {
             uint256 totalLendingDelta = borrowed + _uncollectedFee;
             _totalLending = _totalLending > totalLendingDelta
                 ? _totalLending - totalLendingDelta
                 : 0;
-
-            redeemed += borrowed;
-            updateTotalLendings(_params.asset, _totalLending);
-            protocolsCache.updateSimulates(_params.asset, _totalLending);
+            updateTotalLendings(protocolsCache, _params.asset, _totalLending);
         }
 
-        emit Redeemed(msg.sender, _params.asset, redeemed);
+        emit Redeemed(msg.sender, _params.asset, redeemed + borrowed);
     }
 
     function borrow(Types.UserAssetParams memory _params) external {
@@ -166,29 +154,20 @@ contract Router is RouterStorage, OwnableUpgradeable {
         recordBorrow(_params, newInterest, protocolsBorrows + totalLending);
 
         // execute Brorrow
-        uint256 borrowed;
-        if (protocolsSupplies > 0) {
-            (borrowed) = protocolsCache.redeem(
-                _params.asset,
-                _params.amount,
-                supplies,
-                protocolsSupplies,
-                _params.to
-            );
+        (uint256 redeemed, uint256 borrowed) = protocolsCache.redeemAndBorrow(
+            _params.asset,
+            _params.amount,
+            supplies,
+            protocolsSupplies,
+            _params.to
+        );
 
-            if (borrowed > 0) {
-                totalLending += borrowed;
-                updateTotalLendings(_params.asset, totalLending);
-                protocolsCache.updateSimulates(_params.asset, totalLending);
-            }
+        if (redeemed > 0 || newInterest > 0) {
+            totalLending += redeemed;
+            updateTotalLendings(protocolsCache, _params.asset, totalLending);
         }
 
-        if (_params.amount > borrowed) {
-            _params.amount -= borrowed;
-            borrowed += protocolsCache.borrow(_params);
-        }
-
-        emit Borrowed(msg.sender, _params.asset, _params.amount);
+        emit Borrowed(msg.sender, _params.asset, redeemed + borrowed);
     }
 
     function repay(Types.UserAssetParams memory _params) external payable {
@@ -241,32 +220,20 @@ contract Router is RouterStorage, OwnableUpgradeable {
         }
 
         // execute repay
-        uint256 repayAmount = _params.amount;
-        _params.amount -= fee;
+        (uint256[] memory supplies, uint256 protocolsSupplies) = protocolsCache
+            .totalSupplied(_params.asset);
+        (uint256 repayed, uint256 supplied) = protocolsCache.repayAndSupply(
+            _params.asset,
+            _params.amount - fee,
+            supplies,
+            protocolsSupplies
+        );
+
         totalLending = totalLending > fee ? totalLending - fee : 0;
+        totalLending = totalLending - supplied;
+        updateTotalLendings(protocolsCache, _params.asset, totalLending);
 
-        uint256 repayed = protocolsCache.repay(_params);
-        if (_params.amount > repayed) {
-            (
-                uint256[] memory supplies,
-                uint256 protocolsSupplies
-            ) = protocolsCache.totalSupplied(_params.asset);
-
-            uint256 supplied = protocolsCache.supply(
-                _params.asset,
-                _params.amount - repayed,
-                supplies,
-                protocolsSupplies
-            );
-
-            if (supplied > 0) {
-                totalLending -= supplied;
-                updateTotalLendings(_params.asset, totalLending);
-                protocolsCache.updateSimulates(_params.asset, totalLending);
-            }
-        }
-
-        emit Repayed(_params.to, _params.asset, repayAmount);
+        emit Repayed(_params.to, _params.asset, repayed + supplied + fee);
     }
 
     function liquidate(
@@ -323,7 +290,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
         uint256 userConfig = config.userDebtAndCollateral(_account);
         uint256[] memory rewardsToClaim;
 
-        for (uint256 i = 0; i < underlyings.length; i++) {
+        for (uint256 i = 0; i < underlyings.length; ++i) {
             if (UserAssetBitMap.isUsingAsCollateralOrBorrowing(userConfig, i)) {
                 Types.Asset memory asset = assets[underlyings[i]];
 
@@ -599,7 +566,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
         (uint256 totalLending, uint256 newInterest) = protocols
             .simulateLendings(_asset, totalLendings[_asset]);
 
-        updateTotalLendings(_asset, totalLending);
+        updateTotalLendings(protocols, _asset, totalLending);
         updateAccFee(_asset, newInterest);
     }
 
@@ -618,7 +585,12 @@ contract Router is RouterStorage, OwnableUpgradeable {
         }
     }
 
-    function updateTotalLendings(address _asset, uint256 _new) internal {
+    function updateTotalLendings(
+        IProtocolsHandler _protocol,
+        address _asset,
+        uint256 _new
+    ) internal {
+        _protocol.updateSimulates(_asset, _new);
         totalLendings[_asset] = _new;
         emit TotalLendingsUpdated(_asset, _new);
     }
@@ -685,7 +657,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
         returns (uint256 collateralValue, uint256 borrowingValue)
     {
         uint256 userConfig = config.userDebtAndCollateral(_account);
-        for (uint256 i = 0; i < underlyings.length; i++) {
+        for (uint256 i = 0; i < underlyings.length; ++i) {
             if (UserAssetBitMap.isUsingAsCollateralOrBorrowing(userConfig, i)) {
                 Types.Asset memory asset = assets[underlyings[i]];
 
@@ -726,7 +698,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
         returns (Types.Asset[] memory _assets)
     {
         _assets = new Types.Asset[](underlyings.length);
-        for (uint256 i = 0; i < _assets.length; i++) {
+        for (uint256 i = 0; i < _assets.length; ++i) {
             _assets[i] = assets[underlyings[i]];
         }
     }

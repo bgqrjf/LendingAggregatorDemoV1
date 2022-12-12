@@ -31,13 +31,13 @@ interface IStrategy {
         uint256 _amount
     ) external view returns (uint256[] memory amounts);
 
-    function minSupplyNeeded(
+    function minSupply(
         IProtocol _protocol,
         address _underlying,
         address _account
     ) external view returns (uint256 amount);
 
-    function minRepayNeeded(
+    function minRepay(
         IProtocol _protocol,
         address _underlying,
         address _account

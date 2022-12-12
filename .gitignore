@@ -6,3 +6,4 @@
 /.vscode/
 /coverage/
 .env
+remix-compiler.config.js

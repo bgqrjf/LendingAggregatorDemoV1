@@ -25,7 +25,7 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         __Ownable_init();
 
         protocols = new IProtocol[](_protocols.length);
-        for (uint256 i = 0; i < _protocols.length; i++) {
+        for (uint256 i = 0; i < _protocols.length; ++i) {
             protocols[i] = IProtocol(_protocols[i]);
         }
         strategy = IStrategy(_strategy);
@@ -33,158 +33,42 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
 
     receive() external payable {}
 
-    function redeemAndSupply(
-        address _asset,
-        uint256[] memory supplies,
-        uint256 _totalSupplied
-    )
-        internal
-        returns (uint256[] memory supplyAmounts, uint256[] memory redeemAmounts)
-    {
-        IProtocol[] memory protocolsCache = protocols;
-        (supplyAmounts, redeemAmounts) = strategy.getSupplyStrategy(
-            protocolsCache,
-            _asset,
-            supplies,
-            _totalSupplied
-        );
-
-        for (uint256 i = 0; i < protocolsCache.length; i++) {
-            if (redeemAmounts[i] > 0) {
-                _redeem(protocolsCache[i], _asset, redeemAmounts[i]);
-            }
-        }
-
-        for (uint256 i = 0; i < protocolsCache.length; i++) {
-            if (supplyAmounts[i] > 0) {
-                _supply(protocolsCache[i], _asset, supplyAmounts[i]);
-            }
-        }
-    }
-
-    function supply(
+    function repayAndSupply(
         address _asset,
         uint256 _amount,
         uint256[] memory supplies,
         uint256 _totalSupplied
-    ) public onlyRouter returns (uint256) {
-        uint256 balanceBefore = TransferHelper.balanceOf(_asset, address(this));
-        redeemAndSupply(_asset, supplies, _totalSupplied + _amount);
-        uint256 balanceAfter = TransferHelper.balanceOf(_asset, address(this));
+    )
+        public
+        override
+        onlyRouter
+        returns (uint256 repayAmount, uint256 supplyAmount)
+    {
+        repayAmount = repay(_asset, _amount);
 
-        emit Supplied(_asset, balanceBefore - balanceAfter);
-        return _amount;
+        if (repayAmount < _amount) {
+            supplyAmount = _amount - repayAmount;
+            supply(_asset, supplyAmount, supplies, _totalSupplied);
+        }
     }
 
-    function redeem(
+    function redeemAndBorrow(
         address _asset,
         uint256 _amount,
         uint256[] memory supplies,
         uint256 _totalSupplied,
         address _to
-    ) public onlyRouter returns (uint256) {
-        if (_amount > _totalSupplied) {
-            _amount = _totalSupplied;
-        }
-
-        if (_amount > 0) {
-            redeemAndSupply(_asset, supplies, _totalSupplied - _amount);
-
-            TransferHelper.safeTransfer(_asset, _to, _amount, 0);
-            emit Redeemed(_asset, _amount);
-            return _amount;
-        }
-
-        return 0;
-    }
-
-    function borrow(Types.UserAssetParams memory _params)
+    )
         public
+        override
         onlyRouter
-        returns (uint256 amount)
+        returns (uint256 redeemAmount, uint256 borrowAmount)
     {
-        IProtocol[] memory protocolsCache = protocols;
-        uint256[] memory amounts = strategy.getBorrowStrategy(
-            protocolsCache,
-            _params.asset,
-            _params.amount
-        );
-
-        for (uint256 i = 0; i < protocolsCache.length; i++) {
-            if (amounts[i] > 0) {
-                Types.ProtocolData memory data = protocolsCache[i]
-                    .getBorrowData(_params.asset, amounts[i]);
-                Utils.lowLevelCall(data.target, data.encodedData, 0);
-                if (data.weth != address(0)) {
-                    IWETH(data.weth).withdraw(amounts[i]);
-                }
-            }
+        redeemAmount = redeem(_asset, _amount, supplies, _totalSupplied, _to);
+        if (redeemAmount < _amount) {
+            borrowAmount = _amount - redeemAmount;
+            borrow(_asset, _amount, _to);
         }
-
-        TransferHelper.safeTransfer(
-            _params.asset,
-            _params.to,
-            _params.amount,
-            0
-        );
-
-        emit Borrowed(_params.asset, _params.amount);
-
-        return _params.amount;
-    }
-
-    function repay(Types.UserAssetParams memory _params)
-        public
-        onlyRouter
-        returns (uint256 amount)
-    {
-        (, uint256 total) = totalBorrowed(_params.asset);
-        _params.amount = Utils.minOf(_params.amount, total);
-
-        if (_params.amount > 0) {
-            IProtocol[] memory protocolsCache = protocols;
-            uint256[] memory amounts = strategy.getRepayStrategy(
-                protocolsCache,
-                _params.asset,
-                _params.amount
-            );
-
-            for (uint256 i = 0; i < protocolsCache.length; i++) {
-                if (amounts[i] > 0) {
-                    Types.ProtocolData memory data = protocolsCache[i]
-                        .getRepayData(_params.asset, amounts[i]);
-
-                    if (data.approveTo == address(0)) {
-                        Utils.lowLevelCall(
-                            data.target,
-                            data.encodedData,
-                            amounts[i]
-                        );
-                    } else {
-                        if (data.weth != address(0)) {
-                            IWETH(data.weth).deposit{value: amounts[i]}();
-                            TransferHelper.approve(
-                                data.weth,
-                                data.approveTo,
-                                amounts[i]
-                            );
-                        } else {
-                            TransferHelper.approve(
-                                _params.asset,
-                                data.approveTo,
-                                amounts[i]
-                            );
-                        }
-
-                        Utils.lowLevelCall(data.target, data.encodedData, 0);
-                    }
-                }
-            }
-
-            emit Repayed(_params.asset, _params.amount);
-        }
-
-        return _params.amount;
     }
 
     function getProtocols() public view override returns (IProtocol[] memory) {
@@ -194,26 +78,28 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
     function totalSupplied(address asset)
         public
         view
+        override
         returns (uint256[] memory amounts, uint256 totalAmount)
     {
         IProtocol[] memory protocolsCache = protocols;
         amounts = new uint256[](protocolsCache.length);
-        for (uint256 i = 0; i < protocolsCache.length; i++) {
+        for (uint256 i = 0; i < protocolsCache.length; ++i) {
             amounts[i] = protocolsCache[i].supplyOf(asset, address(this));
-            totalAmount += amounts[i];
+            totalAmount = totalAmount + amounts[i];
         }
     }
 
     function totalBorrowed(address asset)
         public
         view
+        override
         returns (uint256[] memory amounts, uint256 totalAmount)
     {
         IProtocol[] memory protocolsCache = protocols;
         amounts = new uint256[](protocolsCache.length);
-        for (uint256 i = 0; i < protocolsCache.length; i++) {
+        for (uint256 i = 0; i < protocolsCache.length; ++i) {
             amounts[i] = protocolsCache[i].debtOf(asset, address(this));
-            totalAmount += amounts[i];
+            totalAmount = totalAmount + amounts[i];
         }
     }
 
@@ -227,7 +113,7 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         uint256 supplyInterest;
         uint256 borrowInterest;
 
-        for (uint256 i = 0; i < protocolsCache.length; i++) {
+        for (uint256 i = 0; i < protocolsCache.length; ++i) {
             supplyInterest += protocolsCache[i].lastSupplyInterest(
                 _asset,
                 address(this)
@@ -260,7 +146,7 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
 
         uint256 b = _totalLending + supplyInterest + interestDelta;
         if (b > supplied) {
-            b -= supplied;
+            b = b - supplied;
             totalLending = (Math.sqrt(4 * c + b * b) + b) / 2;
         } else {
             b = supplied - b;
@@ -288,10 +174,145 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
             _totalLending
         );
 
-        for (uint256 i = 0; i < protocolsCache.length; i++) {
+        for (uint256 i = 0; i < protocolsCache.length; ++i) {
             protocolsCache[i].updateSupplyShare(_asset, supplyAmounts[i]);
             protocolsCache[i].updateBorrowShare(_asset, borrowAmounts[i]);
         }
+    }
+
+    function redeemAndSupply(
+        address _asset,
+        uint256[] memory supplies,
+        uint256 _totalSupplied
+    ) internal {
+        IProtocol[] memory protocolsCache = protocols;
+        (
+            uint256[] memory supplyAmounts,
+            uint256[] memory redeemAmounts
+        ) = strategy.getSupplyStrategy(
+                protocolsCache,
+                _asset,
+                supplies,
+                _totalSupplied
+            );
+
+        for (uint256 i = 0; i < protocolsCache.length; ++i) {
+            if (redeemAmounts[i] > 0) {
+                _redeem(protocolsCache[i], _asset, redeemAmounts[i]);
+            }
+        }
+
+        for (uint256 i = 0; i < protocolsCache.length; ++i) {
+            if (supplyAmounts[i] > 0) {
+                _supply(protocolsCache[i], _asset, supplyAmounts[i]);
+            }
+        }
+    }
+
+    function supply(
+        address _asset,
+        uint256 _amount,
+        uint256[] memory supplies,
+        uint256 _totalSupplied
+    ) internal {
+        redeemAndSupply(_asset, supplies, _totalSupplied + _amount);
+        emit Supplied(_asset, _amount);
+    }
+
+    function redeem(
+        address _asset,
+        uint256 _amount,
+        uint256[] memory supplies,
+        uint256 _totalSupplied,
+        address _to
+    ) internal returns (uint256 amount) {
+        amount = Utils.minOf(_amount, _totalSupplied);
+
+        if (amount > 0) {
+            redeemAndSupply(_asset, supplies, _totalSupplied - amount);
+
+            TransferHelper.safeTransfer(_asset, _to, amount, 0);
+            emit Redeemed(_asset, amount);
+        }
+    }
+
+    function borrow(
+        address _asset,
+        uint256 _amount,
+        address _to
+    ) internal returns (uint256 amount) {
+        IProtocol[] memory protocolsCache = protocols;
+        uint256[] memory amounts = strategy.getBorrowStrategy(
+            protocolsCache,
+            _asset,
+            _amount
+        );
+
+        for (uint256 i = 0; i < protocolsCache.length; ++i) {
+            if (amounts[i] > 0) {
+                Types.ProtocolData memory data = protocolsCache[i]
+                    .getBorrowData(_asset, amounts[i]);
+                Utils.lowLevelCall(data.target, data.encodedData, 0);
+                if (data.weth != address(0)) {
+                    IWETH(data.weth).withdraw(amounts[i]);
+                }
+            }
+        }
+
+        TransferHelper.safeTransfer(_asset, _to, _amount, 0);
+
+        emit Borrowed(_asset, _amount);
+
+        return _amount;
+    }
+
+    function repay(address _asset, uint256 _amount)
+        internal
+        returns (uint256 amount)
+    {
+        (, uint256 total) = totalBorrowed(_asset);
+        amount = Utils.minOf(_amount, total);
+
+        if (amount == 0) {
+            return amount;
+        }
+
+        IProtocol[] memory protocolsCache = protocols;
+        uint256[] memory amounts = strategy.getRepayStrategy(
+            protocolsCache,
+            _asset,
+            amount
+        );
+
+        for (uint256 i = 0; i < protocolsCache.length; ++i) {
+            if (amounts[i] == 0) {
+                continue;
+            }
+
+            Types.ProtocolData memory data = protocolsCache[i].getRepayData(
+                _asset,
+                amounts[i]
+            );
+
+            if (data.approveTo == address(0)) {
+                Utils.lowLevelCall(data.target, data.encodedData, amounts[i]);
+            } else {
+                if (data.weth != address(0)) {
+                    IWETH(data.weth).deposit{value: amounts[i]}();
+                    TransferHelper.approve(
+                        data.weth,
+                        data.approveTo,
+                        amounts[i]
+                    );
+                } else {
+                    TransferHelper.approve(_asset, data.approveTo, amounts[i]);
+                }
+
+                Utils.lowLevelCall(data.target, data.encodedData, 0);
+            }
+        }
+
+        emit Repayed(_asset, amount);
     }
 
     function _supply(
@@ -325,7 +346,6 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
             if (initData.target != address(0)) {
                 Utils.lowLevelCall(initData.target, initData.encodedData, 0);
             }
-            _protocol.setInitialized(_asset);
         }
     }
 
@@ -353,7 +373,7 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         override
         onlyRouter
     {
-        for (uint256 i = 0; i < protocols.length; i++) {
+        for (uint256 i = 0; i < protocols.length; ++i) {
             address token = protocols[i].rewardToken();
             TransferHelper.safeTransfer(token, _account, _amounts[i], 0);
         }

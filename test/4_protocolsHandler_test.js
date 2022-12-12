@@ -154,7 +154,12 @@ describe("ProtocolsHandler tests", function () {
     await aPool.supply(token0.address, supplyAmount, deployer.address, 0);
 
     await token0.mint(protocolsHandler.address, supplyAmount);
-    await protocolsHandler.supply(token0.address, supplyAmount, [0, 0], 0);
+    await protocolsHandler.repayAndSupply(
+      token0.address,
+      supplyAmount,
+      [0, 0],
+      0
+    );
 
     let [amounts, totalAmount] = await protocolsHandler.totalSupplied(
       token0.address
@@ -181,12 +186,17 @@ describe("ProtocolsHandler tests", function () {
     await aPool.supply(token0.address, supplyAmount, deployer.address, 0);
 
     await token0.mint(protocolsHandler.address, supplyAmount);
-    await protocolsHandler.supply(token0.address, supplyAmount, [0, 0], 0);
+    await protocolsHandler.repayAndSupply(
+      token0.address,
+      supplyAmount,
+      [0, 0],
+      0
+    );
 
     let [amounts, totalAmount] = await protocolsHandler.totalSupplied(
       token0.address
     );
-    await protocolsHandler.redeem(
+    await protocolsHandler.redeemAndBorrow(
       token0.address,
       supplyAmount,
       amounts,
@@ -219,13 +229,20 @@ describe("ProtocolsHandler tests", function () {
     await aPool.borrow(token0.address, borrowAmount, 2, 0, deployer.address);
 
     await token0.mint(protocolsHandler.address, supplyAmount);
-    await protocolsHandler.supply(token0.address, supplyAmount, [0, 0], 0);
+    await protocolsHandler.repayAndSupply(
+      token0.address,
+      supplyAmount,
+      [0, 0],
+      0
+    );
 
-    await protocolsHandler.borrow([
+    await protocolsHandler.redeemAndBorrow(
       token0.address,
       borrowAmount,
-      deployer.address,
-    ]);
+      [0, 0],
+      0,
+      deployer.address
+    );
 
     let [, totalAmount] = await protocolsHandler.totalBorrowed(token0.address);
     expect(totalAmount).to.equal(borrowAmount);
@@ -252,13 +269,20 @@ describe("ProtocolsHandler tests", function () {
     await aPool.borrow(token0.address, borrowAmount, 2, 0, deployer.address);
 
     await token0.mint(protocolsHandler.address, supplyAmount.mul(2));
-    await protocolsHandler.supply(token0.address, supplyAmount, [0, 0], 0);
+    await protocolsHandler.repayAndSupply(
+      token0.address,
+      supplyAmount,
+      [0, 0],
+      0
+    );
 
-    await protocolsHandler.borrow([
+    await protocolsHandler.redeemAndBorrow(
       token0.address,
       borrowAmount,
-      deployer.address,
-    ]);
+      [0, 0],
+      0,
+      deployer.address
+    );
 
     let aaveHandler = deploys.aaveHandler;
     let compoundHandler = deploys.compoundHandler;
@@ -274,11 +298,12 @@ describe("ProtocolsHandler tests", function () {
 
     let [, totalAmount] = await protocolsHandler.totalBorrowed(token0.address);
 
-    await protocolsHandler.repay([
+    await protocolsHandler.repayAndSupply(
       token0.address,
       borrowAmount,
-      deployer.address,
-    ]);
+      [0, 0],
+      0
+    );
 
     [, totalAmount] = await protocolsHandler.totalBorrowed(token0.address);
 
@@ -306,14 +331,21 @@ describe("ProtocolsHandler tests", function () {
     await aPool.borrow(token0.address, borrowAmount, 2, 0, deployer.address);
 
     await token0.mint(protocolsHandler.address, supplyAmount);
-    await protocolsHandler.supply(token0.address, supplyAmount, [0, 0], 0);
+    await protocolsHandler.repayAndSupply(
+      token0.address,
+      supplyAmount,
+      [0, 0],
+      0
+    );
 
-    await protocolsHandler.borrow([
+    // let (amounts, totalAmount) = await totalSupplied(token0.address)
+    await protocolsHandler.redeemAndBorrow(
       token0.address,
       borrowAmount,
-      deployer.address,
-    ]);
-
+      [0, 0],
+      0,
+      deployer.address
+    );
     await protocolsHandler.updateSimulates(token0.address, supplyAmount);
 
     let lendings = await protocolsHandler.simulateLendings(

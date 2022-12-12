@@ -5,7 +5,8 @@
     "@openzeppelin/hardhat-upgrades": "^1.21.0",
     "chai": "^4.3.6",
     "ethers": "^5.7.2",
-    "hardhat": "^2.9.6"
+    "hardhat": "^2.9.6",
+    "hardhat-gas-reporter": "^1.0.9"
   },
   "dependencies": {
     "@nomicfoundation/hardhat-network-helpers": "^1.0.6",

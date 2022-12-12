@@ -4,13 +4,9 @@ pragma solidity ^0.8.14;
 import "../libraries/Types.sol";
 
 interface IProtocol {
-    event TokenInitialized(address indexed, address indexed);
-
     event SupplyShareUpdated(address indexed, address indexed, uint256, bytes);
 
     event BorrowShareUpdated(address indexed, address indexed, uint256, bytes);
-
-    function setInitialized(address _underlying) external;
 
     function updateSupplyShare(address _underlying, uint256 _amount) external;
 
@@ -27,11 +23,6 @@ interface IProtocol {
         returns (Types.ProtocolData memory data);
 
     function getRedeemData(address _underlying, uint256 _amount)
-        external
-        view
-        returns (Types.ProtocolData memory data);
-
-    function getRedeemAllData(address _underlying)
         external
         view
         returns (Types.ProtocolData memory data);

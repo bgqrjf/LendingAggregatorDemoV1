@@ -37,7 +37,7 @@ contract Rewards is IRewards, Ownable {
             data = userData[_account][_asset][true];
         }
 
-        for (uint256 i = 0; i < protocolsCache.length; i++) {
+        for (uint256 i = 0; i < protocolsCache.length; ++i) {
             uint256 currentRewardPerShare = getRewardPerShare(
                 _asset,
                 protocolsCache[i],
@@ -67,7 +67,7 @@ contract Rewards is IRewards, Ownable {
             data = userData[_account][_asset][true];
         }
 
-        for (uint256 i = 0; i < protocolsCache.length; i++) {
+        for (uint256 i = 0; i < protocolsCache.length; ++i) {
             uint256 currentRewardPerShare = getRewardPerShare(
                 _asset,
                 protocolsCache[i],
@@ -106,7 +106,7 @@ contract Rewards is IRewards, Ownable {
             data = userData[_account][_asset][false];
         }
 
-        for (uint256 i = 0; i < protocolsCache.length; i++) {
+        for (uint256 i = 0; i < protocolsCache.length; ++i) {
             uint256 currentRewardPerShare = getRewardPerShare(
                 _asset,
                 protocolsCache[i],
@@ -136,7 +136,7 @@ contract Rewards is IRewards, Ownable {
             data = userData[_account][_asset][false];
         }
 
-        for (uint256 i = 0; i < protocolsCache.length; i++) {
+        for (uint256 i = 0; i < protocolsCache.length; ++i) {
             uint256 currentRewardPerShare = getRewardPerShare(
                 _asset,
                 protocolsCache[i],
@@ -173,7 +173,7 @@ contract Rewards is IRewards, Ownable {
         UserData memory borrowData = userData[_account][_asset][true];
 
         rewardsToCollect = new uint256[](supplyData.rewards.length);
-        for (uint256 i = 0; i < supplyData.rewards.length; i++) {
+        for (uint256 i = 0; i < supplyData.rewards.length; ++i) {
             supplyData.rewards[i].claimed += supplyData.rewards[i].lastReward;
             borrowData.rewards[i].claimed += borrowData.rewards[i].lastReward;
 

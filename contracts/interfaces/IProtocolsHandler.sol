@@ -13,28 +13,20 @@ interface IProtocolsHandler {
     event Borrowed(address indexed asset, uint256 amount);
     event Repayed(address indexed asset, uint256 amount);
 
-    function supply(
+    function repayAndSupply(
         address _asset,
         uint256 _amount,
         uint256[] memory supplies,
         uint256 _totalSupplied
-    ) external returns (uint256 amount);
+    ) external returns (uint256 repayed, uint256 supplied);
 
-    function redeem(
+    function redeemAndBorrow(
         address _asset,
         uint256 _amount,
         uint256[] memory supplies,
         uint256 _totalSupplied,
         address _to
-    ) external returns (uint256);
-
-    function borrow(Types.UserAssetParams memory _params)
-        external
-        returns (uint256 amount);
-
-    function repay(Types.UserAssetParams memory _params)
-        external
-        returns (uint256 amount);
+    ) external returns (uint256 redeemAmount, uint256 borrowAmount);
 
     function totalSupplied(address asset)
         external

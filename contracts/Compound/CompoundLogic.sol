@@ -47,11 +47,6 @@ contract CompoundLogic is IProtocol {
 
     receive() external payable {}
 
-    function setInitialized(address _underlying) external override {
-        // emit event to unify with other contract
-        emit TokenInitialized(msg.sender, _underlying);
-    }
-
     function updateSupplyShare(address _underlying, uint256 _amount)
         external
         override
@@ -125,7 +120,6 @@ contract CompoundLogic is IProtocol {
         (, , , uint256 borrowIndex) = accrueInterest(_underlying, cToken);
         uint256 deltaIndex = borrowIndex - data.index;
         return (deltaIndex * data.amount) / data.index;
-        // return deltaIndex;
     }
 
     function getAddAssetData(address _underlying)
@@ -175,19 +169,6 @@ contract CompoundLogic is IProtocol {
         data.encodedData = abi.encodeWithSelector(
             CERC20Interface.redeemUnderlying.selector,
             _amount
-        );
-    }
-
-    function getRedeemAllData(address _underlying)
-        external
-        view
-        override
-        returns (Types.ProtocolData memory data)
-    {
-        data.target = cTokens[_underlying];
-        data.encodedData = abi.encodeWithSelector(
-            CERC20Interface.redeem.selector,
-            CERC20Interface(data.target).balanceOf(msg.sender)
         );
     }
 
@@ -274,7 +255,8 @@ contract CompoundLogic is IProtocol {
             _account
         );
         IOracle oracle = comptroller.oracle();
-        for (uint256 i = 0; i < userCTokens.length; i++) {
+
+        for (uint256 i = 0; i < userCTokens.length; ++i) {
             CTokenInterface cToken = userCTokens[i];
             // Read the balances and exchange rate from the cToken
             (
@@ -332,7 +314,11 @@ contract CompoundLogic is IProtocol {
                 params.optimalLTV -
                 params.base *
                 Utils.MILLION;
-            delta = (a / Utils.MILLION)**2 + 4 * params.slope2 * _targetRate;
+            delta =
+                ((a * a) / Utils.TRILLION) +
+                4 *
+                params.slope2 *
+                _targetRate;
             supply =
                 (params.totalBorrowed * (Utils.MILLION * delta.sqrt() - a)) /
                 ((_targetRate + _targetRate) * Utils.MILLION);
@@ -420,41 +406,6 @@ contract CompoundLogic is IProtocol {
                 : getBorrowReward(cToken, _account);
     }
 
-    // function getAccountSnapshot(CTokenInterface cToken, address account)
-    //     internal
-    //     view
-    //     returns (
-    //         uint256,
-    //         uint256,
-    //         uint256
-    //     )
-    // {
-    //     address underlying;
-    //     if (address(cToken) == cTokens[TransferHelper.ETH]) {
-    //         underlying == TransferHelper.ETH;
-    //     } else {
-    //         underlying == cToken.underlying();
-    //     }
-
-    //     (
-    //         uint256 totalCash,
-    //         uint256 totalBorrows,
-    //         uint256 totalReserves,
-    //         uint256 _borrowIndexCurrent
-    //     ) = accrueInterest(underlying, cToken);
-    //     uint256 totalSupply = cToken.totalSupply();
-
-    //     return (
-    //         cToken.balanceOf(account),
-    //         (cToken.borrowBalanceStored(account) * _borrowIndexCurrent) /
-    //             cToken.borrowIndex(),
-    //         totalSupply > 0
-    //             ? ((totalCash + totalBorrows - totalReserves) *
-    //                 Utils.QUINTILLION) / totalSupply
-    //             : 0
-    //     );
-    // }
-
     function accrueInterest(address _underlying, CTokenInterface _cToken)
         internal
         view
@@ -479,11 +430,13 @@ contract CompoundLogic is IProtocol {
             uint256 simpleInterestFactor = borrowRateMantissa * blockDelta;
             uint256 interestAccumulated = (simpleInterestFactor *
                 totalBorrows) / Utils.QUINTILLION;
-            totalBorrows += interestAccumulated;
-            totalReserves +=
+            totalBorrows = totalBorrows + interestAccumulated;
+            totalReserves =
+                totalReserves +
                 (_cToken.reserveFactorMantissa() * interestAccumulated) /
                 Utils.QUINTILLION;
-            borrowIndex +=
+            borrowIndex =
+                borrowIndex +
                 (simpleInterestFactor * borrowIndex) /
                 Utils.QUINTILLION;
         }
@@ -518,6 +471,7 @@ contract CompoundLogic is IProtocol {
     {
         (uint256 supplyIndex, uint256 blockNumber) = comptroller
             .compSupplyState(address(_cToken));
+
         uint256 deltaBlocks = block.number - blockNumber;
 
         uint256 supplySpeed = comptroller.compSupplySpeeds(address(_cToken));

@@ -59,23 +59,6 @@ describe("Protocol Interfaces tests", function () {
       );
     });
 
-    it("should setInitialized properly", async () => {
-      const deploys = await loadFixture(aaveInterfaceTestFixture);
-
-      let aaveHandler = deploys.aaveHandler;
-      let token0 = deploys.token0;
-      let aPool = deploys.aPool;
-
-      expect(await aaveHandler.initialized(token0.address)).to.equal(
-        "0x0000000000000000000000000000000000000000"
-      );
-
-      await aaveHandler.setInitialized(token0.address);
-      expect(
-        (await aaveHandler.initialized(token0.address)).toLowerCase()
-      ).to.equal(deploys.deployer.address.toLowerCase());
-    });
-
     it("should updateSupplyShare properly", async () => {
       const deploys = await loadFixture(aaveInterfaceTestFixture);
 

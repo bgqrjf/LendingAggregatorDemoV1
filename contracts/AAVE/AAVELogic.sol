@@ -33,8 +33,6 @@ contract AAVELogic is IProtocol {
     address public rewardToken;
     IAAVEPool public pool;
 
-    // mapping underlying to msg.sender;
-    mapping(address => address) public initialized;
     // mapping underlying , msg.sender to simulateData
     mapping(address => mapping(address => SimulateData))
         public lastSimulatedSupply;
@@ -51,11 +49,6 @@ contract AAVELogic is IProtocol {
         pool = IAAVEPool(_pool);
         wrappedNative = _wrappedNative;
         aaveTokenAddress = _aaveTokenAddress;
-    }
-
-    function setInitialized(address _underlying) external override {
-        initialized[_underlying] = msg.sender;
-        emit TokenInitialized(msg.sender, _underlying);
     }
 
     function updateSupplyShare(address _underlying, uint256 _amount)
@@ -164,7 +157,6 @@ contract AAVELogic is IProtocol {
         }
 
         data.initialized = true;
-        // data.initialized = initialized[_underlying] == msg.sender;
     }
 
     function getRedeemData(address _underlying, uint256 _amount)
@@ -184,35 +176,6 @@ contract AAVELogic is IProtocol {
             pool.withdraw.selector,
             _underlying,
             _amount,
-            msg.sender
-        );
-    }
-
-    function getRedeemAllData(address _underlying)
-        external
-        view
-        override
-        returns (Types.ProtocolData memory data)
-    {
-        data.target = address(pool);
-        if (_underlying == TransferHelper.ETH) {
-            _underlying = wrappedNative;
-            data.weth = payable(_underlying);
-        }
-
-        AAVEDataTypes.ReserveData memory reserve = pool.getReserveData(
-            _underlying
-        );
-        uint256 aTokenSupply = IAToken(reserve.aTokenAddress)
-            .scaledTotalSupply();
-        uint256 underlyingValue = IERC20(reserve.aTokenAddress).totalSupply();
-
-        data.encodedData = abi.encodeWithSelector(
-            pool.withdraw.selector,
-            _underlying,
-            underlyingValue > 0
-                ? (Utils.MAX_UINT * aTokenSupply) / underlyingValue
-                : 0,
             msg.sender
         );
     }
@@ -332,6 +295,7 @@ contract AAVELogic is IProtocol {
             _params,
             (Types.AAVEUsageParams)
         );
+
         _targetRate = (_targetRate * Utils.MILLION).divCeil(
             params.reserveFactor
         );
@@ -343,7 +307,7 @@ contract AAVELogic is IProtocol {
                 params.totalBorrowedVariable -
                 _targetRate *
                 params.unbacked);
-        uint256 delta = (a / Utils.MILLION)**2 +
+        uint256 delta = ((a * a) / Utils.TRILLION) +
             ((4 * params.totalBorrowed * _targetRate * params.optimalLTV) /
                 Utils.MILLION) *
             (params.slopeV1 *
@@ -378,7 +342,7 @@ contract AAVELogic is IProtocol {
                     params.totalBorrowedVariable *
                     params.baseV);
             delta =
-                (a / Utils.MILLION)**2 +
+                ((a * a) / Utils.TRILLION) +
                 4 *
                 _targetRate *
                 params.totalBorrowed *
@@ -490,7 +454,6 @@ contract AAVELogic is IProtocol {
                     excessStableDebtRatio) /
                 Utils.MILLION;
         }
-
         return abi.encode(params);
     }
 
