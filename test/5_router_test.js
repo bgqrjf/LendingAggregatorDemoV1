@@ -338,6 +338,46 @@ describe("Router tests", function () {
   });
 
   describe("router supply tests", function () {
+    it("should not supply", async () => {
+      const deploys = await loadFixture(RouterTestFixture);
+
+      await deploys.router.blockActions(deploys.token0.address, 2 ** 0);
+      let tx = deploys.router.supply(
+        {
+          asset: deploys.token0.address,
+          amount: ethers.BigNumber.from("200000000000000000"),
+          to: deploys.deployer.address,
+        },
+        true
+      );
+      await expect(tx).to.be.revertedWith("Router: action paused");
+      await deploys.router.blockActions(deploys.token0.address, 0);
+
+      await deploys.router.toggleToken(deploys.token0.address);
+      tx = deploys.router.supply(
+        {
+          asset: deploys.token0.address,
+          amount: ethers.BigNumber.from("200000000000000000"),
+          to: deploys.deployer.address,
+        },
+        true
+      );
+      await expect(tx).to.be.revertedWith("Router: token paused");
+      await deploys.router.toggleToken(deploys.token0.address);
+
+      await deploys.router.blockActions(ethers.constants.AddressZero, 2 ** 0);
+      tx = deploys.router.supply(
+        {
+          asset: deploys.token0.address,
+          amount: ethers.BigNumber.from("200000000000000000"),
+          to: deploys.deployer.address,
+        },
+        true
+      );
+      await expect(tx).to.be.revertedWith("Router: action paused");
+      await deploys.router.blockActions(ethers.constants.AddressZero, 0);
+    });
+
     describe("router supply Token0 tests", function () {
       async function supplyToken0ViaSupplyTestFixture() {
         const deploys = await loadFixture(RouterTestFixture);
@@ -889,6 +929,43 @@ describe("Router tests", function () {
   });
 
   describe("router redeem tests", function () {
+    it("should not redeem", async () => {
+      const deploys = await loadFixture(RouterTestFixture);
+
+      let supplyAmount = ethers.BigNumber.from("200000000000000000");
+
+      await supply(
+        deploys.deployer,
+        deploys.router,
+        deploys.token0,
+        supplyAmount
+      );
+
+      await deploys.router.blockActions(deploys.token0.address, 2 ** 1);
+      let tx = deploys.router.redeem(
+        {
+          asset: deploys.token0.address,
+          amount: supplyAmount,
+          to: deploys.deployer.address,
+        },
+        true
+      );
+      await expect(tx).to.be.revertedWith("Router: action paused");
+      await deploys.router.blockActions(deploys.token0.address, 0);
+
+      await deploys.router.blockActions(ethers.constants.AddressZero, 2 ** 1);
+      tx = deploys.router.redeem(
+        {
+          asset: deploys.token0.address,
+          amount: supplyAmount,
+          to: deploys.deployer.address,
+        },
+        true
+      );
+      await expect(tx).to.be.revertedWith("Router: action paused");
+      await deploys.router.blockActions(ethers.constants.AddressZero, 0);
+    });
+
     describe("router redeem Token0 tests", function () {
       async function redeemToken0ViaProtocolsRedeem() {
         const deploys = await loadFixture(RouterTestFixture);
@@ -1448,6 +1525,38 @@ describe("Router tests", function () {
   });
 
   describe("router borrow tests", function () {
+    it("should not borrow", async () => {
+      const deploys = await loadFixture(RouterTestFixture);
+
+      let supplyAmount = ethers.BigNumber.from("200000000000000000");
+      let borrowAmount = ethers.BigNumber.from("100000000000000000");
+
+      await supply(
+        deploys.deployer,
+        deploys.router,
+        deploys.token0,
+        supplyAmount
+      );
+
+      await deploys.router.blockActions(deploys.token0.address, 2 ** 2);
+      let tx = deploys.router.borrow({
+        asset: deploys.token0.address,
+        amount: borrowAmount,
+        to: deploys.deployer.address,
+      });
+      await expect(tx).to.be.revertedWith("Router: action paused");
+      await deploys.router.blockActions(deploys.token0.address, 0);
+
+      await deploys.router.blockActions(ethers.constants.AddressZero, 2 ** 2);
+      tx = deploys.router.borrow({
+        asset: deploys.token0.address,
+        amount: borrowAmount,
+        to: deploys.deployer.address,
+      });
+      await expect(tx).to.be.revertedWith("Router: action paused");
+      await deploys.router.blockActions(ethers.constants.AddressZero, 0);
+    });
+
     describe("router borrow Token0 tests", function () {
       async function borrowToken0ViaProtocolsBorrow() {
         const deploys = await loadFixture(RouterTestFixture);
@@ -2044,6 +2153,45 @@ describe("Router tests", function () {
   });
 
   describe("router repay tests", function () {
+    it("should not repay", async () => {
+      const deploys = await loadFixture(RouterTestFixture);
+
+      let supplyAmount = ethers.BigNumber.from("200000000000000000");
+      let borrowAmount = ethers.BigNumber.from("100000000000000000");
+
+      await supply(
+        deploys.deployer,
+        deploys.router,
+        deploys.token0,
+        supplyAmount
+      );
+
+      await borrow(
+        deploys.deployer,
+        deploys.router,
+        deploys.token0,
+        borrowAmount
+      );
+
+      await deploys.router.blockActions(deploys.token0.address, 2 ** 3);
+      let tx = deploys.router.repay({
+        asset: deploys.token0.address,
+        amount: borrowAmount.mul(2),
+        to: deploys.deployer.address,
+      });
+      await expect(tx).to.be.revertedWith("Router: action paused");
+      await deploys.router.blockActions(deploys.token0.address, 0);
+
+      await deploys.router.blockActions(ethers.constants.AddressZero, 2 ** 3);
+      tx = deploys.router.repay({
+        asset: deploys.token0.address,
+        amount: borrowAmount.mul(2),
+        to: deploys.deployer.address,
+      });
+      await expect(tx).to.be.revertedWith("Router: action paused");
+      await deploys.router.blockActions(ethers.constants.AddressZero, 0);
+    });
+
     describe("router repay Token0 tests", function () {
       async function repayToken0ViaProtocolsRepay() {
         const deploys = await loadFixture(RouterTestFixture);
@@ -2707,7 +2855,7 @@ describe("Router tests", function () {
         deployer,
         router,
         config,
-        protocolsHandler,
+        priceOracle,
         token0,
         dToken0,
         usdt,
@@ -2715,7 +2863,39 @@ describe("Router tests", function () {
         borrowAmount,
       } = await loadFixture(liquidateToken0);
 
+      await router.blockActions(token0.address, 2 ** 4);
       let tx = router.liquidate(
+        {
+          asset: token0.address,
+          amount: borrowAmount,
+          to: deployer.address,
+        },
+        {
+          asset: usdt.address,
+          amount: 0,
+          to: deployer.address,
+        }
+      );
+      await expect(tx).to.be.revertedWith("Router: action paused");
+      await router.blockActions(token0.address, 0);
+
+      await router.blockActions(ethers.constants.AddressZero, 2 ** 4);
+      tx = router.liquidate(
+        {
+          asset: token0.address,
+          amount: borrowAmount,
+          to: deployer.address,
+        },
+        {
+          asset: usdt.address,
+          amount: 0,
+          to: deployer.address,
+        }
+      );
+      await expect(tx).to.be.revertedWith("Router: action paused");
+      await router.blockActions(ethers.constants.AddressZero, 0);
+
+      tx = router.liquidate(
         {
           asset: token0.address,
           amount: borrowAmount,
@@ -2757,6 +2937,27 @@ describe("Router tests", function () {
       );
       await expect(tx).to.be.revertedWith(
         "Router: Token is not using as collateral"
+      );
+
+      await priceOracle.setAssetPrice(token0.address, 16000000000); // set price to 160.00
+      await token0.approve(router.address, borrowAmount);
+      await supply(deployer, router, token0, 1);
+
+      await router.toggleToken(token0.address);
+      tx = router.liquidate(
+        {
+          asset: token0.address,
+          amount: borrowAmount,
+          to: deployer.address,
+        },
+        {
+          asset: usdt.address,
+          amount: 0,
+          to: deployer.address,
+        }
+      );
+      await expect(tx).to.be.revertedWith(
+        "Router: Paused token not liquidated"
       );
     });
 

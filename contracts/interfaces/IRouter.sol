@@ -69,7 +69,11 @@ interface IRouter {
     function userStatus(address, address)
         external
         view
-        returns (uint256, uint256);
+        returns (
+            uint256,
+            uint256,
+            bool
+        );
 
     function protocols() external view returns (IProtocolsHandler);
 

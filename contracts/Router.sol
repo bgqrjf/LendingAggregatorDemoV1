@@ -13,6 +13,7 @@ import "@openzeppelin/contracts/proxy/Clones.sol";
 
 contract Router is RouterStorage, OwnableUpgradeable {
     using Math for uint256;
+    using UserAssetBitMap for uint256;
 
     receive() external payable {}
 
@@ -40,6 +41,9 @@ contract Router is RouterStorage, OwnableUpgradeable {
         external
         payable
     {
+        actionNotPaused(_params.asset, uint256(Action.supply));
+        require(!tokenPaused[_params.asset], "Router: token paused");
+
         IProtocolsHandler protocolsCache = protocols;
 
         (uint256 totalLending, uint256 newInterest) = protocolsCache
@@ -83,6 +87,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
     function redeem(Types.UserAssetParams memory _params, bool _collateralable)
         external
     {
+        actionNotPaused(_params.asset, uint256(Action.redeem));
         IProtocolsHandler protocolsCache = protocols;
         (uint256[] memory supplies, uint256 protocolsSupplies) = protocolsCache
             .totalSupplied(_params.asset);
@@ -136,6 +141,8 @@ contract Router is RouterStorage, OwnableUpgradeable {
     }
 
     function borrow(Types.UserAssetParams memory _params) external {
+        actionNotPaused(_params.asset, uint256(Action.borrow));
+
         require(_params.amount > 0, "Router: Borrow 0 token is not allowed");
         require(borrowAllowed(_params), "Router: Insufficient collateral");
 
@@ -171,6 +178,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
     }
 
     function repay(Types.UserAssetParams memory _params) external payable {
+        actionNotPaused(_params.asset, uint256(Action.repay));
         _repay(_params);
     }
 
@@ -240,6 +248,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
         Types.UserAssetParams memory _repayParams,
         Types.UserAssetParams memory _redeemParams
     ) external payable {
+        actionNotPaused(_repayParams.asset, uint256(Action.liquidate));
         Types.BorrowConfig memory bc = config.borrowConfigs(_repayParams.asset);
 
         _repayParams.amount = validateLiquidatation(
@@ -268,7 +277,10 @@ contract Router is RouterStorage, OwnableUpgradeable {
             );
 
             _redeemParams.amount =
-                (assetValue * bc.liquidateRewardRatio) /
+                (assetValue *
+                    config
+                        .borrowConfigs(_redeemParams.asset)
+                        .liquidateRewardRatio) /
                 Utils.MILLION;
         }
         uint256 uncollectedFee;
@@ -287,14 +299,15 @@ contract Router is RouterStorage, OwnableUpgradeable {
     }
 
     function claimRewards(address _account) external {
+        actionNotPaused(address(0), uint256(Action.claimRewards));
         uint256 userConfig = config.userDebtAndCollateral(_account);
         uint256[] memory rewardsToClaim;
 
         for (uint256 i = 0; i < underlyings.length; ++i) {
-            if (UserAssetBitMap.isUsingAsCollateralOrBorrowing(userConfig, i)) {
+            if (userConfig.isUsingAsCollateralOrBorrowing(i)) {
                 Types.Asset memory asset = assets[underlyings[i]];
 
-                if (UserAssetBitMap.isUsingAsCollateral(userConfig, i)) {
+                if (userConfig.isUsingAsCollateral(i)) {
                     address underlying = asset.sToken.underlying();
                     uint256[] memory amounts = rewards.claim(
                         underlying,
@@ -307,7 +320,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
                     }
                 }
 
-                if (UserAssetBitMap.isBorrowing(userConfig, i)) {
+                if (userConfig.isBorrowing(i)) {
                     address underlying = asset.dToken.underlying();
                     uint256[] memory amounts = rewards.claim(
                         underlying,
@@ -330,7 +343,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
         returns (bool)
     {
         Types.BorrowConfig memory bc = config.borrowConfigs(_params.asset);
-        (uint256 collateralValue, uint256 debtsValue) = userStatus(
+        (uint256 collateralValue, uint256 debtsValue, ) = userStatus(
             _params.to,
             _params.asset
         );
@@ -344,22 +357,28 @@ contract Router is RouterStorage, OwnableUpgradeable {
         Types.UserAssetParams memory _redeemParams,
         Types.BorrowConfig memory _bc
     ) internal view returns (uint256) {
-        (uint256 collateralValue, uint256 debtsValue) = userStatus(
-            _repayParams.to,
-            _repayParams.asset
-        );
+        (
+            uint256 collateralValue,
+            uint256 debtsValue,
+            bool blackListed
+        ) = userStatus(_repayParams.to, _repayParams.asset);
 
         uint256 userConfig = config.userDebtAndCollateral(_repayParams.to);
         Types.Asset memory repayAsset = assets[_repayParams.asset];
         Types.Asset memory redeemAsset = assets[_redeemParams.asset];
 
         require(
-            UserAssetBitMap.isUsingAsCollateral(userConfig, redeemAsset.index),
+            tokenPaused[_redeemParams.asset] == blackListed,
+            "Router: Paused token not liquidated"
+        );
+
+        require(
+            userConfig.isUsingAsCollateral(redeemAsset.index),
             "Router: Token is not using as collateral"
         );
 
         require(
-            UserAssetBitMap.isBorrowing(userConfig, repayAsset.index),
+            userConfig.isBorrowing(repayAsset.index),
             "Router: Token is not borrowing"
         );
 
@@ -654,24 +673,36 @@ contract Router is RouterStorage, OwnableUpgradeable {
     function userStatus(address _account, address _quote)
         public
         view
-        returns (uint256 collateralValue, uint256 borrowingValue)
+        returns (
+            uint256 collateralValue,
+            uint256 borrowingValue,
+            bool blackListedCollateral
+        )
     {
         uint256 userConfig = config.userDebtAndCollateral(_account);
-        for (uint256 i = 0; i < underlyings.length; ++i) {
-            if (UserAssetBitMap.isUsingAsCollateralOrBorrowing(userConfig, i)) {
-                Types.Asset memory asset = assets[underlyings[i]];
+        address[] memory underlyingsCache = underlyings;
+        for (uint256 i = 0; i < underlyingsCache.length; ++i) {
+            if (userConfig.isUsingAsCollateralOrBorrowing(i)) {
+                address underlying = underlyingsCache[i];
+                Types.Asset memory asset = assets[underlying];
 
-                if (UserAssetBitMap.isUsingAsCollateral(userConfig, i)) {
-                    address underlying = asset.sToken.underlying();
+                if (userConfig.isUsingAsCollateral(i)) {
                     uint256 balance = asset.sToken.scaledBalanceOf(_account);
 
-                    collateralValue += underlying == _quote
-                        ? balance
-                        : priceOracle.valueOfAsset(underlying, _quote, balance);
+                    if (tokenPaused[underlying]) {
+                        blackListedCollateral = tokenPaused[underlying];
+                    } else {
+                        collateralValue += underlying == _quote
+                            ? balance
+                            : priceOracle.valueOfAsset(
+                                underlying,
+                                _quote,
+                                balance
+                            );
+                    }
                 }
 
-                if (UserAssetBitMap.isBorrowing(userConfig, i)) {
-                    address underlying = asset.dToken.underlying();
+                if (userConfig.isBorrowing(i)) {
                     uint256 balance = asset.dToken.scaledDebtOf(_account);
 
                     borrowingValue += underlying == _quote
@@ -741,7 +772,23 @@ contract Router is RouterStorage, OwnableUpgradeable {
         return protocolsBorrows + totalLending;
     }
 
+    function actionNotPaused(address _token, uint256 _action) internal view {
+        require(
+            (blockedActions[_token] >> _action) & 1 == 0 &&
+                (blockedActions[address(0)] >> _action) & 1 == 0,
+            "Router: action paused"
+        );
+    }
+
     //  admin functions
+    function blockActions(address _asset, uint256 _actions) external onlyOwner {
+        blockedActions[_asset] = _actions;
+    }
+
+    function toggleToken(address _asset) external onlyOwner {
+        tokenPaused[_asset] = !tokenPaused[_asset];
+    }
+
     function addProtocol(IProtocol _protocol) external override onlyOwner {
         protocols.addProtocol(_protocol);
         rewards.addProtocol(_protocol);
