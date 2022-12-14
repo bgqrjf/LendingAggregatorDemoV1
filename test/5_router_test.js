@@ -556,7 +556,7 @@ describe("Router tests", function () {
         await expect(tx)
           .to.emit(config, "UserDebtAndCollateralSet")
           .withArgs(deployer.address, 0, 2);
-        await expect(tx).to.not.emit(router, "TotalLendingsUpdated");
+        await expect(tx).to.not.emit(router, "InternalLendingsUpdated");
         await expect(tx)
           .to.emit(router, "Supplied")
           .withArgs(deployer.address, token0.address, supplyAmount);
@@ -581,7 +581,9 @@ describe("Router tests", function () {
         let collateralStatusBefore = await config.userDebtAndCollateral(
           deployer.address
         );
-        let totalLendingsBefore = await router.totalLendings(token0.address);
+        let internalLendingsBefore = await router.internalLendings(
+          token0.address
+        );
 
         let tx = await router.supply(
           { asset: token0.address, amount: supplyAmount, to: deployer.address },
@@ -593,12 +595,16 @@ describe("Router tests", function () {
         let collateralStatusAfter = await config.userDebtAndCollateral(
           deployer.address
         );
-        let totalLendingsAfter = await router.totalLendings(token0.address);
+        let internalLendingsAfter = await router.internalLendings(
+          token0.address
+        );
 
         let userTokenSupplied = userBalanceBefore.sub(userBalanceAfter);
         let cToken0Received = cToken0BalanceAfter.sub(cToken0BalanceBefore);
         let sToken0MintAmount = sToken0BalanceAfter.sub(sToken0BalanceBefore);
-        let totalLendingsDelta = totalLendingsAfter.sub(totalLendingsBefore);
+        let internalLendingsDelta = internalLendingsAfter.sub(
+          internalLendingsBefore
+        );
 
         let routerBalance = await token0.balanceOf(router.address);
         let protocolsHandlerBalance = await token0.balanceOf(
@@ -608,7 +614,7 @@ describe("Router tests", function () {
 
         expect(userTokenSupplied).to.equal(supplyAmount);
         expect(cToken0Received).to.equal(supplyAmount);
-        expect(totalLendingsDelta).to.equal(supplyAmount);
+        expect(internalLendingsDelta).to.equal(supplyAmount);
         expect(routerBalance).to.equal(0);
         expect(protocolsHandlerBalance).to.equal(0);
         expect(accFee).to.equal(0);
@@ -671,7 +677,7 @@ describe("Router tests", function () {
           .to.emit(config, "UserDebtAndCollateralSet")
           .withArgs(deployer.address, 9, 11);
         await expect(tx)
-          .to.emit(router, "TotalLendingsUpdated")
+          .to.emit(router, "InternalLendingsUpdated")
           .withArgs(token0.address, supplyAmount);
         await expect(tx)
           .to.emit(router, "Supplied")
@@ -817,7 +823,7 @@ describe("Router tests", function () {
         await expect(tx)
           .to.emit(config, "UserDebtAndCollateralSet")
           .withArgs(deployer.address, 0, 32);
-        await expect(tx).to.not.emit(router, "TotalLendingsUpdated");
+        await expect(tx).to.not.emit(router, "InternalLendingsUpdated");
         await expect(tx)
           .to.emit(router, "Supplied")
           .withArgs(deployer.address, ETHAddress, supplyAmount);
@@ -841,7 +847,7 @@ describe("Router tests", function () {
         let collateralStatusBefore = await config.userDebtAndCollateral(
           deployer.address
         );
-        let totalLendingsBefore = await router.totalLendings(ETHAddress);
+        let internalLendingsBefore = await router.internalLendings(ETHAddress);
         let tx = await router.supply(
           { asset: ETHAddress, amount: supplyAmount, to: deployer.address },
           true,
@@ -852,11 +858,13 @@ describe("Router tests", function () {
         let collateralStatusAfter = await config.userDebtAndCollateral(
           deployer.address
         );
-        let totalLendingsAfter = await router.totalLendings(ETHAddress);
+        let internalLendingsAfter = await router.internalLendings(ETHAddress);
 
         let cETHReceived = cETHBalanceAfter.sub(cETHBalanceBefore);
         let sETHMintAmount = sETHBalanceAfter.sub(sETHBalanceBefore);
-        let totalLendingsDelta = totalLendingsAfter.sub(totalLendingsBefore);
+        let internalLendingsDelta = internalLendingsAfter.sub(
+          internalLendingsBefore
+        );
 
         let routerBalance = await provider.getBalance(router.address);
         let protocolsHandlerBalance = await provider.getBalance(
@@ -865,7 +873,7 @@ describe("Router tests", function () {
         let accFee = await router.accFees(ETHAddress);
 
         expect(cETHReceived).to.equal(supplyAmount);
-        expect(totalLendingsDelta).to.equal(supplyAmount);
+        expect(internalLendingsDelta).to.equal(supplyAmount);
         expect(routerBalance).to.equal(0);
         expect(protocolsHandlerBalance).to.equal(0);
         expect(accFee).to.equal(0);
@@ -919,7 +927,7 @@ describe("Router tests", function () {
           .to.emit(config, "UserDebtAndCollateralSet")
           .withArgs(deployer.address, 24, 56);
         await expect(tx)
-          .to.emit(router, "TotalLendingsUpdated")
+          .to.emit(router, "InternalLendingsUpdated")
           .withArgs(ETHAddress, supplyAmount);
         await expect(tx)
           .to.emit(router, "Supplied")
@@ -1134,7 +1142,7 @@ describe("Router tests", function () {
           .to.emit(protocolsHandler, "Redeemed")
           .withArgs(token0.address, expectRedeemedAmount);
         await expect(tx).to.not.emit(protocolsHandler, "Borrowed");
-        await expect(tx).to.not.emit(router, "TotalLendingsUpdated");
+        await expect(tx).to.not.emit(router, "InternalLendingsUpdated");
         await expect(tx)
           .to.emit(router, "Redeemed")
           .withArgs(deployer.address, token0.address, expectRedeemedAmount);
@@ -1158,7 +1166,9 @@ describe("Router tests", function () {
         let collateralStatusBefore = await config.userDebtAndCollateral(
           deployer.address
         );
-        let totalLendingsBefore = await router.totalLendings(token0.address);
+        let internalLendingsBefore = await router.internalLendings(
+          token0.address
+        );
         let tx = await router.redeem(
           {
             asset: token0.address,
@@ -1173,7 +1183,9 @@ describe("Router tests", function () {
         let collateralStatusAfter = await config.userDebtAndCollateral(
           deployer.address
         );
-        let totalLendingsAfter = await router.totalLendings(token0.address);
+        let internalLendingsAfter = await router.internalLendings(
+          token0.address
+        );
 
         let userTokenRedeemed = userBalanceAfter.sub(userBalanceBefore);
         let cToken0WithdrawedAmount =
@@ -1190,8 +1202,8 @@ describe("Router tests", function () {
         expect(userTokenRedeemed).to.equal(expectRedeemedAmount);
         expect(cToken0WithdrawedAmount).to.equal(expectRedeemedAmount);
         expect(sToken0BurntAmount).to.equal(supplyAmount);
-        expect(totalLendingsBefore).to.equal("200000001165687551");
-        expect(totalLendingsAfter).to.equal(0);
+        expect(internalLendingsBefore).to.equal("200000001165687551");
+        expect(internalLendingsAfter).to.equal(0);
         expect(routerBalance).to.equal(0);
         expect(protocolsHandlerBalance).to.equal(0);
         expect(accFee).to.equal("6577293858");
@@ -1258,7 +1270,7 @@ describe("Router tests", function () {
           .to.emit(protocolsHandler, "Borrowed")
           .withArgs(token0.address, expectRedeemedAmount);
         await expect(tx)
-          .to.emit(router, "TotalLendingsUpdated")
+          .to.emit(router, "InternalLendingsUpdated")
           .withArgs(token0.address, 0);
         await expect(tx)
           .to.emit(router, "Redeemed")
@@ -1411,7 +1423,7 @@ describe("Router tests", function () {
           .to.emit(protocolsHandler, "Redeemed")
           .withArgs(ETHAddress, expectRedeemedAmount);
         await expect(tx).to.not.emit(protocolsHandler, "Borrowed");
-        await expect(tx).to.not.emit(router, "TotalLendingsUpdated");
+        await expect(tx).to.not.emit(router, "InternalLendingsUpdated");
         await expect(tx)
           .to.emit(router, "Redeemed")
           .withArgs(deployer.address, ETHAddress, expectRedeemedAmount);
@@ -1433,7 +1445,7 @@ describe("Router tests", function () {
         let collateralStatusBefore = await config.userDebtAndCollateral(
           deployer.address
         );
-        let totalLendingsBefore = await router.totalLendings(ETHAddress);
+        let internalLendingsBefore = await router.internalLendings(ETHAddress);
         let tx = await router.redeem(
           {
             asset: ETHAddress,
@@ -1447,7 +1459,7 @@ describe("Router tests", function () {
         let collateralStatusAfter = await config.userDebtAndCollateral(
           deployer.address
         );
-        let totalLendingsAfter = await router.totalLendings(ETHAddress);
+        let internalLendingsAfter = await router.internalLendings(ETHAddress);
 
         let cETHWithdrawedAmount = cETHBalanceBefore.sub(cETHBalanceAfter);
         let sETHBurntAmount = sETHBalanceBefore.sub(sETHBalanceAfter);
@@ -1462,8 +1474,8 @@ describe("Router tests", function () {
 
         expect(cETHWithdrawedAmount).to.equal(expectRedeemedAmount);
         expect(sETHBurntAmount).to.equal(supplyAmount);
-        expect(totalLendingsBefore).to.equal("200000001165687341");
-        expect(totalLendingsAfter).to.equal(0);
+        expect(internalLendingsBefore).to.equal("200000001165687341");
+        expect(internalLendingsAfter).to.equal(0);
         expect(routerBalance).to.equal(0);
         expect(protocolsHandlerBalance).to.equal(0);
         expect(accFee).to.equal("6576166021");
@@ -1515,7 +1527,7 @@ describe("Router tests", function () {
           .to.emit(protocolsHandler, "Borrowed")
           .withArgs(ETHAddress, expectRedeemedAmount);
         await expect(tx)
-          .to.emit(router, "TotalLendingsUpdated")
+          .to.emit(router, "InternalLendingsUpdated")
           .withArgs(ETHAddress, 0);
         await expect(tx)
           .to.emit(router, "Redeemed")
@@ -1734,7 +1746,7 @@ describe("Router tests", function () {
           .to.emit(protocolsHandler, "Borrowed")
           .withArgs(token0.address, borrowAmount);
         await expect(tx).to.not.emit(protocolsHandler, "Redeemed");
-        await expect(tx).to.not.emit(router, "TotalLendingsUpdated");
+        await expect(tx).to.not.emit(router, "InternalLendingsUpdated");
         await expect(tx)
           .to.emit(router, "Borrowed")
           .withArgs(deployer.address, token0.address, borrowAmount);
@@ -1867,7 +1879,7 @@ describe("Router tests", function () {
           .withArgs(token0.address, borrowAmount);
         await expect(tx).to.not.emit(protocolsHandler, "Borrowed");
         await expect(tx)
-          .to.emit(router, "TotalLendingsUpdated")
+          .to.emit(router, "InternalLendingsUpdated")
           .withArgs(token0.address, borrowAmount);
         await expect(tx)
           .to.emit(router, "Borrowed")
@@ -2025,7 +2037,7 @@ describe("Router tests", function () {
           .to.emit(protocolsHandler, "Borrowed")
           .withArgs(ETHAddress, borrowAmount);
         await expect(tx).to.not.emit(protocolsHandler, "Redeemed");
-        await expect(tx).to.not.emit(router, "TotalLendingsUpdated");
+        await expect(tx).to.not.emit(router, "InternalLendingsUpdated");
         await expect(tx)
           .to.emit(router, "Borrowed")
           .withArgs(deployer.address, ETHAddress, borrowAmount);
@@ -2143,7 +2155,7 @@ describe("Router tests", function () {
           .withArgs(ETHAddress, borrowAmount);
         await expect(tx).to.not.emit(protocolsHandler, "Borrowed");
         await expect(tx)
-          .to.emit(router, "TotalLendingsUpdated")
+          .to.emit(router, "InternalLendingsUpdated")
           .withArgs(ETHAddress, borrowAmount);
         await expect(tx)
           .to.emit(router, "Borrowed")
@@ -2362,7 +2374,7 @@ describe("Router tests", function () {
           .withArgs(token0.address, expectRepayAmount);
         await expect(tx).to.not.emit(protocolsHandler, "Supplied");
         await expect(tx)
-          .to.emit(router, "TotalLendingsUpdated")
+          .to.emit(router, "InternalLendingsUpdated")
           .withArgs(token0.address, 0);
         await expect(tx)
           .to.emit(router, "Repayed")
@@ -2513,7 +2525,7 @@ describe("Router tests", function () {
           .withArgs(token0.address, expectRepayAmount.sub(collectedFee));
         await expect(tx).to.not.emit(protocolsHandler, "Repayed");
         await expect(tx)
-          .to.emit(router, "TotalLendingsUpdated")
+          .to.emit(router, "InternalLendingsUpdated")
           .withArgs(token0.address, 0);
       });
     });
@@ -2665,7 +2677,7 @@ describe("Router tests", function () {
           .withArgs(ETHAddress, expectRepayAmount);
         await expect(tx).to.not.emit(protocolsHandler, "Supplied");
         await expect(tx)
-          .to.emit(router, "TotalLendingsUpdated")
+          .to.emit(router, "InternalLendingsUpdated")
           .withArgs(ETHAddress, 0);
         await expect(tx)
           .to.emit(router, "Repayed")
@@ -2806,7 +2818,7 @@ describe("Router tests", function () {
           .withArgs(ETHAddress, expectRepayAmount.sub(collectedFee));
         await expect(tx).to.not.emit(protocolsHandler, "Repayed");
         await expect(tx)
-          .to.emit(router, "TotalLendingsUpdated")
+          .to.emit(router, "InternalLendingsUpdated")
           .withArgs(ETHAddress, 0);
         await expect(tx)
           .to.emit(router, "Repayed")

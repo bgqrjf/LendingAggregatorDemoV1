@@ -46,8 +46,8 @@ contract Router is RouterStorage, OwnableUpgradeable {
 
         IProtocolsHandler protocolsCache = protocols;
 
-        (uint256 totalLending, uint256 newInterest) = protocolsCache
-            .simulateLendings(_params.asset, totalLendings[_params.asset]);
+        (uint256 internalLending, uint256 newInterest) = protocolsCache
+            .simulateLendings(_params.asset, internalLendings[_params.asset]);
 
         TransferHelper.collect(
             _params.asset,
@@ -62,7 +62,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
 
         recordSupply(
             _params,
-            protocolsSupplies + totalLending,
+            protocolsSupplies + internalLending,
             newInterest,
             _collateralable
         );
@@ -76,8 +76,12 @@ contract Router is RouterStorage, OwnableUpgradeable {
         );
 
         if (repayed > 0 || newInterest > 0) {
-            totalLending = totalLending + repayed;
-            updateTotalLendings(protocolsCache, _params.asset, totalLending);
+            internalLending = internalLending + repayed;
+            updateInternalLendings(
+                protocolsCache,
+                _params.asset,
+                internalLending
+            );
         }
 
         emit Supplied(_params.to, _params.asset, repayed + supplied);
@@ -92,13 +96,13 @@ contract Router is RouterStorage, OwnableUpgradeable {
         (uint256[] memory supplies, uint256 protocolsSupplies) = protocolsCache
             .totalSupplied(_params.asset);
 
-        (uint256 totalLending, uint256 newInterest) = protocolsCache
-            .simulateLendings(_params.asset, totalLendings[_params.asset]);
+        (uint256 internalLending, uint256 newInterest) = protocolsCache
+            .simulateLendings(_params.asset, internalLendings[_params.asset]);
 
         uint256 uncollectedFee;
         (_params.amount, uncollectedFee) = recordRedeem(
             _params,
-            protocolsSupplies + totalLending,
+            protocolsSupplies + internalLending,
             newInterest,
             _collateralable
         );
@@ -107,7 +111,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
             _params,
             supplies,
             protocolsSupplies,
-            totalLending,
+            internalLending,
             uncollectedFee
         );
     }
@@ -116,7 +120,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
         Types.UserAssetParams memory _params,
         uint256[] memory _supplies,
         uint256 _protocolsSupplies,
-        uint256 _totalLending,
+        uint256 _internalLending,
         uint256 _uncollectedFee
     ) internal {
         IProtocolsHandler protocolsCache = protocols;
@@ -130,11 +134,15 @@ contract Router is RouterStorage, OwnableUpgradeable {
         );
 
         if (borrowed > 0 || _uncollectedFee > 0) {
-            uint256 totalLendingDelta = borrowed + _uncollectedFee;
-            _totalLending = _totalLending > totalLendingDelta
-                ? _totalLending - totalLendingDelta
+            uint256 internalLendingDelta = borrowed + _uncollectedFee;
+            _internalLending = _internalLending > internalLendingDelta
+                ? _internalLending - internalLendingDelta
                 : 0;
-            updateTotalLendings(protocolsCache, _params.asset, _totalLending);
+            updateInternalLendings(
+                protocolsCache,
+                _params.asset,
+                _internalLending
+            );
         }
 
         emit Redeemed(msg.sender, _params.asset, redeemed + borrowed);
@@ -148,8 +156,8 @@ contract Router is RouterStorage, OwnableUpgradeable {
 
         IProtocolsHandler protocolsCache = protocols;
 
-        (uint256 totalLending, uint256 newInterest) = protocolsCache
-            .simulateLendings(_params.asset, totalLendings[_params.asset]);
+        (uint256 internalLending, uint256 newInterest) = protocolsCache
+            .simulateLendings(_params.asset, internalLendings[_params.asset]);
 
         (, uint256 protocolsBorrows) = protocolsCache.totalBorrowed(
             _params.asset
@@ -158,7 +166,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
         (uint256[] memory supplies, uint256 protocolsSupplies) = protocolsCache
             .totalSupplied(_params.asset);
 
-        recordBorrow(_params, newInterest, protocolsBorrows + totalLending);
+        recordBorrow(_params, newInterest, protocolsBorrows + internalLending);
 
         // execute Brorrow
         (uint256 redeemed, uint256 borrowed) = protocolsCache.redeemAndBorrow(
@@ -170,8 +178,12 @@ contract Router is RouterStorage, OwnableUpgradeable {
         );
 
         if (redeemed > 0 || newInterest > 0) {
-            totalLending += redeemed;
-            updateTotalLendings(protocolsCache, _params.asset, totalLending);
+            internalLending += redeemed;
+            updateInternalLendings(
+                protocolsCache,
+                _params.asset,
+                internalLending
+            );
         }
 
         emit Borrowed(msg.sender, _params.asset, redeemed + borrowed);
@@ -189,14 +201,14 @@ contract Router is RouterStorage, OwnableUpgradeable {
             _params.asset
         );
 
-        (uint256 totalLending, uint256 newInterest) = protocolsCache
-            .simulateLendings(_params.asset, totalLendings[_params.asset]);
+        (uint256 internalLending, uint256 newInterest) = protocolsCache
+            .simulateLendings(_params.asset, internalLendings[_params.asset]);
 
         uint256 fee;
         (_params.amount, fee) = recordRepay(
             _params,
             newInterest,
-            protocolsBorrows + totalLending
+            protocolsBorrows + internalLending
         );
 
         // handle transfer
@@ -237,9 +249,9 @@ contract Router is RouterStorage, OwnableUpgradeable {
             protocolsSupplies
         );
 
-        totalLending = totalLending > fee ? totalLending - fee : 0;
-        totalLending = totalLending - supplied;
-        updateTotalLendings(protocolsCache, _params.asset, totalLending);
+        internalLending = internalLending > fee ? internalLending - fee : 0;
+        internalLending = internalLending - supplied;
+        updateInternalLendings(protocolsCache, _params.asset, internalLending);
 
         emit Repayed(_params.to, _params.asset, repayed + supplied + fee);
     }
@@ -263,9 +275,9 @@ contract Router is RouterStorage, OwnableUpgradeable {
         (uint256[] memory supplies, uint256 protocolsSupplies) = protocolsCache
             .totalSupplied(_redeemParams.asset);
 
-        (uint256 totalLending, ) = protocolsCache.simulateLendings(
+        (uint256 internalLending, ) = protocolsCache.simulateLendings(
             _redeemParams.asset,
-            totalLendings[_redeemParams.asset]
+            internalLendings[_redeemParams.asset]
         );
 
         // preprocessing data
@@ -286,14 +298,14 @@ contract Router is RouterStorage, OwnableUpgradeable {
         uint256 uncollectedFee;
         (_redeemParams.amount, uncollectedFee) = recordLiquidateRedeem(
             _redeemParams,
-            protocolsSupplies + totalLending
+            protocolsSupplies + internalLending
         );
 
         _redeem(
             _redeemParams,
             supplies,
             protocolsSupplies,
-            totalLending,
+            internalLending,
             uncollectedFee
         );
     }
@@ -582,10 +594,10 @@ contract Router is RouterStorage, OwnableUpgradeable {
     }
 
     function sync(address _asset) external override {
-        (uint256 totalLending, uint256 newInterest) = protocols
-            .simulateLendings(_asset, totalLendings[_asset]);
+        (uint256 internalLending, uint256 newInterest) = protocols
+            .simulateLendings(_asset, internalLendings[_asset]);
 
-        updateTotalLendings(protocols, _asset, totalLending);
+        updateInternalLendings(protocols, _asset, internalLending);
         updateAccFee(_asset, newInterest);
     }
 
@@ -604,14 +616,14 @@ contract Router is RouterStorage, OwnableUpgradeable {
         }
     }
 
-    function updateTotalLendings(
+    function updateInternalLendings(
         IProtocolsHandler _protocol,
         address _asset,
         uint256 _new
     ) internal {
         _protocol.updateSimulates(_asset, _new);
-        totalLendings[_asset] = _new;
-        emit TotalLendingsUpdated(_asset, _new);
+        internalLendings[_asset] = _new;
+        emit InternalLendingsUpdated(_asset, _new);
     }
 
     function updateFeeIndex(
@@ -744,14 +756,14 @@ contract Router is RouterStorage, OwnableUpgradeable {
         (, uint256 protocolsSupplies) = protocolsCache.totalSupplied(
             _underlying
         );
-        (uint256 totalLending, ) = protocolsCache.simulateLendings(
+        (uint256 internalLending, ) = protocolsCache.simulateLendings(
             _underlying,
-            totalLendings[_underlying]
+            internalLendings[_underlying]
         );
 
         uint256 fee = accFees[_underlying] - collectedFees[_underlying];
 
-        return protocolsSupplies + totalLending - fee;
+        return protocolsSupplies + internalLending - fee;
     }
 
     function totalBorrowed(address _underlying)
@@ -764,12 +776,12 @@ contract Router is RouterStorage, OwnableUpgradeable {
         (, uint256 protocolsBorrows) = protocolsCache.totalBorrowed(
             _underlying
         );
-        (uint256 totalLending, ) = protocolsCache.simulateLendings(
+        (uint256 internalLending, ) = protocolsCache.simulateLendings(
             _underlying,
-            totalLendings[_underlying]
+            internalLendings[_underlying]
         );
 
-        return protocolsBorrows + totalLending;
+        return protocolsBorrows + internalLending;
     }
 
     function actionNotPaused(address _token, uint256 _action) internal view {

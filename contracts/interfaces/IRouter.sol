@@ -37,7 +37,7 @@ interface IRouter {
         uint256 amount
     );
 
-    event TotalLendingsUpdated(address indexed asset, uint256 newLending);
+    event InternalLendingsUpdated(address indexed asset, uint256 newLending);
 
     event AccFeeUpdated(address indexed asset, uint256 newAccFee);
 

@@ -24,7 +24,7 @@ abstract contract RouterStorage is IRouter {
     address public dTokenImplement;
     address[] public underlyings;
     mapping(address => Types.Asset) public assets;
-    mapping(address => uint256) public totalLendings;
+    mapping(address => uint256) public internalLendings;
 
     mapping(address => uint256) public accFees;
     mapping(address => uint256) public collectedFees;
