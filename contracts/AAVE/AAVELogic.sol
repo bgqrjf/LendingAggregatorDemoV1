@@ -13,9 +13,10 @@ import "./IAAVEPriceOracleGetter.sol";
 import "./AAVEDataTypes.sol";
 import "./AAVEReserveConfigurationGetter.sol";
 import "../libraries/Utils.sol";
-import "../libraries/Math.sol";
 import "../libraries/TransferHelper.sol";
 import "../libraries/Types.sol";
+
+import "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract AAVELogic is IProtocol {
     using Math for uint256;
@@ -296,7 +297,7 @@ contract AAVELogic is IProtocol {
             (Types.AAVEUsageParams)
         );
 
-        _targetRate = (_targetRate * Utils.MILLION).divCeil(
+        _targetRate = (_targetRate * Utils.MILLION).ceilDiv(
             params.reserveFactor
         );
 

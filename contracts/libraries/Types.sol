@@ -5,7 +5,7 @@ import "../interfaces/ISToken.sol";
 import "../interfaces/IDToken.sol";
 
 library Types {
-    struct BorrowConfig {
+    struct AssetConfig {
         uint256 maxLTV;
         uint256 liquidateLTV;
         uint256 maxLiquidateRatio;
@@ -28,7 +28,7 @@ library Types {
         string sTokenSymbol;
         string dTokenName;
         string dTokenSymbol;
-        BorrowConfig borrowConfig;
+        AssetConfig config;
     }
 
     struct AAVEUsageParams {

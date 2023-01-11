@@ -4,10 +4,10 @@ pragma solidity ^0.8.14;
 import "./interfaces/ISToken.sol";
 import "./interfaces/IRouter.sol";
 
+import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "./libraries/TransferHelper.sol";
-import "./libraries/Math.sol";
 
 // Supply Token
 // owner is router

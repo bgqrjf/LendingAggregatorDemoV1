@@ -7,8 +7,9 @@ import "./CETHInterface.sol";
 import "./ComptrollerInterface.sol";
 
 import "../libraries/Utils.sol";
-import "../libraries/Math.sol";
 import "../libraries/TransferHelper.sol";
+
+import "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract CompoundLogic is IProtocol {
     using Math for uint256;
@@ -228,7 +229,7 @@ contract CompoundLogic is IProtocol {
         return
             cTokentotalSupply > 0
                 ? ((totalCash + totalBorrows - totalReserves) *
-                    cToken.balanceOf(_account)).divCeil(cTokentotalSupply)
+                    cToken.balanceOf(_account)).ceilDiv(cTokentotalSupply)
                 : 0;
     }
 

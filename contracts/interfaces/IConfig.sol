@@ -5,10 +5,10 @@ import "../libraries/Types.sol";
 
 interface IConfig {
     event RouterSet(address oldRouter, address newRouter);
-    event BorrowConfigSet(
+    event AssetConfigSet(
         address indexed token,
-        Types.BorrowConfig oldConfig,
-        Types.BorrowConfig newConfig
+        Types.AssetConfig oldConfig,
+        Types.AssetConfig newConfig
     );
     event UserDebtAndCollateralSet(
         address account,
@@ -18,7 +18,7 @@ interface IConfig {
 
     function setRouter(address _router) external;
 
-    function setBorrowConfig(address _token, Types.BorrowConfig memory _config)
+    function setAssetConfig(address _token, Types.AssetConfig memory _config)
         external;
 
     function setUsingAsCollateral(
@@ -34,10 +34,13 @@ interface IConfig {
     ) external;
 
     // external state-getters
-    function borrowConfigs(address)
+    function assetConfigs(address)
         external
         view
-        returns (Types.BorrowConfig memory);
+        returns (Types.AssetConfig memory);
 
-    function userDebtAndCollateral(address) external view returns (uint256);
+    function userDebtAndCollateral(address asset)
+        external
+        view
+        returns (uint256 config);
 }

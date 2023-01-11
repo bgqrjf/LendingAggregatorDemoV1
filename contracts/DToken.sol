@@ -4,8 +4,8 @@ pragma solidity ^0.8.14;
 import "./interfaces/IDToken.sol";
 import "./interfaces/IRouter.sol";
 
+import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "./libraries/Math.sol";
 
 // DebtToken
 contract DToken is IDToken, OwnableUpgradeable {
@@ -37,7 +37,7 @@ contract DToken is IDToken, OwnableUpgradeable {
     ) external override onlyOwner returns (uint256 amount) {
         uint256 totalSupplyCache = totalSupply;
         amount = totalSupplyCache > 0
-            ? (_amountOfUnderlying * totalSupplyCache).divCeil(_totalUnderlying)
+            ? (_amountOfUnderlying * totalSupplyCache).ceilDiv(_totalUnderlying)
             : _amountOfUnderlying;
         _mint(_account, amount);
     }
@@ -48,7 +48,7 @@ contract DToken is IDToken, OwnableUpgradeable {
         uint256 _totalUnderlying
     ) external override onlyOwner returns (uint256 amount) {
         amount = _totalUnderlying > 0
-            ? (_amountOfUnderlying * totalSupply).divCeil(_totalUnderlying)
+            ? (_amountOfUnderlying * totalSupply).ceilDiv(_totalUnderlying)
             : _amountOfUnderlying;
         _burn(_account, amount);
     }
@@ -66,7 +66,7 @@ contract DToken is IDToken, OwnableUpgradeable {
             );
     }
 
-    function scaledAmount(uint256 _amount, uint256 totalBorrowed)
+    function scaledAmount(uint256 _amount, uint256 _totalBorrowed)
         public
         view
         override
@@ -74,11 +74,11 @@ contract DToken is IDToken, OwnableUpgradeable {
     {
         return
             totalSupply > 0
-                ? (_amount * totalBorrowed) / (totalSupply)
+                ? (_amount * _totalBorrowed) / (totalSupply)
                 : _amount;
     }
 
-    function totalDebt() public view override returns (uint256 totalBorrowed) {
+    function totalDebt() public view override returns (uint256 amount) {
         return IRouter(owner()).totalBorrowed(underlying);
     }
 

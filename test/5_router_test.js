@@ -57,7 +57,7 @@ describe("Router tests", function () {
     await compoundHandler.updateCTokenList(cToken0.address);
     await compoundHandler.updateCTokenList(cUSDT.address);
 
-    let borrowAmount = ethers.BigNumber.from("10000000000000000000");
+    let borrowAmount = ethers.utils.parseUnits("10", "ether");
     let supplyAmount = borrowAmount.mul(2);
 
     await token0.mint(deployer.address, supplyAmount.mul(2));
@@ -168,6 +168,8 @@ describe("Router tests", function () {
         rewards.address,
         sToken.address,
         dToken.address,
+        // reservePool.address,
+        ethers.constants.AddressZero,
         feeCollector.address,
       ]
     );
@@ -183,6 +185,7 @@ describe("Router tests", function () {
     await config.setRouter(router.address);
     await protocolsHandler.setRouter(router.address);
     await rewards.transferOwnership(router.address);
+    // await reservePool.setRouter(router.address);
 
     await router.addProtocol(aaveHandler.address);
     await router.addProtocol(compoundHandler.address);
@@ -266,6 +269,7 @@ describe("Router tests", function () {
       let tx = await router.supply(
         { asset: ETHAddress, amount: supplyAmount, to: deployer.address },
         true,
+        true,
         { value: supplyAmount }
       );
     } else {
@@ -277,6 +281,7 @@ describe("Router tests", function () {
 
       let tx = await router.supply(
         { asset: token.address, amount: supplyAmount, to: deployer.address },
+        true,
         true
       );
     }
@@ -345,9 +350,10 @@ describe("Router tests", function () {
       let tx = deploys.router.supply(
         {
           asset: deploys.token0.address,
-          amount: ethers.BigNumber.from("200000000000000000"),
+          amount: ethers.utils.parseUnits("0.2", "ether"),
           to: deploys.deployer.address,
         },
+        true,
         true
       );
       await expect(tx).to.be.revertedWith("Router: action paused");
@@ -357,9 +363,10 @@ describe("Router tests", function () {
       tx = deploys.router.supply(
         {
           asset: deploys.token0.address,
-          amount: ethers.BigNumber.from("200000000000000000"),
+          amount: ethers.utils.parseUnits("0.2", "ether"),
           to: deploys.deployer.address,
         },
+        true,
         true
       );
       await expect(tx).to.be.revertedWith("Router: token paused");
@@ -369,9 +376,10 @@ describe("Router tests", function () {
       tx = deploys.router.supply(
         {
           asset: deploys.token0.address,
-          amount: ethers.BigNumber.from("200000000000000000"),
+          amount: ethers.utils.parseUnits("0.2", "ether"),
           to: deploys.deployer.address,
         },
+        true,
         true
       );
       await expect(tx).to.be.revertedWith("Router: action paused");
@@ -386,7 +394,7 @@ describe("Router tests", function () {
         let router = deploys.router;
         let token0 = deploys.token0;
 
-        let supplyAmount = ethers.BigNumber.from("200000000000000000");
+        let supplyAmount = ethers.utils.parseUnits("0.2", "ether");
 
         await token0.mint(deployer.address, supplyAmount);
         await token0.approve(router.address, supplyAmount);
@@ -414,7 +422,7 @@ describe("Router tests", function () {
         let token0 = deploys.token0;
         let usdt = deploys.usdt;
 
-        let supplyAmount = ethers.BigNumber.from("200000000000000000");
+        let supplyAmount = ethers.utils.parseUnits("0.2", "ether");
 
         await supply(deployer, router, usdt, supplyAmount);
         await borrow(deployer, router, token0, supplyAmount);
@@ -458,6 +466,7 @@ describe("Router tests", function () {
         );
         let tx = await router.supply(
           { asset: token0.address, amount: supplyAmount, to: deployer.address },
+          true,
           true
         );
         let userBalanceAfter = await token0.balanceOf(deployer.address);
@@ -508,25 +517,9 @@ describe("Router tests", function () {
           supplyAmount,
         } = await loadFixture(supplyToken0ViaSupplyTestFixture);
 
-        // let aaveLogicAddress = await protocolsHandler.protocols(0);
-        // let aaveLogic = await ethers.getContractAt(
-        //   "AAVELogic",
-        //   aaveLogicAddress
-        // );
-
-        // let data = aaveLogic.interface.encodeFunctionData("getUsageParams", [
-        //   token0.address,
-        //   0,
-        // ]);
-
-        // let gas = await provider.estimateGas({
-        //   to: aaveLogic.address,
-        //   data: data,
-        // });
-        // console.log("getUsageParams gas used:", gas);
-
         let tx = await router.supply(
           { asset: token0.address, amount: supplyAmount, to: deployer.address },
+          true,
           true
         );
 
@@ -585,6 +578,7 @@ describe("Router tests", function () {
 
         let tx = await router.supply(
           { asset: token0.address, amount: supplyAmount, to: deployer.address },
+          true,
           true
         );
         let userBalanceAfter = await token0.balanceOf(deployer.address);
@@ -640,6 +634,7 @@ describe("Router tests", function () {
 
         let tx = await router.supply(
           { asset: token0.address, amount: supplyAmount, to: deployer.address },
+          true,
           true
         );
 
@@ -686,7 +681,7 @@ describe("Router tests", function () {
         let deployer = deploys.deployer;
         let router = deploys.router;
 
-        let supplyAmount = ethers.BigNumber.from("200000000000000000");
+        let supplyAmount = ethers.utils.parseUnits("0.2", "ether");
 
         let assetETH = await router.assets(ETHAddress);
         let sETH = await ethers.getContractAt("ISToken", assetETH.sToken);
@@ -709,7 +704,7 @@ describe("Router tests", function () {
         let router = deploys.router;
         let usdt = deploys.usdt;
 
-        let supplyAmount = ethers.BigNumber.from("200000000000000000");
+        let supplyAmount = ethers.utils.parseUnits("0.2", "ether");
 
         await supply(deployer, router, usdt, supplyAmount);
         await borrow(deployer, router, null, supplyAmount);
@@ -747,6 +742,7 @@ describe("Router tests", function () {
         );
         let tx = await router.supply(
           { asset: ETHAddress, amount: supplyAmount, to: deployer.address },
+          true,
           true,
           { value: supplyAmount }
         );
@@ -797,6 +793,7 @@ describe("Router tests", function () {
         let tx = await router.supply(
           { asset: ETHAddress, amount: supplyAmount, to: deployer.address },
           true,
+          true,
           { value: supplyAmount }
         );
 
@@ -844,6 +841,7 @@ describe("Router tests", function () {
         let totalLendingsBefore = await router.totalLendings(ETHAddress);
         let tx = await router.supply(
           { asset: ETHAddress, amount: supplyAmount, to: deployer.address },
+          true,
           true,
           { value: supplyAmount }
         );
@@ -897,6 +895,7 @@ describe("Router tests", function () {
         let tx = await router.supply(
           { asset: ETHAddress, amount: supplyAmount, to: deployer.address },
           true,
+          true,
           { value: supplyAmount }
         );
 
@@ -932,7 +931,7 @@ describe("Router tests", function () {
     it("should not redeem", async () => {
       const deploys = await loadFixture(RouterTestFixture);
 
-      let supplyAmount = ethers.BigNumber.from("200000000000000000");
+      let supplyAmount = ethers.utils.parseUnits("0.2", "ether");
 
       await supply(
         deploys.deployer,
@@ -948,6 +947,7 @@ describe("Router tests", function () {
           amount: supplyAmount,
           to: deploys.deployer.address,
         },
+        true,
         true
       );
       await expect(tx).to.be.revertedWith("Router: action paused");
@@ -960,6 +960,7 @@ describe("Router tests", function () {
           amount: supplyAmount,
           to: deploys.deployer.address,
         },
+        true,
         true
       );
       await expect(tx).to.be.revertedWith("Router: action paused");
@@ -970,7 +971,7 @@ describe("Router tests", function () {
       async function redeemToken0ViaProtocolsRedeem() {
         const deploys = await loadFixture(RouterTestFixture);
 
-        let supplyAmount = ethers.BigNumber.from("200000000000000000");
+        let supplyAmount = ethers.utils.parseUnits("0.2", "ether");
 
         let sToken0 = await supply(
           deploys.deployer,
@@ -1002,7 +1003,7 @@ describe("Router tests", function () {
         let usdt = deploys.usdt;
         let token0 = deploys.token0;
 
-        let supplyAmount = ethers.BigNumber.from("200000000000000000");
+        let supplyAmount = ethers.utils.parseUnits("0.2", "ether");
         await supply(deployer, router, usdt, supplyAmount);
         let sToken0 = await supply(deployer, router, token0, supplyAmount);
         await borrow(deployer, router, token0, supplyAmount.mul(2));
@@ -1046,6 +1047,7 @@ describe("Router tests", function () {
             amount: supplyAmount,
             to: deployer.address,
           },
+          true,
           true
         );
         let userBalanceAfter = await token0.balanceOf(deployer.address);
@@ -1097,6 +1099,7 @@ describe("Router tests", function () {
             amount: supplyAmount,
             to: deployer.address,
           },
+          true,
           true
         );
 
@@ -1165,6 +1168,7 @@ describe("Router tests", function () {
             amount: supplyAmount,
             to: deployer.address,
           },
+          true,
           true
         );
         let userBalanceAfter = await token0.balanceOf(deployer.address);
@@ -1218,6 +1222,7 @@ describe("Router tests", function () {
             amount: supplyAmount,
             to: deployer.address,
           },
+          true,
           true
         );
 
@@ -1270,7 +1275,7 @@ describe("Router tests", function () {
       async function redeemETHViaProtocolsRedeem() {
         const deploys = await loadFixture(RouterTestFixture);
 
-        let supplyAmount = ethers.BigNumber.from("200000000000000000");
+        let supplyAmount = ethers.utils.parseUnits("0.2", "ether");
 
         let sETH = await supply(
           deploys.deployer,
@@ -1300,7 +1305,7 @@ describe("Router tests", function () {
         let router = deploys.router;
         let usdt = deploys.usdt;
 
-        let supplyAmount = ethers.BigNumber.from("200000000000000000");
+        let supplyAmount = ethers.utils.parseUnits("0.2", "ether");
         await supply(deployer, router, usdt, supplyAmount);
         let sETH = await supply(deployer, router, null, supplyAmount);
         await borrow(deployer, router, null, supplyAmount.mul(2));
@@ -1342,6 +1347,7 @@ describe("Router tests", function () {
             amount: supplyAmount,
             to: deployer.address,
           },
+          true,
           true
         );
         let cETHBalanceAfter = await provider.getBalance(cETH.address);
@@ -1388,6 +1394,7 @@ describe("Router tests", function () {
             amount: supplyAmount,
             to: deployer.address,
           },
+          true,
           true
         );
 
@@ -1440,6 +1447,7 @@ describe("Router tests", function () {
             amount: supplyAmount,
             to: deployer.address,
           },
+          true,
           true
         );
         let cETHBalanceAfter = await provider.getBalance(cETH.address);
@@ -1489,6 +1497,7 @@ describe("Router tests", function () {
             amount: supplyAmount,
             to: deployer.address,
           },
+          true,
           true
         );
 
@@ -1528,8 +1537,8 @@ describe("Router tests", function () {
     it("should not borrow", async () => {
       const deploys = await loadFixture(RouterTestFixture);
 
-      let supplyAmount = ethers.BigNumber.from("200000000000000000");
-      let borrowAmount = ethers.BigNumber.from("100000000000000000");
+      let supplyAmount = ethers.utils.parseUnits("0.2", "ether");
+      let borrowAmount = ethers.utils.parseUnits("0.1", "ether");
 
       await supply(
         deploys.deployer,
@@ -1561,7 +1570,7 @@ describe("Router tests", function () {
       async function borrowToken0ViaProtocolsBorrow() {
         const deploys = await loadFixture(RouterTestFixture);
 
-        let borrowAmount = ethers.BigNumber.from("100000000000000000");
+        let borrowAmount = ethers.utils.parseUnits("0.1", "ether");
         await supply(
           deploys.deployer,
           deploys.router,
@@ -1587,7 +1596,7 @@ describe("Router tests", function () {
       async function borrowToken0ViaProtocolsRedeem() {
         const deploys = await loadFixture(RouterTestFixture);
 
-        let borrowAmount = ethers.BigNumber.from("100000000000000000");
+        let borrowAmount = ethers.utils.parseUnits("0.1", "ether");
         await supply(
           deploys.deployer,
           deploys.router,
@@ -1616,7 +1625,7 @@ describe("Router tests", function () {
         let router = deploys.router;
         let token0 = deploys.token0;
 
-        let borrowAmount = ethers.BigNumber.from("100000000000000000");
+        let borrowAmount = ethers.utils.parseUnits("0.1", "ether");
 
         let tx = router.borrow({
           asset: token0.address,
@@ -1878,7 +1887,7 @@ describe("Router tests", function () {
     describe("router borrow ETH tests", function () {
       async function borrowETHViaProtocolsBorrow() {
         const deploys = await loadFixture(RouterTestFixture);
-        let borrowAmount = ethers.BigNumber.from("100000000000000000");
+        let borrowAmount = ethers.utils.parseUnits("0.1", "ether");
         await supply(
           deploys.deployer,
           deploys.router,
@@ -1900,7 +1909,7 @@ describe("Router tests", function () {
 
       async function borrowETHViaProtocolsRedeem() {
         const deploys = await loadFixture(RouterTestFixture);
-        let borrowAmount = ethers.BigNumber.from("100000000000000000");
+        let borrowAmount = ethers.utils.parseUnits("0.1", "ether");
         await supply(
           deploys.deployer,
           deploys.router,
@@ -1924,7 +1933,7 @@ describe("Router tests", function () {
         const deploys = await loadFixture(RouterTestFixture);
         let deployer = deploys.deployer;
         let router = deploys.router;
-        let borrowAmount = ethers.BigNumber.from("100000000000000000");
+        let borrowAmount = ethers.utils.parseUnits("0.1", "ether");
         let tx = router.borrow({
           asset: ETHAddress,
           amount: borrowAmount,
@@ -2156,8 +2165,8 @@ describe("Router tests", function () {
     it("should not repay", async () => {
       const deploys = await loadFixture(RouterTestFixture);
 
-      let supplyAmount = ethers.BigNumber.from("200000000000000000");
-      let borrowAmount = ethers.BigNumber.from("100000000000000000");
+      let supplyAmount = ethers.utils.parseUnits("0.2", "ether");
+      let borrowAmount = ethers.utils.parseUnits("0.1", "ether");
 
       await supply(
         deploys.deployer,
@@ -2201,7 +2210,7 @@ describe("Router tests", function () {
         let token0 = deploys.token0;
         let usdt = deploys.usdt;
 
-        let borrowAmount = ethers.BigNumber.from("100000000000000000");
+        let borrowAmount = ethers.utils.parseUnits("0.1", "ether");
         await supply(deployer, router, usdt, borrowAmount);
         let dToken0 = await borrow(deployer, router, token0, borrowAmount);
 
@@ -2231,7 +2240,7 @@ describe("Router tests", function () {
         let token0 = deploys.token0;
         let usdt = deploys.usdt;
 
-        let borrowAmount = ethers.BigNumber.from("100000000000000000");
+        let borrowAmount = ethers.utils.parseUnits("0.1", "ether");
 
         await supply(deployer, router, token0, borrowAmount.mul(2));
         let dToken0 = await borrow(deployer, router, token0, borrowAmount);
@@ -2441,7 +2450,7 @@ describe("Router tests", function () {
         expect(feeIndexBefore).to.equal(0);
         expect(feeIndexAfter).to.equal(
           accFeeDelta
-            .mul(ethers.BigNumber.from("1000000000000000000"))
+            .mul(ethers.utils.parseUnits("1", "ether"))
             .div(dTokenBurntAmount)
         );
         expect(collectedFee).to.equal(feeCollected);
@@ -2526,7 +2535,7 @@ describe("Router tests", function () {
         let router = deploys.router;
         let usdt = deploys.usdt;
 
-        let borrowAmount = ethers.BigNumber.from("100000000000000000");
+        let borrowAmount = ethers.utils.parseUnits("0.1", "ether");
         await supply(deployer, router, usdt, borrowAmount);
         let dETH = await borrow(deployer, router, null, borrowAmount);
 
@@ -2551,7 +2560,7 @@ describe("Router tests", function () {
         let router = deploys.router;
         let usdt = deploys.usdt;
 
-        let borrowAmount = ethers.BigNumber.from("100000000000000000");
+        let borrowAmount = ethers.utils.parseUnits("0.1", "ether");
 
         await supply(deployer, router, null, borrowAmount.mul(2));
         let dETH = await borrow(deployer, router, null, borrowAmount);
@@ -2742,7 +2751,7 @@ describe("Router tests", function () {
         expect(feeIndexBefore).to.equal(0);
         expect(feeIndexAfter).to.equal(
           accFeeDelta
-            .mul(ethers.BigNumber.from("1000000000000000000"))
+            .mul(ethers.utils.parseUnits("1", "ether"))
             .div(dTokenBurntAmount)
         );
         expect(collectedFee).to.equal(feeCollected);
@@ -2820,7 +2829,7 @@ describe("Router tests", function () {
       const deploys = await loadFixture(RouterTestFixture);
 
       // value of supply = 2 * value of borrow
-      let borrowAmount = ethers.BigNumber.from("100000000000000000");
+      let borrowAmount = ethers.utils.parseUnits("0.1", "ether");
       let supplyAmount = ethers.BigNumber.from("20000000");
 
       let susdt = await supply(

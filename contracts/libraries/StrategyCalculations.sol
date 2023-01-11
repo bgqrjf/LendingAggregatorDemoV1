@@ -3,7 +3,8 @@ pragma solidity >=0.8.0;
 
 import "./Types.sol";
 import "./Utils.sol";
-import "./Math.sol";
+
+import "@openzeppelin/contracts/utils/math/Math.sol";
 
 import "../interfaces/IProtocol.sol";
 
@@ -77,7 +78,7 @@ library StrategyCalculations {
                 ++i
             ) {
                 amounts[i] -= Utils.minOf(
-                    (amounts[i] * amountToReduce).divCeil(totalAmountToSupply),
+                    (amounts[i] * amountToReduce).ceilDiv(totalAmountToSupply),
                     totalAmountToSupply - _params.targetAmount
                 );
                 totalAmountToSupply -= amounts[i];

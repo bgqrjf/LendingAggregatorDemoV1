@@ -10,8 +10,8 @@ import "./libraries/UserAssetBitMap.sol";
 contract Config is IConfig, Ownable {
     address public router;
 
-    // mapping underlying token to borrowConfig
-    mapping(address => Types.BorrowConfig) private _borrowConfigs;
+    // mapping underlying token to assetConfig
+    mapping(address => Types.AssetConfig) private _assetConfigs;
 
     // mapping (user address => collateral/debt assets)
     // using asset ID as bit map key of the value
@@ -28,7 +28,7 @@ contract Config is IConfig, Ownable {
         emit RouterSet(oldRouter, _router);
     }
 
-    function setBorrowConfig(address _token, Types.BorrowConfig memory _config)
+    function setAssetConfig(address _token, Types.AssetConfig memory _config)
         external
         override
     {
@@ -36,9 +36,9 @@ contract Config is IConfig, Ownable {
             msg.sender == router || msg.sender == owner(),
             "Config: Only Router/Owner"
         );
-        Types.BorrowConfig memory oldConfig = _borrowConfigs[_token];
-        _borrowConfigs[_token] = _config;
-        emit BorrowConfigSet(_token, oldConfig, _config);
+        Types.AssetConfig memory oldConfig = _assetConfigs[_token];
+        _assetConfigs[_token] = _config;
+        emit AssetConfigSet(_token, oldConfig, _config);
     }
 
     function setUsingAsCollateral(
@@ -91,12 +91,12 @@ contract Config is IConfig, Ownable {
         emit UserDebtAndCollateralSet(_account, oldUserConfig, newUserConfig);
     }
 
-    function borrowConfigs(address _token)
+    function assetConfigs(address _token)
         public
         view
         override
-        returns (Types.BorrowConfig memory)
+        returns (Types.AssetConfig memory)
     {
-        return _borrowConfigs[_token];
+        return _assetConfigs[_token];
     }
 }
