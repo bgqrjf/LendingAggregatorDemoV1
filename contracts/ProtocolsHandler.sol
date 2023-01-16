@@ -3,8 +3,8 @@ pragma solidity ^0.8.14;
 
 import "./interfaces/IProtocolsHandler.sol";
 
-import "./libraries/TransferHelper.sol";
-import "./libraries/Utils.sol";
+import "./libraries/internals/TransferHelper.sol";
+import "./libraries/internals/Utils.sol";
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";

@@ -4,7 +4,7 @@ pragma solidity ^0.8.14;
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 import "./interfaces/IRewards.sol";
-import "./libraries/TransferHelper.sol";
+import "./libraries/internals/TransferHelper.sol";
 
 contract Rewards is IRewards, Ownable {
     IProtocol[] public protocols;

@@ -4,7 +4,7 @@ pragma solidity ^0.8.14;
 import "./interfaces/IConfig.sol";
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "./libraries/UserAssetBitMap.sol";
+import "./libraries/internals/UserAssetBitMap.sol";
 
 // proxy
 contract Config is IConfig, Ownable {

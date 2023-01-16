@@ -3,7 +3,7 @@ pragma solidity ^0.8.14;
 
 import "./IProtocol.sol";
 
-import "../libraries/Types.sol";
+import "../libraries/internals/Types.sol";
 
 interface IStrategy {
     function getSupplyStrategy(

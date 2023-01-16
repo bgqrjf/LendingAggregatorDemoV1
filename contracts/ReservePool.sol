@@ -3,8 +3,8 @@ pragma solidity ^0.8.14;
 
 import "./interfaces/IReservePool.sol";
 
-import "./libraries/TransferHelper.sol";
-import "./libraries/Utils.sol";
+import "./libraries/internals/TransferHelper.sol";
+import "./libraries/internals/Utils.sol";
 
 // all mutative function is owned by router
 contract ReservePool is IReservePool {
@@ -17,6 +17,7 @@ contract ReservePool is IReservePool {
     }
 
     IRouter public router;
+    uint256 public maxPendingRatio;
 
     mapping(address => mapping(address => PendingRequest))
         public pendingSupplies;
@@ -28,6 +29,10 @@ contract ReservePool is IReservePool {
     mapping(address => uint256) public maxReserves;
     mapping(address => uint256) public executeSupplyThresholds;
     mapping(address => uint256) public override lentAmounts;
+
+    constructor(uint256 _maxPendingRatio) {
+        maxPendingRatio = _maxPendingRatio;
+    }
 
     function supply(
         Types.UserAssetParams memory _params,
@@ -158,16 +163,22 @@ contract ReservePool is IReservePool {
         reserves[_params.asset] = _params.asset.balanceOf(address(this));
     }
 
-    function repay(Types.UserAssetParams memory _params, bool _executeNow)
-        external
-        override
-    {
+    function repay(
+        Types.UserAssetParams memory _params,
+        uint256 _totalBorrowed,
+        bool _executeNow
+    ) external override {
         uint256 newReserve = _params.asset.balanceOf(address(this));
         uint256 repayAmount = newReserve - reserves[_params.asset];
 
         if (_executeNow) {
             _executeRepay(_params.asset, repayAmount);
         } else {
+            require(
+                repayAmount < _totalBorrowed * maxPendingRatio,
+                "IReservePool: excceed maxPendingRatio"
+            );
+
             require(
                 repayAmount < executeSupplyThresholds[_params.asset] ||
                     newReserve <= maxReserves[_params.asset],
@@ -181,14 +192,17 @@ contract ReservePool is IReservePool {
                 lentAmounts[_params.asset] = 0;
             }
         }
+
+        reserves[_params.asset] = _params.asset.balanceOf(address(this));
     }
 
-    function executeRepayAndSupply(address _asset, uint256 _recordLoops)
-        public
+    function executeSupply(address _asset, uint256 _recordLoops)
+        external
         override
     {
-        _executeRepay(_asset, reserves[_asset]);
-        _executeSupply(_asset, reserves[_asset], _recordLoops);
+        uint256 reserve = reserves[_asset];
+        _executeSupply(_asset, reserve, _recordLoops);
+        reserves[_asset] = _asset.balanceOf(address(this));
     }
 
     function _executeRepay(address _asset, uint256 _amount) internal {

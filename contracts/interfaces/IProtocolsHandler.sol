@@ -5,7 +5,7 @@ import "./IProtocol.sol";
 import "./IStrategy.sol";
 import "./IWETH.sol";
 
-import "../libraries/Types.sol";
+import "../libraries/internals/Types.sol";
 
 interface IProtocolsHandler {
     event Supplied(address indexed asset, uint256 amount);

@@ -6,7 +6,7 @@ import "./Utils.sol";
 
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
-import "../interfaces/IProtocol.sol";
+import "../../interfaces/IProtocol.sol";
 
 library StrategyCalculations {
     using Math for uint256;

@@ -6,8 +6,8 @@ import "./CERC20Interface.sol";
 import "./CETHInterface.sol";
 import "./ComptrollerInterface.sol";
 
-import "../libraries/Utils.sol";
-import "../libraries/TransferHelper.sol";
+import "../libraries/internals/Utils.sol";
+import "../libraries/internals/TransferHelper.sol";
 
 import "@openzeppelin/contracts/utils/math/Math.sol";
 

@@ -7,7 +7,7 @@ import "./interfaces/IRouter.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
-import "./libraries/TransferHelper.sol";
+import "./libraries/internals/TransferHelper.sol";
 
 // Supply Token
 // owner is router

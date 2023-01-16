@@ -4,7 +4,7 @@ pragma solidity ^0.8.14;
 import "./interfaces/IStrategy.sol";
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "./libraries/StrategyCalculations.sol";
+import "./libraries/internals/StrategyCalculations.sol";
 
 contract Strategy is IStrategy, Ownable {
     using StrategyCalculations for Types.StrategyParams;

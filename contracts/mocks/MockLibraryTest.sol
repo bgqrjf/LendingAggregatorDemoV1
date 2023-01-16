@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.14;
 
-import "../libraries/UserAssetBitMap.sol";
+import "../libraries/internals/UserAssetBitMap.sol";
 
 contract MockLibraryTest {
     function isUsingAsCollateralOrBorrowing(

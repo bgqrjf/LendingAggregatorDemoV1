@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.14;
 
-import "../libraries/Types.sol";
+import "../libraries/internals/Types.sol";
 
 interface IConfig {
     event RouterSet(address oldRouter, address newRouter);

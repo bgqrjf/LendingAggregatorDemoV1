@@ -2,7 +2,7 @@
 pragma solidity 0.8.14;
 
 import "../interfaces/IPriceOracle.sol";
-import "../libraries/TransferHelper.sol";
+import "../libraries/internals/TransferHelper.sol";
 
 contract MockPriceOracle is IPriceOracle {
     mapping(address => uint256) public price;

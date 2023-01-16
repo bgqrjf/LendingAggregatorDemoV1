@@ -12,9 +12,9 @@ import "./IAAVEPriceOracleGetter.sol";
 
 import "./AAVEDataTypes.sol";
 import "./AAVEReserveConfigurationGetter.sol";
-import "../libraries/Utils.sol";
-import "../libraries/TransferHelper.sol";
-import "../libraries/Types.sol";
+import "../libraries/internals/Utils.sol";
+import "../libraries/internals/TransferHelper.sol";
+import "../libraries/internals/Types.sol";
 
 import "@openzeppelin/contracts/utils/math/Math.sol";
 

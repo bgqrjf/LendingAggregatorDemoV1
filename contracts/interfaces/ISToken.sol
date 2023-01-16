@@ -2,7 +2,7 @@
 pragma solidity ^0.8.14;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
-import "../libraries/Types.sol";
+import "../libraries/internals/Types.sol";
 
 interface ISToken is IERC20Upgradeable {
     function initialize(

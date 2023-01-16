@@ -33,8 +33,6 @@ abstract contract RouterStorage is IRouter {
     mapping(address => uint256) public feeIndexes;
     mapping(address => mapping(address => uint256)) public userFeeIndexes;
 
-    mapping(address => bool) public tokenPaused;
-
     // address0 => block all
     // tokenAddress => block token
     mapping(address => uint256) public blockedActions;
