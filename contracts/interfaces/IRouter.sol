@@ -11,6 +11,50 @@ import "./IStrategy.sol";
 import "../libraries/internals/Types.sol";
 
 interface IRouter {
+    event Supplied(
+        address indexed supplier,
+        address indexed asset,
+        uint256 amount
+    );
+
+    event Redeemed(
+        address indexed supplier,
+        address indexed asset,
+        uint256 amount
+    );
+
+    event Borrowed(
+        address indexed borrower,
+        address indexed asset,
+        uint256 amount
+    );
+
+    event Repayed(
+        address indexed borrower,
+        address indexed asset,
+        uint256 amount
+    );
+
+    event FeeCollected(
+        address indexed asset,
+        address indexed collector,
+        uint256 amount
+    );
+
+    event TotalLendingsUpdated(address indexed asset, uint256 newLending);
+
+    event AccFeeUpdated(address indexed asset, uint256 newAccFee);
+
+    event FeeIndexUpdated(address indexed asset, uint256 newIndex);
+
+    event UserFeeIndexUpdated(
+        address indexed account,
+        address indexed asset,
+        uint256 newIndex
+    );
+
+    event AccFeeOffsetUpdated(address indexed asset, uint256 newIndex);
+
     function supply(
         Types.UserAssetParams memory _params,
         bool _collateralable,

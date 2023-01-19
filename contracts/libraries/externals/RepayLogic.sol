@@ -29,8 +29,24 @@ library RepayLogic {
         mapping(address => uint256) storage accFees,
         mapping(address => uint256) storage collectedFees,
         mapping(address => uint256) storage feeIndexes
-    ) external returns (uint256 amount) {
-        require(_params.actionNotPaused, "RepayLogic: actionPaused");
+    ) external {
+        repayInternal(
+            _params,
+            totalLendings,
+            accFees,
+            collectedFees,
+            feeIndexes
+        );
+    }
+
+    function repayInternal(
+        Types.RepayParams memory _params,
+        mapping(address => uint256) storage totalLendings,
+        mapping(address => uint256) storage accFees,
+        mapping(address => uint256) storage collectedFees,
+        mapping(address => uint256) storage feeIndexes
+    ) internal returns (uint256 amount) {
+        require(_params.actionNotPaused, "RepayLogic: action paused");
 
         (
             ,
@@ -105,11 +121,10 @@ library RepayLogic {
                 0
             );
 
-            // executeRepay(_params.userParams.asset, amount - fee, totalLending);
-            executeRepay(
+            totalLending = executeRepayInternal(
                 _params.protocols,
                 _params.userParams.asset,
-                _params.userParams.amount,
+                amount - fee,
                 totalLending,
                 totalLendings
             );
@@ -193,7 +208,23 @@ library RepayLogic {
         uint256 _amount,
         uint256 _totalLending,
         mapping(address => uint256) storage totalLendings
-    ) public {
+    ) external {
+        executeRepayInternal(
+            protocols,
+            _asset,
+            _amount,
+            _totalLending,
+            totalLendings
+        );
+    }
+
+    function executeRepayInternal(
+        IProtocolsHandler protocols,
+        address _asset,
+        uint256 _amount,
+        uint256 _totalLending,
+        mapping(address => uint256) storage totalLendings
+    ) internal returns (uint256 totalLending) {
         (uint256[] memory supplies, uint256 protocolsSupplies) = protocols
             .totalSupplied(_asset);
 
@@ -204,10 +235,12 @@ library RepayLogic {
             protocolsSupplies
         );
 
+        totalLending = _totalLending > supplied ? _totalLending - supplied : 0;
+
         ExternalUtils.updateTotalLendings(
             protocols,
             _asset,
-            _totalLending > supplied ? _totalLending - supplied : 0,
+            totalLending,
             totalLendings
         );
     }

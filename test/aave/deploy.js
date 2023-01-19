@@ -4,7 +4,9 @@ exports.deployContracts = async ({ token0, usdt }) => {
   const [deployer] = await ethers.getSigners();
 
   // deploy libraries
-  const BorrowLogic = await ethers.getContractFactory(`BorrowLogic`);
+  const BorrowLogic = await ethers.getContractFactory(
+    `contracts/mocks/aave-core/protocol/libraries/logic/BorrowLogic.sol:BorrowLogic`
+  );
   const borrowLogic = await BorrowLogic.deploy();
   const BridgeLogic = await ethers.getContractFactory(`BridgeLogic`);
   const bridgeLogic = await BridgeLogic.deploy();
@@ -24,7 +26,9 @@ exports.deployContracts = async ({ token0, usdt }) => {
   const liquidationLogic = await LiquidationLogic.deploy();
   const PoolLogic = await ethers.getContractFactory(`PoolLogic`);
   const poolLogic = await PoolLogic.deploy();
-  const SupplyLogic = await ethers.getContractFactory(`SupplyLogic`);
+  const SupplyLogic = await ethers.getContractFactory(
+    `contracts/mocks/aave-core/protocol/libraries/logic/SupplyLogic.sol:SupplyLogic`
+  );
   const supplyLogic = await SupplyLogic.deploy();
 
   // deploy poolAddressProvider

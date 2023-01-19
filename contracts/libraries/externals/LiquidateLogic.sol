@@ -26,14 +26,14 @@ library LiquidateLogic {
         mapping(address => uint256) storage feeIndexes
     ) external {
         // actionNotPaused(_repayParams.asset, Action.liquidate);
-        require(_params.actionNotPaused, "LiquidateLogic: actionPaused");
+        require(_params.actionNotPaused, "LiquidateLogic: action paused");
 
         _params.repayParams.userParams.amount = validateLiquidatation(
             _params,
             assets
         );
 
-        _params.repayParams.userParams.amount = RepayLogic.repay(
+        _params.repayParams.userParams.amount = RepayLogic.repayInternal(
             _params.repayParams,
             totalLendings,
             accFees,
@@ -71,22 +71,21 @@ library LiquidateLogic {
 
             require(
                 redeemAmount >= _params.redeemParams.userParams.amount,
-                "insufficient redeem amount"
+                "LiquidateLogic: insufficient redeem amount"
             );
             _params.redeemParams.userParams.amount = redeemAmount;
         }
         uint256 uncollectedFee;
-        (
-            _params.redeemParams.userParams.amount,
-            uncollectedFee
-        ) = _recordLiquidateRedeem(
-            _params.redeemParams,
-            protocolsSupplies + totalLending,
-            accFees[_params.redeemParams.userParams.asset],
-            collectedFees[_params.redeemParams.userParams.asset]
-        );
+        (_params.redeemParams.userParams.amount, uncollectedFee) = RedeemLogic
+            .recordRedeemInternal(
+                _params.redeemParams,
+                protocolsSupplies + totalLending,
+                0,
+                _params.repayParams.userParams.to,
+                accFees
+            );
 
-        RedeemLogic.executeRedeem(
+        RedeemLogic.executeRedeemInternal(
             _params.redeemParams,
             supplies,
             protocolsSupplies,
@@ -94,6 +93,33 @@ library LiquidateLogic {
             uncollectedFee,
             totalLendings
         );
+    }
+
+    function getLiquidationData(
+        address _account,
+        address _repayAsset,
+        address[] memory _underlyings,
+        IConfig _config,
+        IPriceOracle _priceOracle,
+        mapping(address => Types.Asset) storage assets
+    )
+        external
+        view
+        returns (
+            uint256 liquidationAmount,
+            uint256 maxLiquidationAmount,
+            bool blackListed
+        )
+    {
+        return
+            getLiquidationDataInternal(
+                _account,
+                _repayAsset,
+                _underlyings,
+                _config,
+                _priceOracle,
+                assets
+            );
     }
 
     function validateLiquidatation(
@@ -123,7 +149,7 @@ library LiquidateLogic {
             uint256 liquidationThreshold,
             uint256 maxLiquidationAmount,
             bool blackListed
-        ) = getLiquidationData(
+        ) = getLiquidationDataInternal(
                 _params.repayParams.userParams.to,
                 _params.repayParams.userParams.asset,
                 _params.underlyings,
@@ -134,22 +160,22 @@ library LiquidateLogic {
 
         require(
             assets[_params.redeemParams.userParams.asset].paused == blackListed,
-            "Router: Paused token not liquidated"
+            "LiquidateLogic: Paused token not liquidated"
         );
 
         require(
             userConfig.isUsingAsCollateral(redeemAsset.index),
-            "Router: Token is not using as collateral"
+            "LiquidateLogic: Token is not using as collateral"
         );
 
         require(
             userConfig.isBorrowing(repayAsset.index),
-            "Router: Token is not borrowing"
+            "LiquidateLogic: Token is not borrowing"
         );
 
         require(
             debtsValue > liquidationThreshold,
-            "Router: Liquidate not allowed"
+            "LiquidateLogic: Liquidate not allowed"
         );
 
         return
@@ -158,48 +184,7 @@ library LiquidateLogic {
                 : maxLiquidationAmount;
     }
 
-    function _recordLiquidateRedeem(
-        Types.RedeemParams memory _params,
-        uint256 totalSupplies,
-        uint256 accFee,
-        uint256 collectedFee
-    ) internal returns (uint256 underlyingAmount, uint256 fee) {
-        uint256 totalSupply = _params.asset.sToken.totalSupply();
-
-        uint256 sTokenAmount = _params.asset.sToken.unscaledAmount(
-            _params.userParams.amount,
-            totalSupplies
-        );
-
-        uint256 sTokenBalance = _params.asset.sToken.balanceOf(
-            _params.userParams.to
-        );
-
-        if (sTokenAmount > sTokenBalance) {
-            sTokenAmount = sTokenBalance;
-            _params.config.setUsingAsCollateral(
-                msg.sender,
-                _params.asset.index,
-                false
-            );
-        }
-
-        (underlyingAmount, fee) = _params.asset.sToken.burn(
-            _params.userParams.to,
-            sTokenAmount,
-            totalSupplies,
-            accFee - collectedFee
-        );
-
-        _params.rewards.stopMiningSupplyReward(
-            _params.userParams.asset,
-            msg.sender,
-            underlyingAmount,
-            totalSupply
-        );
-    }
-
-    function getLiquidationData(
+    function getLiquidationDataInternal(
         address _account,
         address _repayAsset,
         address[] memory _underlyings,
@@ -207,7 +192,7 @@ library LiquidateLogic {
         IPriceOracle _priceOracle,
         mapping(address => Types.Asset) storage assets
     )
-        public
+        internal
         view
         returns (
             uint256 liquidationAmount,
@@ -221,20 +206,17 @@ library LiquidateLogic {
             if (userConfig.isUsingAsCollateral(i)) {
                 address underlying = _underlyings[i];
 
-                uint256 collateralAmount;
-                {
-                    uint256 sTokenBalance = assets[underlying]
-                        .sToken
-                        .scaledBalanceOf(_account);
+                uint256 sTokenBalance = assets[underlying]
+                    .sToken
+                    .scaledBalanceOf(_account);
 
-                    collateralAmount = underlying == _repayAsset
-                        ? sTokenBalance
-                        : _priceOracle.valueOfAsset(
-                            underlying,
-                            _repayAsset,
-                            sTokenBalance
-                        );
-                }
+                uint256 collateralAmount = underlying == _repayAsset
+                    ? sTokenBalance
+                    : _priceOracle.valueOfAsset(
+                        underlying,
+                        _repayAsset,
+                        sTokenBalance
+                    );
 
                 Types.AssetConfig memory collateralConfig = _config
                     .assetConfigs(underlying);

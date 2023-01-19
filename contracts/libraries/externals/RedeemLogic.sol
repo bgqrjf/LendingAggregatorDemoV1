@@ -22,7 +22,7 @@ library RedeemLogic {
         mapping(address => uint256) storage totalLendings,
         mapping(address => uint256) storage accFees
     ) external {
-        require(_params.actionNotPaused, "RedeemLogic: actionPaused");
+        require(_params.actionNotPaused, "RedeemLogic: action paused");
 
         if (address(_params.reservePool) != address(0)) {
             _params.reservePool.redeem(
@@ -44,7 +44,7 @@ library RedeemLogic {
                 );
 
             uint256 uncollectedFee;
-            (_params.userParams.amount, uncollectedFee) = recordRedeem(
+            (_params.userParams.amount, uncollectedFee) = recordRedeemInternal(
                 _params,
                 protocolsSupplies + totalLending,
                 newInterest,
@@ -52,7 +52,7 @@ library RedeemLogic {
                 accFees
             );
 
-            executeRedeem(
+            executeRedeemInternal(
                 _params,
                 supplies,
                 protocolsSupplies,
@@ -69,7 +69,42 @@ library RedeemLogic {
         uint256 _newInterest,
         address _redeemFrom,
         mapping(address => uint256) storage accFees
-    ) public returns (uint256 underlyingAmount, uint256 fee) {
+    ) external returns (uint256 underlyingAmount, uint256 fee) {
+        return
+            recordRedeemInternal(
+                _params,
+                _totalSupplies,
+                _newInterest,
+                _redeemFrom,
+                accFees
+            );
+    }
+
+    function executeRedeem(
+        Types.RedeemParams memory _params,
+        uint256[] memory _supplies,
+        uint256 _protocolsSupplies,
+        uint256 _totalLending,
+        uint256 _uncollectedFee,
+        mapping(address => uint256) storage totalLendings
+    ) external {
+        executeRedeemInternal(
+            _params,
+            _supplies,
+            _protocolsSupplies,
+            _totalLending,
+            _uncollectedFee,
+            totalLendings
+        );
+    }
+
+    function recordRedeemInternal(
+        Types.RedeemParams memory _params,
+        uint256 _totalSupplies,
+        uint256 _newInterest,
+        address _redeemFrom,
+        mapping(address => uint256) storage accFees
+    ) internal returns (uint256 underlyingAmount, uint256 fee) {
         uint256 accFee = ExternalUtils.updateAccFee(
             _params.userParams.asset,
             _newInterest,
@@ -114,7 +149,7 @@ library RedeemLogic {
         emit Redeemed(_redeemFrom, _params.userParams.asset, underlyingAmount);
     }
 
-    function executeRedeem(
+    function executeRedeemInternal(
         Types.RedeemParams memory _params,
         uint256[] memory _supplies,
         uint256 _protocolsSupplies,

@@ -73,9 +73,9 @@ module.exports = {
     ],
   },
   contractSizer: {
-    alphaSort: true,
-    runOnCompile: true,
-    disambiguatePaths: false,
+    alphaSort: false,
+    runOnCompile: false,
+    disambiguatePaths: true,
   },
   gasReporter: {
     enabled: false,

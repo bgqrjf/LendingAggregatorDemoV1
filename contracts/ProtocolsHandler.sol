@@ -184,7 +184,7 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
     function redeemAndSupply(
         address _asset,
         uint256[] memory supplies,
-        uint256 _totalSupplied
+        uint256 _totalSuppliedTarget
     ) internal {
         IProtocol[] memory protocolsCache = protocols;
         (
@@ -194,7 +194,7 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
                 protocolsCache,
                 _asset,
                 supplies,
-                _totalSupplied
+                _totalSuppliedTarget
             );
 
         for (uint256 i = 0; i < protocolsCache.length; ++i) {

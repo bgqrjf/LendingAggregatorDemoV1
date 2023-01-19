@@ -30,7 +30,7 @@ library ExternalUtils {
         IConfig _config,
         mapping(address => uint256) storage totalLendings,
         mapping(address => uint256) storage accFees
-    ) external {
+    ) internal {
         (uint256 totalLending, uint256 newInterest) = _protocols
             .simulateLendings(_asset, totalLendings[_asset]);
 
@@ -54,7 +54,7 @@ library ExternalUtils {
         uint256 _newInterest,
         IConfig config,
         mapping(address => uint256) storage accFees
-    ) public returns (uint256 accFee) {
+    ) internal returns (uint256 accFee) {
         if (_newInterest > 0) {
             accFee = accFees[_asset];
 
@@ -126,7 +126,7 @@ library ExternalUtils {
         IProtocolsHandler protocols,
         mapping(address => uint256) storage totalLendings
     )
-        public
+        internal
         view
         returns (
             uint256[] memory supplies,
@@ -148,7 +148,7 @@ library ExternalUtils {
         IProtocolsHandler protocols,
         mapping(address => uint256) storage totalLendings
     )
-        public
+        internal
         view
         returns (
             uint256[] memory borrows,
@@ -184,7 +184,7 @@ library ExternalUtils {
         uint256 _amount,
         uint256 _ratio,
         mapping(address => Types.Asset) storage assets
-    ) public view returns (uint256 amount, bool blackListed) {
+    ) internal view returns (uint256 amount, bool blackListed) {
         if (assets[_underlying].paused) {
             blackListed = true;
         } else {
@@ -223,7 +223,7 @@ library ExternalUtils {
         address[] memory _underlyings,
         mapping(address => Types.Asset) storage assets
     )
-        external
+        internal
         view
         returns (
             uint256 collateralValue,

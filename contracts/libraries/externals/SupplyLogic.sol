@@ -22,7 +22,7 @@ library SupplyLogic {
         mapping(address => uint256) storage totalLendings,
         mapping(address => uint256) storage accFees
     ) external {
-        require(_params.actionNotPaused, "SupplyLogic: actionPaused");
+        require(_params.actionNotPaused, "SupplyLogic: action paused");
 
         if (address(_params.reservePool) != address(0)) {
             TransferHelper.collect(
@@ -50,7 +50,7 @@ library SupplyLogic {
                     totalLendings
                 );
 
-            recordSupply(
+            recordSupplyInternal(
                 _params,
                 protocolsSupplies + totalLending,
                 newInterest,
@@ -65,12 +65,12 @@ library SupplyLogic {
                 0 // gasLimit
             );
 
-            executeSupply(
+            executeSupplyInternal(
                 _params,
                 totalLending,
                 supplies,
                 protocolsSupplies,
-                accFees
+                totalLendings
             );
         }
     }
@@ -80,7 +80,32 @@ library SupplyLogic {
         uint256 _totalSupplies,
         uint256 _newInterest,
         mapping(address => uint256) storage accFees
-    ) public {
+    ) external {
+        recordSupplyInternal(_params, _totalSupplies, _newInterest, accFees);
+    }
+
+    function executeSupply(
+        Types.SupplyParams memory _params,
+        uint256 _totalLending,
+        uint256[] memory _supplies,
+        uint256 _protocolsSupplies,
+        mapping(address => uint256) storage accFees
+    ) external {
+        executeSupplyInternal(
+            _params,
+            _totalLending,
+            _supplies,
+            _protocolsSupplies,
+            accFees
+        );
+    }
+
+    function recordSupplyInternal(
+        Types.SupplyParams memory _params,
+        uint256 _totalSupplies,
+        uint256 _newInterest,
+        mapping(address => uint256) storage accFees
+    ) internal {
         ExternalUtils.updateAccFee(
             _params.userParams.asset,
             _newInterest,
@@ -114,13 +139,13 @@ library SupplyLogic {
         );
     }
 
-    function executeSupply(
+    function executeSupplyInternal(
         Types.SupplyParams memory _params,
         uint256 _totalLending,
         uint256[] memory _supplies,
         uint256 _protocolsSupplies,
-        mapping(address => uint256) storage accFees
-    ) public {
+        mapping(address => uint256) storage totalLendings
+    ) internal {
         (uint256 repayed, ) = _params.protocols.repayAndSupply(
             _params.userParams.asset,
             _params.userParams.amount,
@@ -133,7 +158,7 @@ library SupplyLogic {
                 _params.protocols,
                 _params.userParams.asset,
                 _totalLending + repayed,
-                accFees
+                totalLendings
             );
         }
     }

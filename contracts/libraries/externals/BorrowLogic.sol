@@ -28,7 +28,7 @@ library BorrowLogic {
         mapping(address => uint256) storage feeIndexes,
         mapping(address => mapping(address => uint256)) storage userFeeIndexes
     ) external {
-        require(_params.actionNotPaused, "BorrowLogic: actionPaused");
+        require(_params.actionNotPaused, "BorrowLogic: action paused");
 
         require(
             _params.userParams.amount > 0,
@@ -59,7 +59,7 @@ library BorrowLogic {
                     totalLendings
                 );
 
-            recordBorrow(
+            recordBorrowInternal(
                 Types.RecordBorrowParams(
                     _params.userParams,
                     newInterest,
@@ -75,67 +75,7 @@ library BorrowLogic {
                 userFeeIndexes
             );
 
-            executeBorrow(_params, totalLending, totalLendings);
-        }
-    }
-
-    function borrowAllowed(
-        Types.BorrowParams memory _params,
-        address _borrower,
-        mapping(address => Types.Asset) storage assets
-    ) internal view returns (bool) {
-        uint256 maxDebtAllowed = borrowLimit(
-            _params.config,
-            _params.priceOracle,
-            _borrower,
-            _params.userParams.asset,
-            _params.underlyings,
-            assets
-        );
-        uint256 currentDebts = ExternalUtils.getUserDebts(
-            _borrower,
-            _params.config.userDebtAndCollateral(_borrower),
-            _params.underlyings,
-            _params.userParams.asset,
-            _params.priceOracle,
-            assets
-        );
-
-        return currentDebts + _params.userParams.amount <= maxDebtAllowed;
-    }
-
-    function borrowLimit(
-        IConfig _config,
-        IPriceOracle _priceOracle,
-        address _account,
-        address _borrowAsset,
-        address[] memory _underlyings,
-        mapping(address => Types.Asset) storage assets
-    ) public view returns (uint256 amount) {
-        uint256 userConfig = _config.userDebtAndCollateral(_account);
-
-        for (uint256 i = 0; i < _underlyings.length; ++i) {
-            if (userConfig.isUsingAsCollateral(i)) {
-                address underlying = _underlyings[i];
-                Types.Asset memory asset = assets[underlying];
-
-                if (asset.paused) {
-                    continue;
-                }
-
-                uint256 collateralAmount = underlying == _borrowAsset
-                    ? asset.sToken.scaledBalanceOf(_account)
-                    : _priceOracle.valueOfAsset(
-                        underlying,
-                        _borrowAsset,
-                        asset.sToken.scaledBalanceOf(_account)
-                    );
-
-                amount +=
-                    (_config.assetConfigs(underlying).maxLTV *
-                        collateralAmount) /
-                    Utils.MILLION;
-            }
+            executeBorrowInternal(_params, totalLending, totalLendings);
         }
     }
 
@@ -146,7 +86,52 @@ library BorrowLogic {
         mapping(address => uint256) storage accFeeOffsets,
         mapping(address => uint256) storage feeIndexes,
         mapping(address => mapping(address => uint256)) storage userFeeIndexes
-    ) public {
+    ) external {
+        recordBorrowInternal(
+            _params,
+            assets,
+            accFees,
+            accFeeOffsets,
+            feeIndexes,
+            userFeeIndexes
+        );
+    }
+
+    function executeBorrow(
+        Types.BorrowParams memory _params,
+        uint256 _totalLending,
+        mapping(address => uint256) storage totalLendings
+    ) external {
+        executeBorrowInternal(_params, _totalLending, totalLendings);
+    }
+
+    function borrowLimit(
+        IConfig _config,
+        IPriceOracle _priceOracle,
+        address _account,
+        address _borrowAsset,
+        address[] memory _underlyings,
+        mapping(address => Types.Asset) storage assets
+    ) external view returns (uint256 amount) {
+        return
+            borrowLimitInternal(
+                _config,
+                _priceOracle,
+                _account,
+                _borrowAsset,
+                _underlyings,
+                assets
+            );
+    }
+
+    function recordBorrowInternal(
+        Types.RecordBorrowParams memory _params,
+        mapping(address => Types.Asset) storage assets,
+        mapping(address => uint256) storage accFees,
+        mapping(address => uint256) storage accFeeOffsets,
+        mapping(address => uint256) storage feeIndexes,
+        mapping(address => mapping(address => uint256)) storage userFeeIndexes
+    ) internal {
         Types.Asset memory asset = assets[_params.userParams.asset];
 
         uint256 accFee = ExternalUtils.updateAccFee(
@@ -205,11 +190,11 @@ library BorrowLogic {
         );
     }
 
-    function executeBorrow(
+    function executeBorrowInternal(
         Types.BorrowParams memory _params,
         uint256 _totalLending,
         mapping(address => uint256) storage totalLendings
-    ) public {
+    ) internal {
         IProtocolsHandler protocolsCache = _params.protocols;
 
         (uint256[] memory supplies, uint256 protocolsSupplies) = protocolsCache
@@ -229,5 +214,66 @@ library BorrowLogic {
             _totalLending + redeemed,
             totalLendings
         );
+    }
+
+    function borrowAllowed(
+        Types.BorrowParams memory _params,
+        address _borrower,
+        mapping(address => Types.Asset) storage assets
+    ) internal view returns (bool) {
+        uint256 maxDebtAllowed = borrowLimitInternal(
+            _params.config,
+            _params.priceOracle,
+            _borrower,
+            _params.userParams.asset,
+            _params.underlyings,
+            assets
+        );
+
+        uint256 currentDebts = ExternalUtils.getUserDebts(
+            _borrower,
+            _params.config.userDebtAndCollateral(_borrower),
+            _params.underlyings,
+            _params.userParams.asset,
+            _params.priceOracle,
+            assets
+        );
+
+        return currentDebts + _params.userParams.amount <= maxDebtAllowed;
+    }
+
+    function borrowLimitInternal(
+        IConfig _config,
+        IPriceOracle _priceOracle,
+        address _account,
+        address _borrowAsset,
+        address[] memory _underlyings,
+        mapping(address => Types.Asset) storage assets
+    ) internal view returns (uint256 amount) {
+        uint256 userConfig = _config.userDebtAndCollateral(_account);
+
+        for (uint256 i = 0; i < _underlyings.length; ++i) {
+            if (userConfig.isUsingAsCollateral(i)) {
+                address underlying = _underlyings[i];
+                Types.Asset memory asset = assets[underlying];
+
+                if (asset.paused) {
+                    continue;
+                }
+
+                uint256 collateralAmount = underlying == _borrowAsset
+                    ? asset.sToken.scaledBalanceOf(_account)
+                    : _priceOracle.valueOfAsset(
+                        underlying,
+                        _borrowAsset,
+                        asset.sToken.scaledBalanceOf(_account)
+                    );
+
+                amount +=
+                    (_config.assetConfigs(underlying).maxLTV *
+                        collateralAmount) /
+                    Utils.MILLION;
+            }
+        }
     }
 }
