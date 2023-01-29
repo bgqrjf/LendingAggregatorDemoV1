@@ -28,17 +28,19 @@ library RedeemLogic {
             _params.reservePool.redeem(
                 _params.userParams,
                 msg.sender,
-                _params.executeNow,
-                _params.collateralable
+                _params.collateralable,
+                _params.executeNow
             );
         } else {
             (
                 uint256[] memory supplies,
                 uint256 protocolsSupplies,
                 uint256 totalLending,
+                uint256 totalBorrowedAmountWithFee,
                 uint256 newInterest
             ) = ExternalUtils.getSupplyStatus(
                     _params.userParams.asset,
+                    _params.reservePool,
                     _params.protocols,
                     totalLendings
                 );
@@ -46,7 +48,7 @@ library RedeemLogic {
             uint256 uncollectedFee;
             (_params.userParams.amount, uncollectedFee) = recordRedeemInternal(
                 _params,
-                protocolsSupplies + totalLending,
+                totalBorrowedAmountWithFee,
                 newInterest,
                 msg.sender,
                 accFees

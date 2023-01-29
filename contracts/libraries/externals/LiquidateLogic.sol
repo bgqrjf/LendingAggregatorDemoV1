@@ -244,9 +244,8 @@ library LiquidateLogic {
                     );
 
                 liquidationAmount += liquidationAmountNew;
-                if (!blackListed && blackListedNew) {
-                    blackListed = true;
-                }
+
+                blackListed = blackListed || blackListedNew;
             }
         }
     }

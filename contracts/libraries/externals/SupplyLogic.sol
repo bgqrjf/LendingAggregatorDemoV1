@@ -35,24 +35,26 @@ library SupplyLogic {
 
             _params.reservePool.supply(
                 _params.userParams,
-                _params.executeNow,
-                _params.collateralable
+                _params.collateralable,
+                _params.executeNow
             );
         } else {
             (
                 uint256[] memory supplies,
                 uint256 protocolsSupplies,
                 uint256 totalLending,
+                uint256 totalBorrowedAmountWithFee,
                 uint256 newInterest
             ) = ExternalUtils.getSupplyStatus(
                     _params.userParams.asset,
+                    _params.reservePool,
                     _params.protocols,
                     totalLendings
                 );
 
             recordSupplyInternal(
                 _params,
-                protocolsSupplies + totalLending,
+                totalBorrowedAmountWithFee,
                 newInterest,
                 accFees
             );
@@ -89,14 +91,14 @@ library SupplyLogic {
         uint256 _totalLending,
         uint256[] memory _supplies,
         uint256 _protocolsSupplies,
-        mapping(address => uint256) storage accFees
+        mapping(address => uint256) storage totalLendings
     ) external {
         executeSupplyInternal(
             _params,
             _totalLending,
             _supplies,
             _protocolsSupplies,
-            accFees
+            totalLendings
         );
     }
 

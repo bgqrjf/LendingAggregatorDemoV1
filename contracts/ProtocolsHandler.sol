@@ -10,14 +10,10 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
-    address public router;
     IStrategy public strategy;
     IProtocol[] public protocols;
 
-    modifier onlyRouter() {
-        require(msg.sender == router, "ProtocolsHandler: OnlyRouter");
-        _;
-    }
+    receive() external payable {}
 
     function initialize(address[] memory _protocols, address _strategy)
         external
@@ -32,17 +28,15 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         strategy = IStrategy(_strategy);
     }
 
-    receive() external payable {}
-
     function repayAndSupply(
         address _asset,
         uint256 _amount,
         uint256[] memory supplies,
         uint256 _totalSupplied
     )
-        public
+        external
         override
-        onlyRouter
+        onlyOwner
         returns (uint256 repayAmount, uint256 supplyAmount)
     {
         repayAmount = repay(_asset, _amount);
@@ -60,9 +54,9 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         uint256 _totalSupplied,
         address _to
     )
-        public
+        external
         override
-        onlyRouter
+        onlyOwner
         returns (uint256 redeemAmount, uint256 borrowAmount)
     {
         redeemAmount = redeem(_asset, _amount, supplies, _totalSupplied, _to);
@@ -160,7 +154,7 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
     function updateSimulates(address _asset, uint256 _totalLending)
         external
         override
-        onlyRouter
+        onlyOwner
     {
         IProtocol[] memory protocolsCache = protocols;
         uint256[] memory supplyAmounts = strategy.getSimulateSupplyStrategy(
@@ -365,23 +359,18 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         }
     }
 
-    function addProtocol(IProtocol _protocol) external override onlyRouter {
+    function addProtocol(IProtocol _protocol) external override onlyOwner {
         protocols.push(_protocol);
     }
 
     function claimRewards(address _account, uint256[] memory _amounts)
         external
         override
-        onlyRouter
+        onlyOwner
     {
         for (uint256 i = 0; i < protocols.length; ++i) {
             address token = protocols[i].rewardToken();
             TransferHelper.safeTransfer(token, _account, _amounts[i], 0);
         }
-    }
-
-    // admin functions
-    function setRouter(address _router) external override onlyOwner {
-        router = _router;
     }
 }

@@ -2,10 +2,9 @@ const { expect } = require("chai");
 const { ethers, waffle } = require("hardhat");
 const aave = require("./aave/deploy");
 const compound = require("./compound/deploy");
+const transparentProxy = require("./utils/transparentProxy");
 const m = require("mocha-logger");
 const { loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
-const ProxyAdmin = require("@openzeppelin/contracts/build/contracts/ProxyAdmin.json");
-const TransparentUpgradeableProxy = require("@openzeppelin/contracts/build/contracts/TransparentUpgradeableProxy.json");
 
 describe("ProtocolsHandler tests", function () {
   const provider = waffle.provider;
@@ -62,42 +61,15 @@ describe("ProtocolsHandler tests", function () {
       [700000, 700000, 700000]
     );
 
-    let ProtocolsHandler = await ethers.getContractFactory("ProtocolsHandler");
-    let protocolsHandlerImplementation = await ProtocolsHandler.deploy();
+    const proxyAdmin = await transparentProxy.deployProxyAdmin();
+    let protocolsHandler = await transparentProxy.deployProxy({
+      implementationFactory: "ProtocolsHandler",
+      libraries: {},
+      initializeParams: [[], strategy.address],
+      proxyAdmin: proxyAdmin,
+    });
 
-    let Admin = await ethers.getContractFactory(
-      ProxyAdmin.abi,
-      ProxyAdmin.bytecode
-    );
-
-    let proxyAdmin = await Admin.deploy();
-
-    const Proxy = await ethers.getContractFactory(
-      TransparentUpgradeableProxy.abi,
-      TransparentUpgradeableProxy.bytecode
-    );
-
-    let interface = new ethers.utils.Interface([
-      "function initialize(address[],address)",
-    ]);
-
-    let initializeData = interface.encodeFunctionData("initialize", [
-      [],
-      strategy.address,
-    ]);
-
-    let proxy = await Proxy.deploy(
-      protocolsHandlerImplementation.address,
-      proxyAdmin.address,
-      initializeData
-    );
-
-    let protocolsHandler = await ethers.getContractAt(
-      "ProtocolsHandler",
-      proxy.address
-    );
-
-    await protocolsHandler.setRouter(aaveContracts.signer.address);
+    await protocolsHandler.transferOwnership(aaveContracts.signer.address);
     await protocolsHandler.addProtocol(aaveHandler.address);
     await protocolsHandler.addProtocol(compoundHandler.address);
 
@@ -127,7 +99,6 @@ describe("ProtocolsHandler tests", function () {
     let aaveHandler = deploys.aaveHandler;
     let compoundHandler = deploys.compoundHandler;
 
-    expect(await protocolsHandler.router()).to.equal(deployer.address);
     expect(await protocolsHandler.strategy()).to.equal(strategy.address);
     expect(await protocolsHandler.getProtocols()).to.have.members([
       aaveHandler.address,

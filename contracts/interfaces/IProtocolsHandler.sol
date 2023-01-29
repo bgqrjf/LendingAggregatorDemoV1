@@ -45,8 +45,6 @@ interface IProtocolsHandler {
 
     function updateSimulates(address _asset, uint256 _totalLending) external;
 
-    function setRouter(address _router) external;
-
     function claimRewards(address _account, uint256[] memory _amounts) external;
 
     function addProtocol(IProtocol _protocol) external;

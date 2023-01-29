@@ -36,6 +36,8 @@ library Types {
         string dTokenName;
         string dTokenSymbol;
         AssetConfig config;
+        uint256 maxReserve;
+        uint256 executeSupplyThreshold;
     }
 
     struct AAVEUsageParams {

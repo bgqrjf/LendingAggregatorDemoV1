@@ -123,6 +123,7 @@ library ExternalUtils {
     // views
     function getSupplyStatus(
         address _underlying,
+        IReservePool reservePool,
         IProtocolsHandler protocols,
         mapping(address => uint256) storage totalLendings
     )
@@ -132,6 +133,7 @@ library ExternalUtils {
             uint256[] memory supplies,
             uint256 protocolsSupplies,
             uint256 totalLending,
+            uint256 totalSuppliedAmount,
             uint256 newInterest
         )
     {
@@ -140,6 +142,13 @@ library ExternalUtils {
             _underlying,
             totalLendings[_underlying]
         );
+
+        uint256 redeemedAmount;
+        if (address(reservePool) != address(0)) {
+            redeemedAmount = reservePool.redeemedAmounts(_underlying);
+        }
+
+        totalSuppliedAmount = protocolsSupplies + totalLending - redeemedAmount;
     }
 
     function getBorrowStatus(
@@ -152,28 +161,35 @@ library ExternalUtils {
         view
         returns (
             uint256[] memory borrows,
-            uint256 protocolsBorrows,
+            uint256 totalBorrowed,
             uint256 totalLending,
-            uint256 reservePoolLentAmount,
             uint256 newInterest
         )
     {
         IProtocolsHandler protocolsCache = protocols;
+        uint256 protocolsBorrows;
         (borrows, protocolsBorrows) = protocolsCache.totalBorrowed(_underlying);
         (totalLending, newInterest) = protocolsCache.simulateLendings(
             _underlying,
             totalLendings[_underlying]
         );
 
-        reservePoolLentAmount = address(reservePool) == address(0)
-            ? 0
-            : reservePool.lentAmounts(_underlying);
+        uint256 reservePoolLentAmount;
+        uint256 reservePoolPendingRepayAmount;
+        if (address(reservePool) != address(0)) {
+            reservePoolLentAmount = reservePool.lentAmounts(_underlying);
+            reservePoolPendingRepayAmount = reservePool.pendingRepayAmounts(
+                _underlying
+            );
+        }
 
         return (
             borrows,
-            protocolsBorrows,
+            protocolsBorrows +
+                totalLending +
+                reservePoolLentAmount -
+                reservePoolPendingRepayAmount,
             totalLending,
-            reservePoolLentAmount,
             newInterest
         );
     }

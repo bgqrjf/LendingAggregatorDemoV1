@@ -111,16 +111,9 @@ interface IRouter {
         uint256 _uncollectedFee
     ) external;
 
-    function executeBorrow(
-        Types.UserAssetParams memory _params,
-        uint256 _totalLending
-    ) external;
+    function executeBorrow(Types.UserAssetParams memory _params) external;
 
-    function executeRepay(
-        address _asset,
-        uint256 _amount,
-        uint256 _totalLending
-    ) external;
+    function executeRepay(address _asset, uint256 _amount) external;
 
     function liquidate(
         Types.UserAssetParams memory,
@@ -153,6 +146,7 @@ interface IRouter {
             uint256[] memory supplies,
             uint256 protocolsSupplies,
             uint256 totalLending,
+            uint256 totalSuppliedAmountWithFee,
             uint256 newInterest
         );
 
@@ -161,9 +155,8 @@ interface IRouter {
         view
         returns (
             uint256[] memory borrows,
-            uint256 protocolsBorrows,
+            uint256 totalBorrowedAmount,
             uint256 totalLending,
-            uint256 reservePoolLentAmount,
             uint256 newInterest
         );
 

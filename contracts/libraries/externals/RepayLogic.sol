@@ -50,9 +50,8 @@ library RepayLogic {
 
         (
             ,
-            uint256 protocolsBorrows,
+            uint256 totalBorrowedAmount,
             uint256 totalLending,
-            uint256 reservePoolLentAmount,
             uint256 newInterest
         ) = ExternalUtils.getBorrowStatus(
                 _params.userParams.asset,
@@ -60,10 +59,6 @@ library RepayLogic {
                 _params.protocols,
                 totalLendings
             );
-
-        uint256 totalBorrowedAmount = protocolsBorrows +
-            totalLending +
-            reservePoolLentAmount;
 
         uint256 fee;
         (amount, fee) = recordRepay(
@@ -108,7 +103,11 @@ library RepayLogic {
             );
 
             _params.reservePool.repay(
-                _params.userParams,
+                Types.UserAssetParams(
+                    _params.userParams.asset,
+                    amount - fee,
+                    _params.userParams.to
+                ),
                 totalBorrowedAmount,
                 _params.executeNow
             );
@@ -121,7 +120,7 @@ library RepayLogic {
                 0
             );
 
-            totalLending = executeRepayInternal(
+            executeRepayInternal(
                 _params.protocols,
                 _params.userParams.asset,
                 amount - fee,
@@ -129,6 +128,8 @@ library RepayLogic {
                 totalLendings
             );
         }
+
+        totalLending = totalLendings[_params.userParams.asset];
 
         ExternalUtils.updateTotalLendings(
             _params.protocols,
@@ -224,7 +225,7 @@ library RepayLogic {
         uint256 _amount,
         uint256 _totalLending,
         mapping(address => uint256) storage totalLendings
-    ) internal returns (uint256 totalLending) {
+    ) internal {
         (uint256[] memory supplies, uint256 protocolsSupplies) = protocols
             .totalSupplied(_asset);
 
@@ -235,12 +236,10 @@ library RepayLogic {
             protocolsSupplies
         );
 
-        totalLending = _totalLending > supplied ? _totalLending - supplied : 0;
-
         ExternalUtils.updateTotalLendings(
             protocols,
             _asset,
-            totalLending,
+            _totalLending > supplied ? _totalLending - supplied : 0,
             totalLendings
         );
     }

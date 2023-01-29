@@ -344,7 +344,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
             _totalLending,
             _supplies,
             _protocolsSupplies,
-            accFees
+            totalLendings
         );
     }
 
@@ -376,16 +376,23 @@ contract Router is RouterStorage, OwnableUpgradeable {
         );
     }
 
-    function executeBorrow(
-        Types.UserAssetParams memory _params,
-        uint256 _totalLending
-    ) external override onlyReservePool {
+    function executeBorrow(Types.UserAssetParams memory _params)
+        external
+        override
+        onlyReservePool
+    {
+        IProtocolsHandler protocolsCache = protocols;
+        (uint256 totalLending, ) = protocolsCache.simulateLendings(
+            _params.asset,
+            totalLendings[_params.asset]
+        );
+
         BorrowLogic.executeBorrow(
             Types.BorrowParams(
                 _params,
                 true, // not used in library
                 true, // not used in library
-                protocols,
+                protocolsCache,
                 reservePool,
                 rewards,
                 config,
@@ -393,21 +400,27 @@ contract Router is RouterStorage, OwnableUpgradeable {
                 collectedFees[_params.asset],
                 underlyings
             ),
-            _totalLending,
+            totalLending,
             totalLendings
         );
     }
 
-    function executeRepay(
-        address _asset,
-        uint256 _amount,
-        uint256 _totalLending
-    ) external override onlyReservePool {
+    function executeRepay(address _asset, uint256 _amount)
+        external
+        override
+        onlyReservePool
+    {
+        IProtocolsHandler protocolsCache = protocols;
+        (uint256 totalLending, ) = protocolsCache.simulateLendings(
+            _asset,
+            totalLendings[_asset]
+        );
+
         RepayLogic.executeRepay(
             protocols,
             _asset,
             _amount,
-            _totalLending,
+            totalLending,
             totalLendings
         );
     }
@@ -498,12 +511,14 @@ contract Router is RouterStorage, OwnableUpgradeable {
             uint256[] memory supplies,
             uint256 protocolsSupplies,
             uint256 totalLending,
+            uint256 totalSuppliedAmountWithFee,
             uint256 newInterest
         )
     {
         return
             ExternalUtils.getSupplyStatus(
                 _underlying,
+                reservePool,
                 protocols,
                 totalLendings
             );
@@ -515,9 +530,8 @@ contract Router is RouterStorage, OwnableUpgradeable {
         override
         returns (
             uint256[] memory borrows,
-            uint256 protocolsBorrows,
+            uint256 totalBorrowedAmount,
             uint256 totalLending,
-            uint256 reservePoolLentAmount,
             uint256 newInterest
         )
     {
@@ -531,35 +545,27 @@ contract Router is RouterStorage, OwnableUpgradeable {
     }
 
     function totalSupplied(address _underlying)
-        public
+        external
         view
         override
         returns (uint256)
     {
-        (, uint256 protocolsSupplies, uint256 totalLending, ) = getSupplyStatus(
+        (, , , uint256 totalSuppliedAmountWithFee, ) = getSupplyStatus(
             _underlying
         );
 
         uint256 fee = accFees[_underlying] - collectedFees[_underlying];
 
-        return protocolsSupplies + totalLending - fee;
+        return totalSuppliedAmountWithFee - fee;
     }
 
     function totalBorrowed(address _underlying)
         external
         view
         override
-        returns (uint256)
+        returns (uint256 totalBorrowedAmount)
     {
-        (
-            ,
-            uint256 protocolsBorrows,
-            uint256 totalLending,
-            uint256 reservePoolLentAmount,
-
-        ) = getBorrowStatus(_underlying);
-
-        return protocolsBorrows + totalLending + reservePoolLentAmount;
+        (, totalBorrowedAmount, , ) = getBorrowStatus(_underlying);
     }
 
     // validations
@@ -625,6 +631,30 @@ contract Router is RouterStorage, OwnableUpgradeable {
 
         assets[_newAsset.underlying] = asset;
         config.setAssetConfig(_newAsset.underlying, _newAsset.config);
+
+        _updateReservePoolConfig(
+            _newAsset.underlying,
+            _newAsset.maxReserve,
+            _newAsset.executeSupplyThreshold
+        );
+    }
+
+    function updateReservePoolConfig(
+        address _asset,
+        uint256 _maxReserve,
+        uint256 _executeSupplyThreshold
+    ) external onlyOwner {
+        _updateReservePoolConfig(_asset, _maxReserve, _executeSupplyThreshold);
+    }
+
+    function _updateReservePoolConfig(
+        address _asset,
+        uint256 _maxReserve,
+        uint256 _executeSupplyThreshold
+    ) internal {
+        if (address(reservePool) != address(0)) {
+            reservePool.setConfig(_asset, _maxReserve, _executeSupplyThreshold);
+        }
     }
 
     function updateSToken(address _sToken) external override onlyOwner {

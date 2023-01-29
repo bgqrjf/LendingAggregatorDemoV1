@@ -32,49 +32,44 @@ library BorrowLogic {
 
         require(
             _params.userParams.amount > 0,
-            "Router: Borrow 0 token is not allowed"
+            "BorrowLogic: Borrow 0 token is not allowed"
         );
         require(
             borrowAllowed(_params, msg.sender, assets),
-            "Router: Insufficient collateral"
+            "BorrowLogic: Insufficient collateral"
+        );
+
+        (
+            ,
+            uint256 totalBorrowedAmount,
+            uint256 totalLending,
+            uint256 newInterest
+        ) = ExternalUtils.getBorrowStatus(
+                _params.userParams.asset,
+                _params.reservePool,
+                _params.protocols,
+                totalLendings
+            );
+
+        recordBorrowInternal(
+            Types.RecordBorrowParams(
+                _params.userParams,
+                newInterest,
+                totalBorrowedAmount,
+                msg.sender,
+                _params.config,
+                _params.rewards
+            ),
+            assets,
+            accFees,
+            accFeeOffsets,
+            feeIndexes,
+            userFeeIndexes
         );
 
         if (address(_params.reservePool) != address(0)) {
-            _params.reservePool.borrow(
-                _params.userParams,
-                msg.sender,
-                _params.executeNow
-            );
+            _params.reservePool.borrow(_params.userParams, _params.executeNow);
         } else {
-            (
-                ,
-                uint256 protocolsBorrows,
-                uint256 totalLending,
-                uint256 reservePoolLentAmount,
-                uint256 newInterest
-            ) = ExternalUtils.getBorrowStatus(
-                    _params.userParams.asset,
-                    _params.reservePool,
-                    _params.protocols,
-                    totalLendings
-                );
-
-            recordBorrowInternal(
-                Types.RecordBorrowParams(
-                    _params.userParams,
-                    newInterest,
-                    protocolsBorrows + totalLending + reservePoolLentAmount,
-                    msg.sender,
-                    _params.config,
-                    _params.rewards
-                ),
-                assets,
-                accFees,
-                accFeeOffsets,
-                feeIndexes,
-                userFeeIndexes
-            );
-
             executeBorrowInternal(_params, totalLending, totalLendings);
         }
     }
@@ -251,16 +246,11 @@ library BorrowLogic {
         mapping(address => Types.Asset) storage assets
     ) internal view returns (uint256 amount) {
         uint256 userConfig = _config.userDebtAndCollateral(_account);
-
         for (uint256 i = 0; i < _underlyings.length; ++i) {
-            if (userConfig.isUsingAsCollateral(i)) {
-                address underlying = _underlyings[i];
-                Types.Asset memory asset = assets[underlying];
+            address underlying = _underlyings[i];
+            Types.Asset memory asset = assets[underlying];
 
-                if (asset.paused) {
-                    continue;
-                }
-
+            if (userConfig.isUsingAsCollateral(i) && !asset.paused) {
                 uint256 collateralAmount = underlying == _borrowAsset
                     ? asset.sToken.scaledBalanceOf(_account)
                     : _priceOracle.valueOfAsset(
