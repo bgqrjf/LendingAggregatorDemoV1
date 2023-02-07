@@ -26,35 +26,17 @@ describe("Router tests", function () {
     let wETH = aaveContracts.wETH;
     let aOracle = aaveContracts.priceOracle;
 
-    let AAVEHandler = await ethers.getContractFactory("AAVELogic");
-    // _aaveTokenAddress
-    let aaveHandler = await AAVEHandler.deploy(
-      aPool.address,
-      wETH.address,
-      wETH.address
-    );
-
     // deploy compound contracts
     let compoundContracts = await compound.deployContracts({
       token0: token0,
       usdt: usdt,
     });
+
     let comptroller = compoundContracts.comptroller;
     let cToken0 = compoundContracts.cToken0;
     let cUSDT = compoundContracts.cUSDT;
     let cETH = compoundContracts.cETH;
     let comp = compoundContracts.comp;
-
-    let CompoundHandler = await ethers.getContractFactory("CompoundLogic");
-    let compoundHandler = await CompoundHandler.deploy(
-      comptroller.address,
-      cETH.address,
-      comp.address,
-      { gasLimit: 5000000 }
-    );
-
-    await compoundHandler.updateCTokenList(cToken0.address);
-    await compoundHandler.updateCTokenList(cUSDT.address);
 
     let borrowAmount = ethers.utils.parseUnits("10", "ether");
     let supplyAmount = borrowAmount.mul(2);
@@ -106,6 +88,25 @@ describe("Router tests", function () {
       initializeParams: [[], strategy.address],
       proxyAdmin: proxyAdmin,
     });
+
+    let AAVEHandler = await ethers.getContractFactory("AAVELogic");
+    let aaveHandler = await AAVEHandler.deploy(
+      protocolsHandler.address,
+      aPool.address,
+      wETH.address
+    );
+
+    let CompoundHandler = await ethers.getContractFactory("CompoundLogic");
+    let compoundHandler = await CompoundHandler.deploy(
+      protocolsHandler.address,
+      comptroller.address,
+      cETH.address,
+      comp.address,
+      { gasLimit: 5000000 }
+    );
+
+    await compoundHandler.updateCTokenList(cToken0.address);
+    await compoundHandler.updateCTokenList(cUSDT.address);
 
     // priceOracle
     let PriceOracle = await ethers.getContractFactory("MockPriceOracle");
@@ -261,6 +262,7 @@ describe("Router tests", function () {
       usdt: usdt,
       wETH: wETH,
       cToken0: cToken0,
+      cUSDT: cUSDT,
       cETH: cETH,
     };
   }
@@ -500,7 +502,7 @@ describe("Router tests", function () {
         balance = await sToken0.scaledBalanceOf(deployer.address);
 
         expect(sBalance).to.equal(supplyAmount);
-        expect(balance).to.equal("200000596832047430");
+        expect(balance).to.equal("200000596832076110");
       });
 
       it("should emit events when supply token0 via protocols supply", async () => {
@@ -615,7 +617,7 @@ describe("Router tests", function () {
         balance = await sToken0.scaledBalanceOf(deployer.address);
 
         expect(sBalance).to.equal(supplyAmount);
-        expect(balance).to.equal("200000607483321105");
+        expect(balance).to.equal("200000607484748070");
       });
 
       it("should emit events when supply token0 via protocols reapy", async () => {
@@ -774,7 +776,7 @@ describe("Router tests", function () {
         balance = await sETH.scaledBalanceOf(deployer.address);
 
         expect(sBalance).to.equal(supplyAmount);
-        expect(balance).to.equal("200000596831939941");
+        expect(balance).to.equal("200000596831968621");
       });
 
       it("should emit events when supply ETH via protocols supply", async () => {
@@ -876,7 +878,7 @@ describe("Router tests", function () {
         balance = await sETH.scaledBalanceOf(deployer.address);
 
         expect(sBalance).to.equal(supplyAmount);
-        expect(balance).to.equal("200000607401865341");
+        expect(balance).to.equal("200000607403371068");
       });
 
       it("should emit events when supply ETH via protocols reapy", async () => {
@@ -1071,7 +1073,7 @@ describe("Router tests", function () {
         );
         let accFee = await router.accFees(token0.address);
 
-        let expectRedeemedAmount = "200000597997735022";
+        let expectRedeemedAmount = "200000597997763759";
 
         expect(userTokenRedeemed).to.equal(expectRedeemedAmount);
         expect(cToken0WithdrawedAmount).to.equal(expectRedeemedAmount);
@@ -1109,7 +1111,7 @@ describe("Router tests", function () {
         let receipt = await tx.wait();
         m.log("redeem gas used:", receipt.gasUsed);
 
-        let expectRedeemedAmount = "200000597997735022";
+        let expectRedeemedAmount = "200000597997763759";
 
         await expect(tx).to.not.emit(router, "AccFeeUpdated");
         await expect(tx)
@@ -1192,16 +1194,16 @@ describe("Router tests", function () {
         );
         let accFee = await router.accFees(token0.address);
 
-        let expectRedeemedAmount = "200000652319909822";
+        let expectRedeemedAmount = "200000652321329993";
 
         expect(userTokenRedeemed).to.equal(expectRedeemedAmount);
         expect(cToken0WithdrawedAmount).to.equal(expectRedeemedAmount);
         expect(sToken0BurntAmount).to.equal(supplyAmount);
-        expect(totalLendingsBefore).to.equal("200000001165687634");
+        expect(totalLendingsBefore).to.equal("200000001165687690");
         expect(totalLendingsAfter).to.equal(0);
         expect(routerBalance).to.equal(0);
         expect(protocolsHandlerBalance).to.equal(0);
-        expect(accFee).to.equal("6577315375");
+        expect(accFee).to.equal("6577329720");
         //even though true is set by user, collateral still set to false, because there is no supply remainning.
         expect(collateralStatusBefore).to.equal(11);
         expect(collateralStatusAfter).to.equal(9);
@@ -1232,11 +1234,11 @@ describe("Router tests", function () {
         let receipt = await tx.wait();
         m.log("redeem gas used:", receipt.gasUsed);
 
-        let expectRedeemedAmount = "200000652319909822";
+        let expectRedeemedAmount = "200000652321329993";
 
         await expect(tx)
           .to.emit(router, "AccFeeUpdated")
-          .withArgs(token0.address, "6577315375");
+          .withArgs(token0.address, "6577329720");
         await expect(tx)
           .to.emit(sToken0, "Transfer")
           .withArgs(
@@ -1368,7 +1370,7 @@ describe("Router tests", function () {
         );
 
         let accFee = await router.accFees(ETHAddress);
-        let expectRedeemedAmount = "200000597997627324";
+        let expectRedeemedAmount = "200000597997656060";
 
         expect(cETHWithdrawedAmount).to.equal(expectRedeemedAmount);
         expect(sETHBurntAmount).to.equal(supplyAmount);
@@ -1404,7 +1406,7 @@ describe("Router tests", function () {
         let receipt = await tx.wait();
         m.log("redeem gas used:", receipt.gasUsed);
 
-        let expectRedeemedAmount = "200000597997627324";
+        let expectRedeemedAmount = "200000597997656060";
 
         await expect(tx).to.not.emit(router, "AccFeeUpdated");
         await expect(tx)
@@ -1469,15 +1471,15 @@ describe("Router tests", function () {
         );
         let accFee = await router.accFees(ETHAddress);
 
-        let expectRedeemedAmount = "200000652208362032";
+        let expectRedeemedAmount = "200000652209854379";
 
         expect(cETHWithdrawedAmount).to.equal(expectRedeemedAmount);
         expect(sETHBurntAmount).to.equal(supplyAmount);
-        expect(totalLendingsBefore).to.equal("200000001165687424");
+        expect(totalLendingsBefore).to.equal("200000001165687479");
         expect(totalLendingsAfter).to.equal(0);
         expect(routerBalance).to.equal(0);
         expect(protocolsHandlerBalance).to.equal(0);
-        expect(accFee).to.equal("6576188632");
+        expect(accFee).to.equal("6576203706");
         //even though true is set by user, collateral still set to false, because there is no supply remainning.
         expect(collateralStatusBefore).to.equal(56);
         expect(collateralStatusAfter).to.equal(24);
@@ -1507,11 +1509,11 @@ describe("Router tests", function () {
         let receipt = await tx.wait();
         m.log("redeem gas used:", receipt.gasUsed);
 
-        let expectRedeemedAmount = "200000652208362032";
+        let expectRedeemedAmount = "200000652209854379";
 
         await expect(tx)
           .to.emit(router, "AccFeeUpdated")
-          .withArgs(ETHAddress, "6576188632");
+          .withArgs(ETHAddress, "6576203706");
         await expect(tx)
           .to.emit(sETH, "Transfer")
           .withArgs(
@@ -1712,7 +1714,7 @@ describe("Router tests", function () {
         balance = await dToken0.scaledDebtOf(deployer.address);
 
         expect(dBalance).to.equal(borrowAmount);
-        expect(balance).to.equal("100000614916468889");
+        expect(balance).to.equal("100000614916483225");
       });
 
       it("should emit events when borrow token0 via protocols borrow", async () => {
@@ -1849,7 +1851,7 @@ describe("Router tests", function () {
         balance = await dToken0.scaledDebtOf(deployer.address);
 
         expect(dBalance).to.equal(borrowAmount);
-        expect(balance).to.equal("100000300060669539");
+        expect(balance).to.equal("100000300062067289");
       });
 
       it("should emit events when borrow token0 via protocols redeem", async () => {
@@ -2027,7 +2029,7 @@ describe("Router tests", function () {
         balance = await dETH.scaledDebtOf(deployer.address);
 
         expect(dBalance).to.equal(borrowAmount);
-        expect(balance).to.equal("100000614916422297");
+        expect(balance).to.equal("100000614916436633");
       });
 
       it("should emit events when borrow ETH via protocols borrow", async () => {
@@ -2148,7 +2150,7 @@ describe("Router tests", function () {
         balance = await dETH.scaledDebtOf(deployer.address);
 
         expect(dBalance).to.equal(borrowAmount);
-        expect(balance).to.equal("100000299979292074");
+        expect(balance).to.equal("100000299980768587");
       });
 
       it("should emit events when borrow ETH via protocols redeem", async () => {
@@ -2359,7 +2361,7 @@ describe("Router tests", function () {
         );
         let accFee = await router.accFees(token0.address);
 
-        let expectRepayAmount = ethers.BigNumber.from("100000618519495074");
+        let expectRepayAmount = ethers.BigNumber.from("100000618519509494");
 
         expect(userTokenRepayed).to.equal(expectRepayAmount);
         expect(cTokenRepayedAmount).to.equal(expectRepayAmount);
@@ -2395,7 +2397,7 @@ describe("Router tests", function () {
         let receipt = await tx.wait();
         m.log("repay gas used:", receipt.gasUsed);
 
-        let expectRepayAmount = ethers.BigNumber.from("100000618519495074");
+        let expectRepayAmount = ethers.BigNumber.from("100000618519509494");
 
         await expect(tx)
           .to.emit(config, "UserDebtAndCollateralSet")
@@ -2497,7 +2499,7 @@ describe("Router tests", function () {
         );
         let collectedFee = collectedFeeAfter.sub(collectedFeeBefore);
 
-        let expectRepayAmount = ethers.BigNumber.from("100000301818837526");
+        let expectRepayAmount = ethers.BigNumber.from("100000301820243464");
 
         let assetConfig = await config.assetConfigs(token0.address);
         let accFeeDeltaExpect = expectRepayAmount
@@ -2553,7 +2555,7 @@ describe("Router tests", function () {
         let collectedFee = await router.collectedFees(token0.address);
         let feeIndex = await router.feeIndexes(token0.address);
 
-        let expectRepayAmount = ethers.BigNumber.from("100000301818837526");
+        let expectRepayAmount = ethers.BigNumber.from("100000301820243464");
 
         await expect(tx)
           .to.emit(config, "UserDebtAndCollateralSet")
@@ -2687,7 +2689,7 @@ describe("Router tests", function () {
         );
         let accFee = await router.accFees(ETHAddress);
 
-        let expectRepayAmount = ethers.BigNumber.from("100000616117430934");
+        let expectRepayAmount = ethers.BigNumber.from("100000616117445298");
 
         expect(cTokenRepayedAmount).to.equal(expectRepayAmount);
         expect(dTokenBurntAmount).to.equal(borrowAmount);
@@ -2722,7 +2724,7 @@ describe("Router tests", function () {
         let receipt = await tx.wait();
         m.log("repay gas used:", receipt.gasUsed);
 
-        let expectRepayAmount = ethers.BigNumber.from("100000616117430934");
+        let expectRepayAmount = ethers.BigNumber.from("100000616117445298");
 
         await expect(tx)
           .to.emit(config, "UserDebtAndCollateralSet")
@@ -2807,7 +2809,7 @@ describe("Router tests", function () {
         );
         let collectedFee = collectedFeeAfter.sub(collectedFeeBefore);
 
-        let expectRepayAmount = ethers.BigNumber.from("100000300565189129");
+        let expectRepayAmount = ethers.BigNumber.from("100000300566668529");
 
         let assetConfig = await config.assetConfigs(ETHAddress);
         let accFeeDeltaExpect = expectRepayAmount
@@ -2860,7 +2862,7 @@ describe("Router tests", function () {
         let collectedFee = await router.collectedFees(ETHAddress);
         let feeIndex = await router.feeIndexes(ETHAddress);
 
-        let expectRepayAmount = ethers.BigNumber.from("100000300565189129");
+        let expectRepayAmount = ethers.BigNumber.from("100000300566668529");
 
         await expect(tx)
           .to.emit(config, "UserDebtAndCollateralSet")
@@ -3113,13 +3115,13 @@ describe("Router tests", function () {
       let susdtBurned = susdtBalanceBefore.sub(susdtBalanceAfter);
       let usdtReceived = usdtBalanceAfterRedeem.sub(usdtBalanceBeforeRedeem);
 
-      let expectLiquidatorRepayedAmount = "62500015625000000";
+      let expectLiquidatorRepayedAmount = "62500018750000000";
 
       expect(liquidatorRepayed).to.equal(expectLiquidatorRepayedAmount);
-      expect(dTokenRepayed).to.equal("62500013373108154");
-      expect(debtsRemaining).to.equal("37499987978026184");
+      expect(dTokenRepayed).to.equal("62500016498107989");
+      expect(debtsRemaining).to.equal("37499984853026268");
       expect(susdtBurned).to.equal("10800000");
-      expect(usdtReceived).to.equal("10800002");
+      expect(usdtReceived).to.equal("10800003");
     });
 
     it("should emit events when liquidating", async () => {
@@ -3154,7 +3156,7 @@ describe("Router tests", function () {
       let receipt = await tx.wait();
       m.log("liquidate gas used:", receipt.gasUsed);
 
-      let expectLiquidatorRepayedAmount = "62500015625000000";
+      let expectLiquidatorRepayedAmount = "62500018750000000";
 
       await expect(tx)
         .emit(router, "Repayed")
@@ -3165,7 +3167,7 @@ describe("Router tests", function () {
         );
       await expect(tx)
         .emit(router, "Redeemed")
-        .withArgs(deployer.address, usdt.address, "10800002");
+        .withArgs(deployer.address, usdt.address, "10800003");
     });
   });
 });

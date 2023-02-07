@@ -24,11 +24,25 @@ describe("ProtocolsHandler tests", function () {
     let wETH = aaveContracts.wETH;
     let aOracle = aaveContracts.priceOracle;
 
+    let Strategy = await ethers.getContractFactory("Strategy");
+    let strategy = await Strategy.deploy();
+    await strategy.setMaxLTVs(
+      [token0.address, ETHAddress, usdt.address],
+      [700000, 700000, 700000]
+    );
+
+    const proxyAdmin = await transparentProxy.deployProxyAdmin();
+    let protocolsHandler = await transparentProxy.deployProxy({
+      implementationFactory: "ProtocolsHandler",
+      libraries: {},
+      initializeParams: [[], strategy.address],
+      proxyAdmin: proxyAdmin,
+    });
+
     let AAVEHandler = await ethers.getContractFactory("AAVELogic");
-    // _aaveTokenAddress
     let aaveHandler = await AAVEHandler.deploy(
+      protocolsHandler.address,
       aPool.address,
-      wETH.address,
       wETH.address
     );
 
@@ -45,6 +59,7 @@ describe("ProtocolsHandler tests", function () {
 
     let CompoundHandler = await ethers.getContractFactory("CompoundLogic");
     let compoundHandler = await CompoundHandler.deploy(
+      protocolsHandler.address,
       comptroller.address,
       cETH.address,
       comp.address,
@@ -54,22 +69,6 @@ describe("ProtocolsHandler tests", function () {
     await compoundHandler.updateCTokenList(cToken0.address);
     await compoundHandler.updateCTokenList(cUSDT.address);
 
-    let Strategy = await ethers.getContractFactory("Strategy");
-    let strategy = await Strategy.deploy();
-    await strategy.setMaxLTVs(
-      [token0.address, ETHAddress, usdt.address],
-      [700000, 700000, 700000]
-    );
-
-    const proxyAdmin = await transparentProxy.deployProxyAdmin();
-    let protocolsHandler = await transparentProxy.deployProxy({
-      implementationFactory: "ProtocolsHandler",
-      libraries: {},
-      initializeParams: [[], strategy.address],
-      proxyAdmin: proxyAdmin,
-    });
-
-    await protocolsHandler.transferOwnership(aaveContracts.signer.address);
     await protocolsHandler.addProtocol(aaveHandler.address);
     await protocolsHandler.addProtocol(compoundHandler.address);
 
@@ -278,7 +277,7 @@ describe("ProtocolsHandler tests", function () {
 
     [, totalAmount] = await protocolsHandler.totalBorrowed(token0.address);
 
-    expect(totalAmount).to.equal(237339448);
+    expect(totalAmount).to.equal(640697868);
   });
 
   it("should simulateLendings properly", async () => {
@@ -328,15 +327,14 @@ describe("ProtocolsHandler tests", function () {
 
     lendings = await protocolsHandler.simulateLendings(
       token0.address,
-
       supplyAmount
     );
 
     expect(lendings.totalLending).to.equal(
-      ethers.BigNumber.from("500000414896903393")
+      ethers.BigNumber.from("500000636222529406")
     );
     expect(lendings.newInterest).to.equal(
-      ethers.BigNumber.from("414896903393")
+      ethers.BigNumber.from("310592886212")
     );
   });
 

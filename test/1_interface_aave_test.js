@@ -25,8 +25,8 @@ describe("Protocol Interfaces tests", function () {
     let AAVEHandler = await ethers.getContractFactory("AAVELogic");
     // _aaveTokenAddress
     let aaveHandler = await AAVEHandler.deploy(
+      ethers.constants.AddressZero,
       aPool.address,
-      wETH.address,
       wETH.address
     );
 
@@ -68,8 +68,7 @@ describe("Protocol Interfaces tests", function () {
       let aPool = deploys.aPool;
 
       let simulateSupplyData = await aaveHandler.lastSimulatedSupply(
-        token0.address,
-        deployer.address
+        token0.address
       );
 
       expect(simulateSupplyData.index).to.equal(0);
@@ -78,8 +77,7 @@ describe("Protocol Interfaces tests", function () {
       await aaveHandler.updateSupplyShare(token0.address, 1234567);
 
       simulateSupplyData = await aaveHandler.lastSimulatedSupply(
-        token0.address,
-        deployer.address
+        token0.address
       );
 
       expect(simulateSupplyData.index).to.equal(await aaveHandler.RAY());
@@ -95,8 +93,7 @@ describe("Protocol Interfaces tests", function () {
       let aPool = deploys.aPool;
 
       let simulateBorrowData = await aaveHandler.lastSimulatedBorrow(
-        token0.address,
-        deployer.address
+        token0.address
       );
 
       expect(simulateBorrowData.index).to.equal(0);
@@ -105,8 +102,7 @@ describe("Protocol Interfaces tests", function () {
       await aaveHandler.updateBorrowShare(token0.address, 1234567);
 
       simulateBorrowData = await aaveHandler.lastSimulatedBorrow(
-        token0.address,
-        deployer.address
+        token0.address
       );
 
       expect(simulateBorrowData.index).to.equal(await aaveHandler.RAY());
@@ -141,8 +137,7 @@ describe("Protocol Interfaces tests", function () {
       ]);
 
       let simulateInterest = await aaveHandler.lastSupplyInterest(
-        token0.address,
-        deployer.address
+        token0.address
       );
 
       let reserveData = await aPool.getReserveData(token0.address);
@@ -182,8 +177,7 @@ describe("Protocol Interfaces tests", function () {
       ]);
 
       let simulateInterest = await aaveHandler.lastBorrowInterest(
-        token0.address,
-        deployer.address
+        token0.address
       );
 
       let reserveData = await aPool.getReserveData(token0.address);
@@ -196,73 +190,30 @@ describe("Protocol Interfaces tests", function () {
       expect(simulateInterest).to.equal(routerVToken0Balance.sub(borrowAmount));
     });
 
-    // it("should getAddAssetData correctly", async () => {
-    //   const deploys = await loadFixture(aaveInterfaceTestFixture);
-
-    //   let aaveHandler = deploys.aaveHandler;
-    //   let token0 = deploys.token0;
-    //   let deployer = deploys.deployer;
-
-    //   let borrowAmount = ethers.BigNumber.from("100000000000000000");
-    //   let supplyAmount = borrowAmount.mul(2);
-    //   await token0.mint(deployer.address, supplyAmount);
-    //   await token0.approve(aPool.address, supplyAmount);
-
-    //   // deposit aave
-    //   await aPool.supply(token0.address, supplyAmount, deployer.address, 0);
-    //   let data = await aaveHandler.getAddAssetData(token0.address);
-    //   m.log("data.target:", data.target);
-    //   m.log("data.encodedData:", data.encodedData);
-
-    //   // let tx = {
-    //   //   from: deployer.address,
-    //   //   to: data.target,
-    //   //   value: 0,
-    //   //   gasLimit: ethers.utils.hexlify(1000000), // 100000
-    //   //   data: data.encodedData,
-    //   // };
-
-    //   // await deployer.sendTransaction(tx);
-    //   let newConfig = await aPool.getUserConfiguration(deployer.address);
-    //   m.log("newConfig:", newConfig);
-    // });
-
-    it("should getSupplyData correctly", async () => {
+    it("should supply correctly", async () => {
       const deploys = await loadFixture(aaveInterfaceTestFixture);
 
       let aaveHandler = deploys.aaveHandler;
       let token0 = deploys.token0;
-      let deployer = deploys.deployer;
       let aPool = deploys.aPool;
 
       let borrowAmount = ethers.BigNumber.from("100000000000000000");
       let supplyAmount = borrowAmount.mul(2);
-      await token0.mint(deployer.address, supplyAmount);
-      await token0.approve(aPool.address, supplyAmount);
+      await token0.mint(aaveHandler.address, supplyAmount);
 
       // deposit aave
-      let data = await aaveHandler.getSupplyData(token0.address, supplyAmount);
-
-      let tx = {
-        from: deployer.address,
-        to: data.target,
-        value: 0,
-        gasLimit: ethers.utils.hexlify(1000000),
-        data: data.encodedData,
-      };
-
-      await deployer.sendTransaction(tx);
+      let data = await aaveHandler.supply(token0.address, supplyAmount);
 
       let reserveData = await aPool.getReserveData(token0.address);
       let aToken0 = await ethers.getContractAt(
         "AToken",
         reserveData.aTokenAddress
       );
-      let balance = await aToken0.balanceOf(deployer.address);
+      let balance = await aToken0.balanceOf(aaveHandler.address);
       expect(balance).to.equal(supplyAmount);
     });
 
-    it("should getRedeemData correctly", async () => {
+    it("should redeem correctly", async () => {
       const deploys = await loadFixture(aaveInterfaceTestFixture);
 
       let aaveHandler = deploys.aaveHandler;
@@ -274,19 +225,9 @@ describe("Protocol Interfaces tests", function () {
       let supplyAmount = borrowAmount.mul(2);
       await token0.mint(deployer.address, supplyAmount);
       await token0.approve(aPool.address, supplyAmount);
-      await aPool.supply(token0.address, supplyAmount, deployer.address, 0);
+      await aPool.supply(token0.address, supplyAmount, aaveHandler.address, 0);
 
-      let data = await aaveHandler.getRedeemData(token0.address, supplyAmount);
-
-      let tx = {
-        from: deployer.address,
-        to: data.target,
-        value: 0,
-        gasLimit: ethers.utils.hexlify(1000000),
-        data: data.encodedData,
-      };
-
-      await deployer.sendTransaction(tx);
+      await aaveHandler.redeem(token0.address, supplyAmount);
 
       let reserveData = await aPool.getReserveData(token0.address);
       let aToken0 = await ethers.getContractAt(
@@ -294,11 +235,11 @@ describe("Protocol Interfaces tests", function () {
         reserveData.aTokenAddress
       );
 
-      let balance = await aToken0.balanceOf(deployer.address);
+      let balance = await aToken0.balanceOf(aaveHandler.address);
       expect(balance).to.equal(0);
     });
 
-    it("should getBorrowData correctly", async () => {
+    it("should borrow correctly", async () => {
       const deploys = await loadFixture(aaveInterfaceTestFixture);
 
       let aaveHandler = deploys.aaveHandler;
@@ -310,30 +251,20 @@ describe("Protocol Interfaces tests", function () {
       let supplyAmount = borrowAmount.mul(2);
       await token0.mint(deployer.address, supplyAmount);
       await token0.approve(aPool.address, supplyAmount);
-      await aPool.supply(token0.address, supplyAmount, deployer.address, 0);
+      await aPool.supply(token0.address, supplyAmount, aaveHandler.address, 0);
 
-      let data = await aaveHandler.getBorrowData(token0.address, borrowAmount);
-
-      let tx = {
-        from: deployer.address,
-        to: data.target,
-        value: 0,
-        gasLimit: ethers.utils.hexlify(1000000),
-        data: data.encodedData,
-      };
-
-      await deployer.sendTransaction(tx);
+      await aaveHandler.borrow(token0.address, borrowAmount);
 
       let reserveData = await aPool.getReserveData(token0.address);
       let vToken0 = await ethers.getContractAt(
         "VariableDebtToken",
         reserveData.variableDebtTokenAddress
       );
-      let routerVToken0Balance = await vToken0.balanceOf(deployer.address);
-      expect(routerVToken0Balance).to.equal(borrowAmount);
+      let balance = await vToken0.balanceOf(aaveHandler.address);
+      expect(balance).to.equal(borrowAmount);
     });
 
-    it("should getRepayData correctly", async () => {
+    it("should repay correctly", async () => {
       const deploys = await loadFixture(aaveInterfaceTestFixture);
 
       let aaveHandler = deploys.aaveHandler;
@@ -343,30 +274,21 @@ describe("Protocol Interfaces tests", function () {
 
       let borrowAmount = ethers.BigNumber.from("100000000000000000");
       let supplyAmount = borrowAmount.mul(2);
-      await token0.mint(deployer.address, supplyAmount.mul(2));
-      await token0.approve(aPool.address, supplyAmount.mul(2));
-      await aPool.supply(token0.address, supplyAmount, deployer.address, 0);
-      await aPool.borrow(token0.address, borrowAmount, 2, 0, deployer.address);
+      await token0.mint(deployer.address, supplyAmount);
+      await token0.mint(aaveHandler.address, supplyAmount);
+      await token0.approve(aPool.address, supplyAmount);
+      await aPool.supply(token0.address, supplyAmount, aaveHandler.address, 0);
+      await aaveHandler.borrow(token0.address, borrowAmount);
 
-      let data = await aaveHandler.getRepayData(token0.address, supplyAmount);
-
-      let tx = {
-        from: deployer.address,
-        to: data.target,
-        value: 0,
-        gasLimit: ethers.utils.hexlify(1000000),
-        data: data.encodedData,
-      };
-
-      await deployer.sendTransaction(tx);
+      let data = await aaveHandler.repay(token0.address, supplyAmount);
 
       let reserveData = await aPool.getReserveData(token0.address);
       let vToken0 = await ethers.getContractAt(
         "VariableDebtToken",
         reserveData.variableDebtTokenAddress
       );
-      let routerVToken0Balance = await vToken0.balanceOf(deployer.address);
-      expect(routerVToken0Balance).to.equal(0);
+      let balance = await vToken0.balanceOf(aaveHandler.address);
+      expect(balance).to.equal(0);
     });
 
     it("should call supplyOf properly", async () => {

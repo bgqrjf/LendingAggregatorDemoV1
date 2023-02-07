@@ -28,6 +28,13 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         strategy = IStrategy(_strategy);
     }
 
+    function rebalance(address _asset) external override {
+        (uint256[] memory supplies, uint256 totalSupplies) = totalSupplied(
+            _asset
+        );
+        supply(_asset, 0, supplies, totalSupplies);
+    }
+
     function repayAndSupply(
         address _asset,
         uint256 _amount,
@@ -109,15 +116,8 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         uint256 borrowInterest;
 
         for (uint256 i = 0; i < protocolsCache.length; ++i) {
-            supplyInterest += protocolsCache[i].lastSupplyInterest(
-                _asset,
-                address(this)
-            );
-
-            borrowInterest += protocolsCache[i].lastBorrowInterest(
-                _asset,
-                address(this)
-            );
+            supplyInterest += protocolsCache[i].lastSupplyInterest(_asset);
+            borrowInterest += protocolsCache[i].lastBorrowInterest(_asset);
         }
 
         uint256 interestDelta = borrowInterest > supplyInterest
@@ -151,6 +151,66 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         newInterest = totalLending - _totalLending;
     }
 
+    function getRates(address _underlying)
+        external
+        view
+        override
+        returns (uint256 supplyRate, uint256 borrowRate)
+    {
+        IProtocol[] memory protocolsCache = protocols;
+
+        uint256 supplyWeight;
+        uint256 borrowWeight;
+        for (uint256 i = 0; i < protocolsCache.length; i++) {
+            uint256 protocolSupplyRate = protocolsCache[i].getCurrentSupplyRate(
+                _underlying
+            );
+
+            uint256 protocolSupplyAmount = protocolsCache[i].supplyOf(
+                _underlying,
+                address(this)
+            );
+
+            uint256 newSupplyWeight = supplyWeight + protocolSupplyAmount;
+
+            if (newSupplyWeight > 0) {
+                supplyRate =
+                    (supplyRate *
+                        supplyWeight +
+                        protocolSupplyRate *
+                        protocolSupplyAmount) /
+                    newSupplyWeight;
+                supplyWeight = newSupplyWeight;
+            } else {
+                supplyRate = Utils.maxOf(supplyRate, protocolSupplyRate);
+            }
+
+            uint256 protocolBorrowRate = protocolsCache[i].getCurrentBorrowRate(
+                _underlying
+            );
+
+            uint256 protocolBorrowAmount = protocolsCache[i].debtOf(
+                _underlying,
+                address(this)
+            );
+
+            uint256 newBorrowWeight = borrowWeight + protocolBorrowAmount;
+            if (newBorrowWeight > 0) {
+                borrowRate =
+                    borrowRate *
+                    borrowWeight +
+                    (protocolBorrowRate * protocolBorrowAmount) /
+                    newBorrowWeight;
+
+                borrowWeight = newBorrowWeight;
+            } else {
+                borrowRate = borrowRate > 0
+                    ? Utils.minOf(borrowRate, protocolBorrowRate)
+                    : protocolBorrowRate;
+            }
+        }
+    }
+
     function updateSimulates(address _asset, uint256 _totalLending)
         external
         override
@@ -170,8 +230,23 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         );
 
         for (uint256 i = 0; i < protocolsCache.length; ++i) {
-            protocolsCache[i].updateSupplyShare(_asset, supplyAmounts[i]);
-            protocolsCache[i].updateBorrowShare(_asset, borrowAmounts[i]);
+            Utils.delegateCall(
+                address(protocolsCache[i]),
+                abi.encodeWithSelector(
+                    protocolsCache[i].updateSupplyShare.selector,
+                    _asset,
+                    supplyAmounts[i]
+                )
+            );
+
+            Utils.delegateCall(
+                address(protocolsCache[i]),
+                abi.encodeWithSelector(
+                    protocolsCache[i].updateBorrowShare.selector,
+                    _asset,
+                    borrowAmounts[i]
+                )
+            );
         }
     }
 
@@ -193,13 +268,27 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
 
         for (uint256 i = 0; i < protocolsCache.length; ++i) {
             if (redeemAmounts[i] > 0) {
-                _redeem(protocolsCache[i], _asset, redeemAmounts[i]);
+                Utils.delegateCall(
+                    address(protocolsCache[i]),
+                    abi.encodeWithSelector(
+                        protocolsCache[i].redeem.selector,
+                        _asset,
+                        redeemAmounts[i]
+                    )
+                );
             }
         }
 
         for (uint256 i = 0; i < protocolsCache.length; ++i) {
             if (supplyAmounts[i] > 0) {
-                _supply(protocolsCache[i], _asset, supplyAmounts[i]);
+                Utils.delegateCall(
+                    address(protocolsCache[i]),
+                    abi.encodeWithSelector(
+                        protocolsCache[i].supply.selector,
+                        _asset,
+                        supplyAmounts[i]
+                    )
+                );
             }
         }
     }
@@ -225,7 +314,6 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
 
         if (amount > 0) {
             redeemAndSupply(_asset, supplies, _totalSupplied - amount);
-
             TransferHelper.safeTransfer(_asset, _to, amount, 0);
             emit Redeemed(_asset, amount);
         }
@@ -245,12 +333,14 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
 
         for (uint256 i = 0; i < protocolsCache.length; ++i) {
             if (amounts[i] > 0) {
-                Types.ProtocolData memory data = protocolsCache[i]
-                    .getBorrowData(_asset, amounts[i]);
-                Utils.lowLevelCall(data.target, data.encodedData, 0);
-                if (data.weth != address(0)) {
-                    IWETH(data.weth).withdraw(amounts[i]);
-                }
+                Utils.delegateCall(
+                    address(protocolsCache[i]),
+                    abi.encodeWithSelector(
+                        protocolsCache[i].borrow.selector,
+                        _asset,
+                        _amount
+                    )
+                );
             }
         }
 
@@ -267,7 +357,6 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
     {
         (, uint256 total) = totalBorrowed(_asset);
         amount = Utils.minOf(_amount, total);
-
         if (amount == 0) {
             return amount;
         }
@@ -280,87 +369,37 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         );
 
         for (uint256 i = 0; i < protocolsCache.length; ++i) {
-            if (amounts[i] == 0) {
-                continue;
-            }
-
-            Types.ProtocolData memory data = protocolsCache[i].getRepayData(
-                _asset,
-                amounts[i]
-            );
-
-            if (data.approveTo == address(0)) {
-                Utils.lowLevelCall(data.target, data.encodedData, amounts[i]);
-            } else {
-                if (data.weth != address(0)) {
-                    IWETH(data.weth).deposit{value: amounts[i]}();
-                    TransferHelper.approve(
-                        data.weth,
-                        data.approveTo,
-                        amounts[i]
-                    );
-                } else {
-                    TransferHelper.approve(_asset, data.approveTo, amounts[i]);
-                }
-
-                Utils.lowLevelCall(data.target, data.encodedData, 0);
+            if (amounts[i] > 0) {
+                Utils.delegateCall(
+                    address(protocolsCache[i]),
+                    abi.encodeWithSelector(
+                        protocolsCache[i].repay.selector,
+                        _asset,
+                        _amount
+                    )
+                );
             }
         }
 
         emit Repayed(_asset, amount);
     }
 
-    function _supply(
-        IProtocol _protocol,
-        address _asset,
-        uint256 _amount
-    ) internal {
-        Types.ProtocolData memory data = _protocol.getSupplyData(
-            _asset,
-            _amount
-        );
-
-        // if supply with ETH
-        if (data.approveTo == address(0)) {
-            Utils.lowLevelCall(data.target, data.encodedData, _amount);
-        } else {
-            if (data.weth != address(0)) {
-                IWETH(data.weth).deposit{value: _amount}();
-                TransferHelper.approve(data.weth, data.approveTo, _amount);
-            } else {
-                TransferHelper.approve(_asset, data.approveTo, _amount);
-            }
-
-            Utils.lowLevelCall(data.target, data.encodedData, 0);
-        }
-
-        if (!data.initialized) {
-            Types.ProtocolData memory initData = _protocol.getAddAssetData(
-                _asset
-            );
-            if (initData.target != address(0)) {
-                Utils.lowLevelCall(initData.target, initData.encodedData, 0);
-            }
-        }
-    }
-
-    function _redeem(
-        IProtocol _protocol,
-        address _asset,
-        uint256 _amount
-    ) internal {
-        Types.ProtocolData memory data = _protocol.getRedeemData(
-            _asset,
-            _amount
-        );
-        Utils.lowLevelCall(data.target, data.encodedData, 0);
-        if (data.weth != address(0)) {
-            IWETH(data.weth).withdraw(_amount);
-        }
-    }
-
     function addProtocol(IProtocol _protocol) external override onlyOwner {
         protocols.push(_protocol);
+    }
+
+    function updateProtocol(IProtocol _old, IProtocol _new)
+        external
+        override
+        onlyOwner
+    {
+        IProtocol[] memory protocolsCache = protocols;
+        for (uint256 i = 0; i < protocolsCache.length; i++) {
+            if (_old == protocolsCache[i]) {
+                protocols[i] = _new;
+                break;
+            }
+        }
     }
 
     function claimRewards(address _account, uint256[] memory _amounts)

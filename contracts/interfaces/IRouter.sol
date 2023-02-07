@@ -11,6 +11,15 @@ import "./IStrategy.sol";
 import "../libraries/internals/Types.sol";
 
 interface IRouter {
+    enum Action {
+        supply,
+        redeem,
+        borrow,
+        repay,
+        liquidate,
+        claimRewards
+    }
+
     event Supplied(
         address indexed supplier,
         address indexed asset,
@@ -54,6 +63,10 @@ interface IRouter {
     );
 
     event AccFeeOffsetUpdated(address indexed asset, uint256 newIndex);
+
+    event ActionPaused(address asset, Action action);
+
+    event TokenPaused(address asset);
 
     function supply(
         Types.UserAssetParams memory _params,
@@ -160,6 +173,15 @@ interface IRouter {
             uint256 newInterest
         );
 
+    function getSupplyRate(address _underlying) external view returns (uint256);
+
+    function getBorrowRate(address _underlying) external view returns (uint256);
+
+    function getLendingRate(address _underlying)
+        external
+        view
+        returns (uint256);
+
     function totalSupplied(address _underlying) external view returns (uint256);
 
     function totalBorrowed(address _underlying) external view returns (uint256);
@@ -179,6 +201,8 @@ interface IRouter {
 
     function updateProtocolsHandler(IProtocolsHandler _protocolsHandler)
         external;
+
+    function updateProtocol(IProtocol _old, IProtocol _new) external;
 
     function updatePriceOracle(IPriceOracle _priceOracle) external;
 }

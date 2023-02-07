@@ -4,39 +4,24 @@ pragma solidity ^0.8.14;
 import "../libraries/internals/Types.sol";
 
 interface IProtocol {
-    event SupplyShareUpdated(address indexed, address indexed, uint256, bytes);
+    event SupplyShareUpdated(address indexed, uint256, bytes);
 
-    event BorrowShareUpdated(address indexed, address indexed, uint256, bytes);
+    event BorrowShareUpdated(address indexed, uint256, bytes);
 
+    // delegate calls
     function updateSupplyShare(address _underlying, uint256 _amount) external;
 
     function updateBorrowShare(address _underlying, uint256 _amount) external;
 
-    function getAddAssetData(address _underlying)
-        external
-        view
-        returns (Types.ProtocolData memory data);
+    function supply(address _underlying, uint256 _amount) external;
 
-    function getSupplyData(address _underlying, uint256 _amount)
-        external
-        view
-        returns (Types.ProtocolData memory data);
+    function redeem(address _underlying, uint256 _amount) external;
 
-    function getRedeemData(address _underlying, uint256 _amount)
-        external
-        view
-        returns (Types.ProtocolData memory data);
+    function borrow(address _underlying, uint256 _amount) external;
 
-    function getBorrowData(address _underlying, uint256 _amount)
-        external
-        view
-        returns (Types.ProtocolData memory data);
+    function repay(address _underlying, uint256 _amount) external;
 
-    function getRepayData(address _underlying, uint256 _amount)
-        external
-        view
-        returns (Types.ProtocolData memory data);
-
+    // static calls
     function getCurrentSupplyRate(address _underlying)
         external
         view
@@ -85,12 +70,12 @@ interface IProtocol {
         pure
         returns (int256);
 
-    function lastSupplyInterest(address _underlying, address _account)
+    function lastSupplyInterest(address _underlying)
         external
         view
         returns (uint256);
 
-    function lastBorrowInterest(address _underlying, address _account)
+    function lastBorrowInterest(address _underlying)
         external
         view
         returns (uint256);

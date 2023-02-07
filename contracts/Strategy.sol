@@ -91,6 +91,7 @@ contract Strategy is IStrategy, Ownable {
                 _asset,
                 msg.sender
             );
+
             maxBorrowAmount += params.maxAmounts[i];
 
             uint256 rate = _protocols[i].getCurrentBorrowRate(_asset);
@@ -202,6 +203,7 @@ contract Strategy is IStrategy, Ownable {
     ) public view override returns (uint256 amount) {
         (uint256 collateral, uint256 borrowed) = _protocol
             .totalColletralAndBorrow(_account, _underlying);
+
         uint256 maxDebtAllowed = (collateral * maxLTVs[_underlying]) /
             Utils.MILLION;
         return maxDebtAllowed > borrowed ? maxDebtAllowed - borrowed : 0;

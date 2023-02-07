@@ -425,9 +425,9 @@ contract Router is RouterStorage, OwnableUpgradeable {
         );
     }
 
-    // public views
+    // views
     function borrowLimit(address _account, address _borrowAsset)
-        public
+        external
         view
         returns (uint256 amount)
     {
@@ -443,7 +443,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
     }
 
     function getLiquidationData(address _account, address _repayAsset)
-        public
+        external
         view
         returns (
             uint256 liquidationAmount,
@@ -463,7 +463,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
     }
 
     function userStatus(address _account, address _quote)
-        public
+        external
         view
         returns (
             uint256 collateralValue,
@@ -504,7 +504,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
     }
 
     function getSupplyStatus(address _underlying)
-        public
+        external
         view
         override
         returns (
@@ -525,7 +525,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
     }
 
     function getBorrowStatus(address _underlying)
-        public
+        external
         view
         override
         returns (
@@ -544,15 +544,99 @@ contract Router is RouterStorage, OwnableUpgradeable {
             );
     }
 
-    function totalSupplied(address _underlying)
+    function getSupplyRate(address _underlying)
         external
         view
         override
         returns (uint256)
     {
-        (, , , uint256 totalSuppliedAmountWithFee, ) = getSupplyStatus(
-            _underlying
-        );
+        (
+            ,
+            uint256 protocolsSupplies,
+            uint256 totalLending,
+            uint256 totalSuppliedAmountWithFee,
+
+        ) = ExternalUtils.getSupplyStatus(
+                _underlying,
+                reservePool,
+                protocols,
+                totalLendings
+            );
+
+        (uint256 protocolsSupplyRate, uint256 protocolsBorrowRate) = protocols
+            .getRates(_underlying);
+
+        uint256 lendingRate = ((protocolsBorrowRate - protocolsSupplyRate) *
+            (totalBorrowed(_underlying))) / (totalSuppliedAmountWithFee);
+
+        return
+            (protocolsSupplyRate *
+                protocolsSupplies +
+                lendingRate *
+                totalLending) / (totalSuppliedAmountWithFee * Utils.MILLION);
+    }
+
+    function getBorrowRate(address _underlying)
+        external
+        view
+        override
+        returns (uint256)
+    {
+        (
+            uint256[] memory borrows,
+            uint256 totalBorrowedAmount,
+            uint256 totalLending,
+
+        ) = ExternalUtils.getBorrowStatus(
+                _underlying,
+                reservePool,
+                protocols,
+                totalLendings
+            );
+
+        (uint256 protocolsSupplyRate, uint256 protocolsBorrowRate) = protocols
+            .getRates(_underlying);
+
+        uint256 lendingRate = ((protocolsBorrowRate - protocolsSupplyRate) *
+            (totalBorrowedAmount)) / (totalSupplied(_underlying));
+
+        uint256 protocolsBorrows = Utils.samOf(borrows);
+
+        return
+            (protocolsBorrowRate *
+                protocolsBorrows +
+                lendingRate *
+                totalLending) / (totalBorrowedAmount * Utils.MILLION);
+    }
+
+    function getLendingRate(address _underlying)
+        external
+        view
+        override
+        returns (uint256 lendingRate)
+    {
+        (uint256 protocolsSupplyRate, uint256 protocolsBorrowRate) = protocols
+            .getRates(_underlying);
+
+        lendingRate =
+            ((protocolsBorrowRate - protocolsSupplyRate) *
+                (totalBorrowed(_underlying))) /
+            (totalSupplied(_underlying));
+    }
+
+    function totalSupplied(address _underlying)
+        public
+        view
+        override
+        returns (uint256)
+    {
+        (, , , uint256 totalSuppliedAmountWithFee, ) = ExternalUtils
+            .getSupplyStatus(
+                _underlying,
+                reservePool,
+                protocols,
+                totalLendings
+            );
 
         uint256 fee = accFees[_underlying] - collectedFees[_underlying];
 
@@ -560,12 +644,17 @@ contract Router is RouterStorage, OwnableUpgradeable {
     }
 
     function totalBorrowed(address _underlying)
-        external
+        public
         view
         override
         returns (uint256 totalBorrowedAmount)
     {
-        (, totalBorrowedAmount, , ) = getBorrowStatus(_underlying);
+        (, totalBorrowedAmount, , ) = ExternalUtils.getBorrowStatus(
+            _underlying,
+            reservePool,
+            protocols,
+            totalLendings
+        );
     }
 
     // validations
@@ -575,25 +664,35 @@ contract Router is RouterStorage, OwnableUpgradeable {
         returns (bool)
     {
         return
-            (blockedActions[_token] >> uint256(_action)) & 1 == 0 &&
-            (blockedActions[address(0)] >> uint256(_action)) & 1 == 0;
+            (uint256(blockedActions[_token]) >> uint256(_action)) & 1 == 0 &&
+            (uint256(blockedActions[address(0)]) >> uint256(_action)) & 1 == 0;
     }
 
     //  admin functions
-    function setBlockActions(address _asset, uint256 _actions)
+    function setBlockActions(address _asset, Action _action)
         external
         onlyOwner
     {
-        blockedActions[_asset] = _actions;
+        blockedActions[_asset] = _action;
+        emit ActionPaused(_asset, _action);
     }
 
     function toggleToken(address _asset) external onlyOwner {
         assets[_asset].paused = !assets[_asset].paused;
+        emit TokenPaused(_asset);
     }
 
     function addProtocol(IProtocol _protocol) external override onlyOwner {
         protocols.addProtocol(_protocol);
         rewards.addProtocol(_protocol);
+    }
+
+    function updateProtocol(IProtocol _old, IProtocol _new)
+        external
+        override
+        onlyOwner
+    {
+        protocols.updateProtocol(_old, _new);
     }
 
     function addAsset(Types.NewAssetParams memory _newAsset)

@@ -26,8 +26,8 @@ describe("Strategy tests", function () {
     let AAVEHandler = await ethers.getContractFactory("AAVELogic");
     // _aaveTokenAddress
     let aaveHandler = await AAVEHandler.deploy(
+      ethers.constants.AddressZero,
       aPool.address,
-      wETH.address,
       wETH.address
     );
 
@@ -44,6 +44,7 @@ describe("Strategy tests", function () {
 
     let CompoundHandler = await ethers.getContractFactory("CompoundLogic");
     let compoundHandler = await CompoundHandler.deploy(
+      ethers.constants.AddressZero,
       comptroller.address,
       cETH.address,
       comp.address,

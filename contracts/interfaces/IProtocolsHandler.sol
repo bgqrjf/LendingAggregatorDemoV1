@@ -13,6 +13,8 @@ interface IProtocolsHandler {
     event Borrowed(address indexed asset, uint256 amount);
     event Repayed(address indexed asset, uint256 amount);
 
+    function rebalance(address _asset) external;
+
     function repayAndSupply(
         address _asset,
         uint256 _amount,
@@ -38,6 +40,11 @@ interface IProtocolsHandler {
         view
         returns (uint256[] memory amounts, uint256 totalAmount);
 
+    function getRates(address _underlying)
+        external
+        view
+        returns (uint256, uint256);
+
     function simulateLendings(address _asset, uint256 _totalLending)
         external
         view
@@ -48,6 +55,8 @@ interface IProtocolsHandler {
     function claimRewards(address _account, uint256[] memory _amounts) external;
 
     function addProtocol(IProtocol _protocol) external;
+
+    function updateProtocol(IProtocol _old, IProtocol _new) external;
 
     function getProtocols() external view returns (IProtocol[] memory);
 }

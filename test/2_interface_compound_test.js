@@ -26,6 +26,7 @@ describe("Protocol Interfaces tests", function () {
 
     let CompoundHandler = await ethers.getContractFactory("CompoundLogic");
     let compoundHandler = await CompoundHandler.deploy(
+      ethers.constants.AddressZero,
       comptroller.address,
       cETH.address,
       comp.address,
@@ -74,8 +75,7 @@ describe("Protocol Interfaces tests", function () {
       let token0 = deploys.token0;
 
       let simulateSupplyData = await compoundHandler.lastSimulatedSupply(
-        token0.address,
-        deployer.address
+        token0.address
       );
 
       expect(simulateSupplyData.amount).to.equal(0);
@@ -84,8 +84,7 @@ describe("Protocol Interfaces tests", function () {
       await compoundHandler.updateSupplyShare(token0.address, 1234567);
 
       simulateSupplyData = await compoundHandler.lastSimulatedSupply(
-        token0.address,
-        deployer.address
+        token0.address
       );
 
       expect(simulateSupplyData.amount).to.equal(1234567);
@@ -100,8 +99,7 @@ describe("Protocol Interfaces tests", function () {
       let token0 = deploys.token0;
 
       let simulateBorrowData = await compoundHandler.lastSimulatedBorrow(
-        token0.address,
-        deployer.address
+        token0.address
       );
 
       expect(simulateBorrowData.amount).to.equal(0);
@@ -110,8 +108,7 @@ describe("Protocol Interfaces tests", function () {
       await compoundHandler.updateBorrowShare(token0.address, 1234567);
 
       simulateBorrowData = await compoundHandler.lastSimulatedBorrow(
-        token0.address,
-        deployer.address
+        token0.address
       );
 
       expect(simulateBorrowData.amount).to.equal(1234567);
@@ -141,8 +138,7 @@ describe("Protocol Interfaces tests", function () {
       ]);
 
       let simulateInterest = await compoundHandler.lastSupplyInterest(
-        token0.address,
-        deployer.address
+        token0.address
       );
 
       let cToken0Interface = await ethers.getContractAt(
@@ -160,7 +156,6 @@ describe("Protocol Interfaces tests", function () {
     it("should calculate borrow interest proerly", async () => {
       const deploys = await loadFixture(compoundInterfaceTestFixture);
 
-      let deployer = deploys.deployer;
       let comptroller = deploys.comptroller;
       let compoundHandler = deploys.compoundHandler;
       let token0 = deploys.token0;
@@ -169,19 +164,17 @@ describe("Protocol Interfaces tests", function () {
       let borrowAmount = ethers.BigNumber.from("100000000000000000");
       let supplyAmount = borrowAmount.mul(2);
 
-      await token0.mint(deployer.address, supplyAmount);
-      await token0.approve(cToken0.address, supplyAmount);
-      await cToken0.mint(supplyAmount);
+      await token0.mint(compoundHandler.address, supplyAmount);
+      await compoundHandler.supply(token0.address, supplyAmount);
       await compoundHandler.updateBorrowShare(token0.address, borrowAmount);
-      await cToken0.borrow(borrowAmount);
+      await compoundHandler.borrow(token0.address, borrowAmount);
 
       await hre.network.provider.send("hardhat_mine", [
         "0x" + (2102400).toString(16),
       ]);
 
       let simulateInterest = await compoundHandler.lastBorrowInterest(
-        token0.address,
-        deployer.address
+        token0.address
       );
 
       let cToken0Interface = await ethers.getContractAt(
@@ -190,13 +183,13 @@ describe("Protocol Interfaces tests", function () {
       );
 
       let balance = await cToken0Interface.balanceOfUnderlying(
-        deployer.address
+        compoundHandler.address
       );
 
       expect(simulateInterest).to.equal(balance.sub(supplyAmount));
     });
 
-    it("should getSupplyData correctly", async () => {
+    it("should supply correctly", async () => {
       const deploys = await loadFixture(compoundInterfaceTestFixture);
 
       let deployer = deploys.deployer;
@@ -208,23 +201,8 @@ describe("Protocol Interfaces tests", function () {
       let borrowAmount = ethers.BigNumber.from("100000000000000000");
       let supplyAmount = borrowAmount.mul(2);
 
-      await token0.mint(deployer.address, supplyAmount);
-      await token0.approve(cToken0.address, supplyAmount);
-
-      let data = await compoundHandler.getSupplyData(
-        token0.address,
-        supplyAmount
-      );
-
-      let tx = {
-        from: deployer.address,
-        to: data.target,
-        value: 0,
-        gasLimit: ethers.utils.hexlify(1000000),
-        data: data.encodedData,
-      };
-
-      await deployer.sendTransaction(tx);
+      await token0.mint(compoundHandler.address, compoundHandler.address);
+      await compoundHandler.supply(token0.address, supplyAmount);
 
       let cToken0Interface = await ethers.getContractAt(
         "contracts/Compound/CTokenInterface.sol:CTokenInterface",
@@ -232,16 +210,15 @@ describe("Protocol Interfaces tests", function () {
       );
 
       let balance = await cToken0Interface.balanceOfUnderlying(
-        deployer.address
+        compoundHandler.address
       );
 
       expect(balance).to.equal(supplyAmount);
     });
 
-    it("should getRedeemData correctly", async () => {
+    it("should redeem correctly", async () => {
       const deploys = await loadFixture(compoundInterfaceTestFixture);
 
-      let deployer = deploys.deployer;
       let comptroller = deploys.comptroller;
       let compoundHandler = deploys.compoundHandler;
       let token0 = deploys.token0;
@@ -250,37 +227,23 @@ describe("Protocol Interfaces tests", function () {
       let borrowAmount = ethers.BigNumber.from("100000000000000000");
       let supplyAmount = borrowAmount.mul(2);
 
-      await token0.mint(deployer.address, supplyAmount);
-      await token0.approve(cToken0.address, supplyAmount);
-      await cToken0.mint(supplyAmount);
+      await token0.mint(compoundHandler.address, supplyAmount);
+      await compoundHandler.supply(token0.address, supplyAmount);
+      await compoundHandler.redeem(token0.address, supplyAmount);
 
-      let data = await compoundHandler.getRedeemData(
-        token0.address,
-        supplyAmount
-      );
-
-      let tx = {
-        from: deployer.address,
-        to: data.target,
-        value: 0,
-        gasLimit: ethers.utils.hexlify(1000000),
-        data: data.encodedData,
-      };
-
-      await deployer.sendTransaction(tx);
       let cToken0Interface = await ethers.getContractAt(
         "contracts/Compound/CTokenInterface.sol:CTokenInterface",
         cToken0.address
       );
 
       let balance = await cToken0Interface.balanceOfUnderlying(
-        deployer.address
+        compoundHandler.address
       );
 
       expect(balance).to.equal(0);
     });
 
-    it("should getBorrowData correctly", async () => {
+    it("should borrow correctly", async () => {
       const deploys = await loadFixture(compoundInterfaceTestFixture);
 
       let deployer = deploys.deployer;
@@ -292,31 +255,16 @@ describe("Protocol Interfaces tests", function () {
       let borrowAmount = ethers.BigNumber.from("100000000000000000");
       let supplyAmount = borrowAmount.mul(2);
 
-      await token0.mint(deployer.address, supplyAmount);
-      await token0.approve(cToken0.address, supplyAmount);
-      await cToken0.mint(supplyAmount);
-
-      let data = await compoundHandler.getBorrowData(
-        token0.address,
-        borrowAmount
-      );
-
-      let tx = {
-        from: deployer.address,
-        to: data.target,
-        value: 0,
-        gasLimit: ethers.utils.hexlify(1000000),
-        data: data.encodedData,
-      };
-
-      await deployer.sendTransaction(tx);
+      await token0.mint(compoundHandler.address, supplyAmount);
+      await compoundHandler.supply(token0.address, supplyAmount);
+      await compoundHandler.borrow(token0.address, borrowAmount);
 
       let balanceLeft = await token0.balanceOf(cToken0.address);
 
       expect(supplyAmount.sub(balanceLeft)).to.equal(borrowAmount);
     });
 
-    it("should getRepayData correctly", async () => {
+    it("should repay correctly", async () => {
       const deploys = await loadFixture(compoundInterfaceTestFixture);
 
       let deployer = deploys.deployer;
@@ -328,25 +276,10 @@ describe("Protocol Interfaces tests", function () {
       let borrowAmount = ethers.BigNumber.from("100000000000000000");
       let supplyAmount = borrowAmount.mul(2);
 
-      await token0.mint(deployer.address, supplyAmount.mul(2));
-      await token0.approve(cToken0.address, supplyAmount.mul(2));
-      await cToken0.mint(supplyAmount);
-      await cToken0.borrow(borrowAmount);
-
-      let data = await compoundHandler.getRepayData(
-        token0.address,
-        borrowAmount
-      );
-
-      let tx = {
-        from: deployer.address,
-        to: data.target,
-        value: 0,
-        gasLimit: ethers.utils.hexlify(1000000),
-        data: data.encodedData,
-      };
-
-      await deployer.sendTransaction(tx);
+      await token0.mint(compoundHandler.address, supplyAmount);
+      await compoundHandler.supply(token0.address, supplyAmount);
+      await compoundHandler.borrow(token0.address, borrowAmount);
+      await compoundHandler.repay(token0.address, borrowAmount);
 
       let balanceLeft = await token0.balanceOf(cToken0.address);
 

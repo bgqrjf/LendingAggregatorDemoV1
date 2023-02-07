@@ -4,7 +4,6 @@ pragma solidity ^0.8.14;
 import "../interfaces/IProtocol.sol";
 import "../interfaces/IWETH.sol";
 
-import "./IAAVEPool.sol";
 import "./IAToken.sol";
 import "./IVariableDebtToken.sol";
 import "./IAAVEInterestRateStrategy.sol";
@@ -18,217 +17,162 @@ import "../libraries/internals/Types.sol";
 
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
+import "./AAVELogicStorage.sol";
+
 contract AAVELogic is IProtocol {
     using Math for uint256;
 
-    struct SimulateData {
-        uint256 amount;
-        uint256 index;
-    }
-
+    AAVELogicStorage public immutable LOGIC_STORAGE;
     // ray = 1e27 truncate to 1e6
     uint256 public immutable RAY = 1e27;
     uint256 public immutable BASE = 1e21;
-    address payable public wrappedNative;
-    address public aaveTokenAddress;
-    address public rewardToken;
-    IAAVEPool public pool;
-
-    // mapping underlying , msg.sender to simulateData
-    mapping(address => mapping(address => SimulateData))
-        public lastSimulatedSupply;
-    mapping(address => mapping(address => SimulateData))
-        public lastSimulatedBorrow;
 
     receive() external payable {}
 
     constructor(
+        address _protocolsHandler,
         address _pool,
-        address payable _wrappedNative,
-        address _aaveTokenAddress
+        address payable _wrappedNative
     ) {
-        pool = IAAVEPool(_pool);
-        wrappedNative = _wrappedNative;
-        aaveTokenAddress = _aaveTokenAddress;
+        // for testing purpose
+        if (_protocolsHandler == address(0)) {
+            _protocolsHandler = address(this);
+        }
+        LOGIC_STORAGE = new AAVELogicStorage(
+            _protocolsHandler,
+            _pool,
+            _wrappedNative
+        );
     }
 
     function updateSupplyShare(address _underlying, uint256 _amount)
         external
         override
     {
-        SimulateData memory data = SimulateData(
-            _amount,
-            pool.getReserveNormalizedIncome(_underlying)
-        );
+        AAVELogicStorage.SimulateData memory data = AAVELogicStorage
+            .SimulateData(
+                _amount,
+                LOGIC_STORAGE.pool().getReserveNormalizedIncome(_underlying)
+            );
 
-        lastSimulatedSupply[_underlying][msg.sender] = data;
+        LOGIC_STORAGE.setLastSimulatedSupply(_underlying, data);
 
-        emit SupplyShareUpdated(
-            msg.sender,
-            _underlying,
-            _amount,
-            abi.encode(data)
-        );
+        emit SupplyShareUpdated(_underlying, _amount, abi.encode(data));
     }
 
     function updateBorrowShare(address _underlying, uint256 _amount)
         external
         override
     {
-        SimulateData memory data = SimulateData(
-            _amount,
-            pool.getReserveNormalizedVariableDebt(_underlying)
-        );
+        AAVELogicStorage.SimulateData memory data = AAVELogicStorage
+            .SimulateData(
+                _amount,
+                LOGIC_STORAGE.pool().getReserveNormalizedVariableDebt(
+                    _underlying
+                )
+            );
 
-        lastSimulatedBorrow[_underlying][msg.sender] = data;
+        LOGIC_STORAGE.setLastSimulatedBorrow(_underlying, data);
 
-        emit BorrowShareUpdated(
-            msg.sender,
-            _underlying,
-            _amount,
-            abi.encode(data)
-        );
+        emit BorrowShareUpdated(_underlying, _amount, abi.encode(data));
     }
 
-    function lastSupplyInterest(address _underlying, address _account)
+    function lastSupplyInterest(address _underlying)
         external
         view
         override
         returns (uint256)
     {
-        SimulateData memory data = lastSimulatedSupply[_underlying][_account];
+        AAVELogicStorage.SimulateData memory data = LOGIC_STORAGE
+            .getLastSimulatedSupply(_underlying);
+
         if (data.index == 0) {
             return 0;
         }
 
-        uint256 deltaIndex = pool.getReserveNormalizedIncome(_underlying) -
-            data.index;
-        return (deltaIndex * data.amount) / data.index;
-    }
-
-    function lastBorrowInterest(address _underlying, address _account)
-        external
-        view
-        override
-        returns (uint256)
-    {
-        SimulateData memory data = lastSimulatedBorrow[_underlying][_account];
-        if (data.index == 0) {
-            return 0;
-        }
-
-        uint256 deltaIndex = pool.getReserveNormalizedVariableDebt(
+        uint256 deltaIndex = LOGIC_STORAGE.pool().getReserveNormalizedIncome(
             _underlying
         ) - data.index;
         return (deltaIndex * data.amount) / data.index;
     }
 
-    function getAddAssetData(address _underlying)
+    function lastBorrowInterest(address _underlying)
         external
         view
         override
-        returns (Types.ProtocolData memory data)
-    {}
-
-    function getSupplyData(address _underlying, uint256 _amount)
-        external
-        view
-        override
-        returns (Types.ProtocolData memory data)
+        returns (uint256)
     {
-        data.target = address(pool);
-        data.approveTo = data.target;
-        if (_underlying != TransferHelper.ETH) {
-            data.encodedData = abi.encodeWithSelector(
-                pool.supply.selector,
-                _underlying,
-                _amount,
-                msg.sender,
-                0
-            );
-        } else {
-            data.weth = wrappedNative;
-            data.encodedData = abi.encodeWithSelector(
-                pool.supply.selector,
-                data.weth,
-                _amount,
-                msg.sender,
-                0
-            );
+        AAVELogicStorage.SimulateData memory data = LOGIC_STORAGE
+            .getLastSimulatedBorrow(_underlying);
+        if (data.index == 0) {
+            return 0;
         }
 
-        data.initialized = true;
+        uint256 deltaIndex = LOGIC_STORAGE
+            .pool()
+            .getReserveNormalizedVariableDebt(_underlying) - data.index;
+        return (deltaIndex * data.amount) / data.index;
     }
 
-    function getRedeemData(address _underlying, uint256 _amount)
-        external
-        view
-        override
-        returns (Types.ProtocolData memory data)
-    {
-        data.target = address(pool);
+    function supply(address _underlying, uint256 _amount) external override {
+        IAAVEPool aPool = LOGIC_STORAGE.pool();
+        if (_underlying == TransferHelper.ETH) {
+            _underlying = LOGIC_STORAGE.wrappedNative();
+            IWETH(payable(_underlying)).deposit{value: _amount}();
+        }
+
+        TransferHelper.approve(_underlying, address(aPool), _amount);
+        aPool.supply(_underlying, _amount, address(this), 0);
+    }
+
+    function redeem(address _underlying, uint256 _amount) external {
+        IAAVEPool aPool = LOGIC_STORAGE.pool();
 
         if (_underlying == TransferHelper.ETH) {
-            _underlying = wrappedNative;
-            data.weth = payable(_underlying);
+            _underlying = LOGIC_STORAGE.wrappedNative();
+            aPool.withdraw(_underlying, _amount, address(this));
+            IWETH(payable(_underlying)).withdraw(_amount);
+        } else {
+            aPool.withdraw(_underlying, _amount, address(this));
         }
-
-        data.encodedData = abi.encodeWithSelector(
-            pool.withdraw.selector,
-            _underlying,
-            _amount,
-            msg.sender
-        );
     }
 
-    function getBorrowData(address _underlying, uint256 _amount)
-        external
-        view
-        override
-        returns (Types.ProtocolData memory data)
-    {
-        data.target = address(pool);
+    function borrow(address _underlying, uint256 _amount) external {
+        IAAVEPool aPool = LOGIC_STORAGE.pool();
         if (_underlying != TransferHelper.ETH) {
-            data.encodedData = abi.encodeWithSelector(
-                pool.borrow.selector,
+            aPool.borrow(
                 _underlying,
                 _amount,
                 uint256(AAVEDataTypes.InterestRateMode.VARIABLE),
                 0,
-                msg.sender
+                address(this)
             );
         } else {
-            data.weth = wrappedNative;
-            data.encodedData = abi.encodeWithSelector(
-                pool.borrow.selector,
-                data.weth,
+            _underlying = LOGIC_STORAGE.wrappedNative();
+            aPool.borrow(
+                _underlying,
                 _amount,
                 uint256(AAVEDataTypes.InterestRateMode.VARIABLE),
                 0,
-                msg.sender
+                address(this)
             );
+            IWETH(payable(_underlying)).withdraw(_amount);
         }
     }
 
-    function getRepayData(address _underlying, uint256 _amount)
-        external
-        view
-        override
-        returns (Types.ProtocolData memory data)
-    {
-        data.target = address(pool);
-        data.approveTo = data.target;
+    function repay(address _underlying, uint256 _amount) external {
+        IAAVEPool aPool = LOGIC_STORAGE.pool();
         if (_underlying == TransferHelper.ETH) {
-            _underlying = wrappedNative;
-            data.weth = payable(_underlying);
+            _underlying = LOGIC_STORAGE.wrappedNative();
+            IWETH(payable(_underlying)).deposit{value: _amount}();
         }
 
-        data.encodedData = abi.encodeWithSelector(
-            pool.repay.selector,
+        TransferHelper.approve(_underlying, address(aPool), _amount);
+        aPool.repay(
             _underlying,
             _amount,
             uint256(AAVEDataTypes.InterestRateMode.VARIABLE),
-            msg.sender
+            address(this)
         );
     }
 
@@ -241,9 +185,9 @@ contract AAVELogic is IProtocol {
         returns (uint256)
     {
         _underlying = replaceNative(_underlying);
-        AAVEDataTypes.ReserveData memory reserve = pool.getReserveData(
-            _underlying
-        );
+        AAVEDataTypes.ReserveData memory reserve = LOGIC_STORAGE
+            .pool()
+            .getReserveData(_underlying);
         return IERC20(reserve.aTokenAddress).balanceOf(_account);
     }
 
@@ -254,9 +198,9 @@ contract AAVELogic is IProtocol {
         returns (uint256)
     {
         _underlying = replaceNative(_underlying);
-        AAVEDataTypes.ReserveData memory reserve = pool.getReserveData(
-            _underlying
-        );
+        AAVEDataTypes.ReserveData memory reserve = LOGIC_STORAGE
+            .pool()
+            .getReserveData(_underlying);
         return IERC20(reserve.variableDebtTokenAddress).balanceOf(_account);
     }
 
@@ -267,16 +211,18 @@ contract AAVELogic is IProtocol {
         returns (uint256 collateralValue, uint256 borrowedValue)
     {
         _quote = replaceNative(_quote);
-        (collateralValue, borrowedValue, , , , ) = pool.getUserAccountData(
-            _account
-        );
+        (collateralValue, borrowedValue, , , , ) = LOGIC_STORAGE
+            .pool()
+            .getUserAccountData(_account);
         IAAVEPriceOracleGetter priceOracle = IAAVEPriceOracleGetter(
-            pool.ADDRESSES_PROVIDER().getPriceOracle()
+            LOGIC_STORAGE.pool().ADDRESSES_PROVIDER().getPriceOracle()
         );
         uint256 priceQuote = priceOracle.getAssetPrice(_quote);
 
-        AAVEDataTypes.ReserveConfigurationMap memory configuration = pool
-            .getConfiguration(_quote);
+        AAVEDataTypes.ReserveConfigurationMap
+            memory configuration = LOGIC_STORAGE.pool().getConfiguration(
+                _quote
+            );
         (, , , uint256 decimals, , ) = AAVEReserveConfigurationGetter.getParams(
             configuration
         );
@@ -315,10 +261,13 @@ contract AAVELogic is IProtocol {
                 params.totalBorrowedVariable +
                 params.slopeS1 *
                 params.totalBorrowedStable);
-        uint256 supply = (a + Utils.MILLION * delta.sqrt()) /
+        uint256 supplyAmount = (a + Utils.MILLION * delta.sqrt()) /
             (2 * _targetRate * params.optimalLTV);
 
-        if (params.totalBorrowed * Utils.MILLION > supply * params.optimalLTV) {
+        if (
+            params.totalBorrowed * Utils.MILLION >
+            supplyAmount * params.optimalLTV
+        ) {
             params.baseS += params.slopeS1;
             params.baseV += params.slopeV1;
             params.slopeS2 =
@@ -351,10 +300,12 @@ contract AAVELogic is IProtocol {
                     params.totalBorrowedStable +
                     params.slopeV2 *
                     params.totalBorrowedVariable);
-            supply = (delta.sqrt() - a / Utils.MILLION) / (2 * _targetRate);
+            supplyAmount =
+                (delta.sqrt() - a / Utils.MILLION) /
+                (2 * _targetRate);
         }
 
-        return int256(supply) - int256(params.totalSupplied);
+        return int256(supplyAmount) - int256(params.totalSupplied);
     }
 
     function borrowToTargetBorrowRate(uint256 _targetRate, bytes memory _params)
@@ -372,16 +323,19 @@ contract AAVELogic is IProtocol {
             _targetRate = params.baseV;
         }
 
-        uint256 borrow = (params.totalSupplied *
+        uint256 borrowAmount = (params.totalSupplied *
             (_targetRate - params.baseV) *
             params.optimalLTV) / (Utils.MILLION * params.slopeV1);
 
-        if (borrow * Utils.MILLION > params.totalSupplied * params.optimalLTV) {
+        if (
+            borrowAmount * Utils.MILLION >
+            params.totalSupplied * params.optimalLTV
+        ) {
             params.baseV += params.slopeV1;
             params.slopeV2 =
                 (params.slopeV2 * Utils.MILLION) /
                 (params.maxExcessUsageRatio);
-            borrow =
+            borrowAmount =
                 (params.totalSupplied *
                     (_targetRate - params.baseV) *
                     Utils.MILLION +
@@ -390,7 +344,7 @@ contract AAVELogic is IProtocol {
                 (Utils.MILLION * params.slopeV2);
         }
 
-        return int256(borrow) - int256(params.totalBorrowed);
+        return int256(borrowAmount) - int256(params.totalBorrowed);
     }
 
     function totalRewards(
@@ -399,15 +353,43 @@ contract AAVELogic is IProtocol {
         bool _isSupply
     ) external view override returns (uint256 rewards) {}
 
+    function pool() external view returns (IAAVEPool) {
+        return LOGIC_STORAGE.pool();
+    }
+
+    function rewardToken() external view override returns (address) {
+        return LOGIC_STORAGE.rewardToken();
+    }
+
+    function wrappedNative() external view returns (address) {
+        return LOGIC_STORAGE.wrappedNative();
+    }
+
+    function lastSimulatedSupply(address _asset)
+        external
+        view
+        returns (AAVELogicStorage.SimulateData memory)
+    {
+        return LOGIC_STORAGE.getLastSimulatedSupply(_asset);
+    }
+
+    function lastSimulatedBorrow(address _asset)
+        external
+        view
+        returns (AAVELogicStorage.SimulateData memory)
+    {
+        return LOGIC_STORAGE.getLastSimulatedBorrow(_asset);
+    }
+
     function getUsageParams(address _underlying, uint256 _suppliesToRedeem)
         external
         view
         override
         returns (bytes memory)
     {
-        AAVEDataTypes.ReserveData memory reserve = pool.getReserveData(
-            replaceNative(_underlying)
-        );
+        AAVEDataTypes.ReserveData memory reserve = LOGIC_STORAGE
+            .pool()
+            .getReserveData(replaceNative(_underlying));
         IAAVEInterestRateStrategy strategy = IAAVEInterestRateStrategy(
             reserve.interestRateStrategyAddress
         );
@@ -465,7 +447,8 @@ contract AAVELogic is IProtocol {
         returns (uint256)
     {
         return
-            pool
+            LOGIC_STORAGE
+                .pool()
                 .getReserveData(replaceNative(_underlying))
                 .currentLiquidityRate / BASE;
     }
@@ -477,7 +460,8 @@ contract AAVELogic is IProtocol {
         returns (uint256)
     {
         return
-            pool
+            LOGIC_STORAGE
+                .pool()
                 .getReserveData(replaceNative(_underlying))
                 .currentVariableBorrowRate / BASE;
     }
@@ -488,7 +472,7 @@ contract AAVELogic is IProtocol {
         returns (address)
     {
         if (_underlying == TransferHelper.ETH) {
-            return wrappedNative;
+            return LOGIC_STORAGE.wrappedNative();
         } else {
             return _underlying;
         }
