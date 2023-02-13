@@ -1194,7 +1194,7 @@ describe("Router tests", function () {
         );
         let accFee = await router.accFees(token0.address);
 
-        let expectRedeemedAmount = "200000652321329993";
+        let expectRedeemedAmount = "200000628262382513";
 
         expect(userTokenRedeemed).to.equal(expectRedeemedAmount);
         expect(cToken0WithdrawedAmount).to.equal(expectRedeemedAmount);
@@ -1203,7 +1203,7 @@ describe("Router tests", function () {
         expect(totalLendingsAfter).to.equal(0);
         expect(routerBalance).to.equal(0);
         expect(protocolsHandlerBalance).to.equal(0);
-        expect(accFee).to.equal("6577329720");
+        expect(accFee).to.equal("6334310048");
         //even though true is set by user, collateral still set to false, because there is no supply remainning.
         expect(collateralStatusBefore).to.equal(11);
         expect(collateralStatusAfter).to.equal(9);
@@ -1234,11 +1234,11 @@ describe("Router tests", function () {
         let receipt = await tx.wait();
         m.log("redeem gas used:", receipt.gasUsed);
 
-        let expectRedeemedAmount = "200000652321329993";
+        let expectRedeemedAmount = "200000628262382513";
 
         await expect(tx)
           .to.emit(router, "AccFeeUpdated")
-          .withArgs(token0.address, "6577329720");
+          .withArgs(token0.address, "6334310048");
         await expect(tx)
           .to.emit(sToken0, "Transfer")
           .withArgs(
@@ -1471,7 +1471,7 @@ describe("Router tests", function () {
         );
         let accFee = await router.accFees(ETHAddress);
 
-        let expectRedeemedAmount = "200000652209854379";
+        let expectRedeemedAmount = "200000628190920483";
 
         expect(cETHWithdrawedAmount).to.equal(expectRedeemedAmount);
         expect(sETHBurntAmount).to.equal(supplyAmount);
@@ -1479,7 +1479,7 @@ describe("Router tests", function () {
         expect(totalLendingsAfter).to.equal(0);
         expect(routerBalance).to.equal(0);
         expect(protocolsHandlerBalance).to.equal(0);
-        expect(accFee).to.equal("6576203706");
+        expect(accFee).to.equal("6333588212");
         //even though true is set by user, collateral still set to false, because there is no supply remainning.
         expect(collateralStatusBefore).to.equal(56);
         expect(collateralStatusAfter).to.equal(24);
@@ -1509,11 +1509,11 @@ describe("Router tests", function () {
         let receipt = await tx.wait();
         m.log("redeem gas used:", receipt.gasUsed);
 
-        let expectRedeemedAmount = "200000652209854379";
+        let expectRedeemedAmount = "200000628190920483";
 
         await expect(tx)
           .to.emit(router, "AccFeeUpdated")
-          .withArgs(ETHAddress, "6576203706");
+          .withArgs(ETHAddress, "6333588212");
         await expect(tx)
           .to.emit(sETH, "Transfer")
           .withArgs(
@@ -2229,6 +2229,7 @@ describe("Router tests", function () {
       );
 
       await deploys.router.setBlockActions(deploys.token0.address, 2 ** 3);
+
       let tx = deploys.router.repay(
         {
           asset: deploys.token0.address,
@@ -2809,7 +2810,7 @@ describe("Router tests", function () {
         );
         let collectedFee = collectedFeeAfter.sub(collectedFeeBefore);
 
-        let expectRepayAmount = ethers.BigNumber.from("100000300566668529");
+        let expectRepayAmount = ethers.BigNumber.from("100000300566668526");
 
         let assetConfig = await config.assetConfigs(ETHAddress);
         let accFeeDeltaExpect = expectRepayAmount
@@ -2862,7 +2863,7 @@ describe("Router tests", function () {
         let collectedFee = await router.collectedFees(ETHAddress);
         let feeIndex = await router.feeIndexes(ETHAddress);
 
-        let expectRepayAmount = ethers.BigNumber.from("100000300566668529");
+        let expectRepayAmount = ethers.BigNumber.from("100000300566668526");
 
         await expect(tx)
           .to.emit(config, "UserDebtAndCollateralSet")
@@ -2881,6 +2882,9 @@ describe("Router tests", function () {
           .to.emit(router, "FeeIndexUpdated")
           .withArgs(ETHAddress, feeIndex);
         await expect(tx)
+          .to.emit(router, "Repayed")
+          .withArgs(deployer.address, ETHAddress, expectRepayAmount);
+        await expect(tx)
           .to.emit(router, "FeeCollected")
           .withArgs(ETHAddress, feeCollector.address, collectedFee);
         await expect(tx)
@@ -2890,9 +2894,6 @@ describe("Router tests", function () {
         await expect(tx)
           .to.emit(router, "TotalLendingsUpdated")
           .withArgs(ETHAddress, 0);
-        await expect(tx)
-          .to.emit(router, "Repayed")
-          .withArgs(deployer.address, ETHAddress, expectRepayAmount);
       });
     });
   });

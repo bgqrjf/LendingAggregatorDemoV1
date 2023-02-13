@@ -88,11 +88,13 @@ contract Router is RouterStorage, OwnableUpgradeable {
                 reservePool,
                 rewards,
                 config,
+                priceOracle,
                 collectedFees[_params.asset],
-                assets[_params.asset]
+                underlyings
             ),
             totalLendings,
-            accFees
+            accFees,
+            assets
         );
     }
 
@@ -180,8 +182,9 @@ contract Router is RouterStorage, OwnableUpgradeable {
                     reservePool,
                     rewards,
                     config,
+                    priceOracle,
                     collectedFees[_redeemParams.asset],
-                    assets[_redeemParams.asset]
+                    underlyings
                 ),
                 actionNotPaused(_repayParams.asset, Action.liquidate),
                 underlyings
@@ -285,13 +288,15 @@ contract Router is RouterStorage, OwnableUpgradeable {
                     reservePool,
                     rewards,
                     config,
+                    priceOracle,
                     collectedFees[_params.asset],
-                    assets[_params.asset]
+                    underlyings
                 ),
                 _totalSupplies,
                 _newInterest,
                 _redeemFrom,
-                accFees
+                accFees,
+                assets
             );
     }
 
@@ -365,8 +370,9 @@ contract Router is RouterStorage, OwnableUpgradeable {
                 reservePool,
                 rewards,
                 config,
+                priceOracle,
                 collectedFees[_params.asset],
-                assets[_params.asset]
+                underlyings
             ),
             _supplies,
             _protocolsSupplies,
@@ -669,12 +675,12 @@ contract Router is RouterStorage, OwnableUpgradeable {
     }
 
     //  admin functions
-    function setBlockActions(address _asset, Action _action)
+    function setBlockActions(address _asset, uint256 _action)
         external
         onlyOwner
     {
         blockedActions[_asset] = _action;
-        emit ActionPaused(_asset, _action);
+        emit BlockActionsSet(_asset, _action);
     }
 
     function toggleToken(address _asset) external onlyOwner {

@@ -16,6 +16,16 @@ import "../../interfaces/IConfig.sol";
 library LiquidateLogic {
     using UserAssetBitMap for uint256;
 
+    event Liquidated(
+        address borrower,
+        address liquidator,
+        address repayedToken,
+        uint256 repayedAmount,
+        address redeemedToken,
+        uint256 redeemedAmount,
+        uint256 penaltyRatio
+    );
+
     // _redeemParams.amount is the minAmount redeem which is used as slippage validation
     function liquidate(
         Types.LiquidateParams memory _params,
@@ -82,7 +92,8 @@ library LiquidateLogic {
                 protocolsSupplies + totalLending,
                 0,
                 _params.repayParams.userParams.to,
-                accFees
+                accFees,
+                assets
             );
 
         RedeemLogic.executeRedeemInternal(
@@ -93,6 +104,15 @@ library LiquidateLogic {
             uncollectedFee,
             totalLendings
         );
+
+        // emit Liquidated(
+        //     _params.repayedParams.to,
+        //     _params.redeemParams.to,
+        //     _params.repayedParams.asset,
+        //     _params.repayedParams.amount,
+        //     _params.redeemedAmount.asset,
+        //     _params.redeemedAmount.amount,
+        // );
     }
 
     function getLiquidationData(

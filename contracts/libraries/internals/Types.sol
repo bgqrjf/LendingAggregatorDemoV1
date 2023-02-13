@@ -126,8 +126,9 @@ library Types {
         IReservePool reservePool;
         IRewards rewards;
         IConfig config;
+        IPriceOracle priceOracle;
         uint256 collectedFee;
-        Asset asset;
+        address[] underlyings;
     }
 
     struct BorrowParams {

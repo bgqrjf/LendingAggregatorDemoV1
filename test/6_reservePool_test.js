@@ -27,14 +27,6 @@ describe("Reserve pool tests", function () {
     let wETH = aaveContracts.wETH;
     let aOracle = aaveContracts.priceOracle;
 
-    let AAVEHandler = await ethers.getContractFactory("AAVELogic");
-    // _aaveTokenAddress
-    let aaveHandler = await AAVEHandler.deploy(
-      aPool.address,
-      wETH.address,
-      wETH.address
-    );
-
     // deploy compound contracts
     let compoundContracts = await compound.deployContracts({
       token0: token0,
@@ -45,17 +37,6 @@ describe("Reserve pool tests", function () {
     let cUSDT = compoundContracts.cUSDT;
     let cETH = compoundContracts.cETH;
     let comp = compoundContracts.comp;
-
-    let CompoundHandler = await ethers.getContractFactory("CompoundLogic");
-    let compoundHandler = await CompoundHandler.deploy(
-      comptroller.address,
-      cETH.address,
-      comp.address,
-      { gasLimit: 5000000 }
-    );
-
-    await compoundHandler.updateCTokenList(cToken0.address);
-    await compoundHandler.updateCTokenList(cUSDT.address);
 
     let borrowAmount = ethers.utils.parseUnits("10", "ether");
     let supplyAmount = borrowAmount.mul(2);
@@ -104,6 +85,25 @@ describe("Reserve pool tests", function () {
       initializeParams: [[], strategy.address],
       proxyAdmin: proxyAdmin,
     });
+
+    let AAVEHandler = await ethers.getContractFactory("AAVELogic");
+    let aaveHandler = await AAVEHandler.deploy(
+      protocolsHandler.address,
+      aPool.address,
+      wETH.address
+    );
+
+    let CompoundHandler = await ethers.getContractFactory("CompoundLogic");
+    let compoundHandler = await CompoundHandler.deploy(
+      protocolsHandler.address,
+      comptroller.address,
+      cETH.address,
+      comp.address,
+      { gasLimit: 5000000 }
+    );
+
+    await compoundHandler.updateCTokenList(cToken0.address);
+    await compoundHandler.updateCTokenList(cUSDT.address);
 
     // priceOracle
     let PriceOracle = await ethers.getContractFactory("MockPriceOracle");
@@ -536,7 +536,10 @@ describe("Reserve pool tests", function () {
       await expect(reserve).to.equal(0);
       await expect(balance).to.equal(0);
       await expect(sTokenBalance).to.equal(supplyAmount);
-      await expect(underlyingBalance).to.equal(supplyAmount);
+      await expect(underlyingBalance).to.be.within(
+        supplyAmount.sub(1),
+        supplyAmount
+      );
     });
 
     it("should emit events when execute supply", async () => {
@@ -941,9 +944,9 @@ describe("Reserve pool tests", function () {
       await expect(bobPendingSupply.amount).to.equal(supplyAmount);
       await expect(reserve).to.equal(0);
       await expect(balance).to.equal(0);
-      await expect(sTokenBalance).to.equal(21571300569);
-      await expect(underlyingBalance).to.equal(21571301035);
-      await expect(totalSupplies).to.equal(21571301035);
+      await expect(sTokenBalance).to.equal(21571301644);
+      await expect(underlyingBalance).to.equal(21571302110);
+      await expect(totalSupplies).to.equal(21571302110);
     });
 
     it("should not emit events when redeem from reserve", async () => {

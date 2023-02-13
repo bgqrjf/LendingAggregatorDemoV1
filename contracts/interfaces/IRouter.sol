@@ -64,7 +64,7 @@ interface IRouter {
 
     event AccFeeOffsetUpdated(address indexed asset, uint256 newIndex);
 
-    event ActionPaused(address asset, Action action);
+    event BlockActionsSet(address asset, uint256 actions);
 
     event TokenPaused(address asset);
 

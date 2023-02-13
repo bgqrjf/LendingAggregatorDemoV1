@@ -11,6 +11,8 @@ import "../../interfaces/IRewards.sol";
 import "../../interfaces/IConfig.sol";
 
 library RedeemLogic {
+    using UserAssetBitMap for uint256;
+
     event Redeemed(
         address indexed supplier,
         address indexed asset,
@@ -20,7 +22,8 @@ library RedeemLogic {
     function redeem(
         Types.RedeemParams memory _params,
         mapping(address => uint256) storage totalLendings,
-        mapping(address => uint256) storage accFees
+        mapping(address => uint256) storage accFees,
+        mapping(address => Types.Asset) storage assets
     ) external {
         require(_params.actionNotPaused, "RedeemLogic: action paused");
 
@@ -51,7 +54,8 @@ library RedeemLogic {
                 totalBorrowedAmountWithFee,
                 newInterest,
                 msg.sender,
-                accFees
+                accFees,
+                assets
             );
 
             executeRedeemInternal(
@@ -65,12 +69,45 @@ library RedeemLogic {
         }
     }
 
+    function redeemAllowed(
+        Types.RedeemParams memory _params,
+        address _redeemFrom,
+        mapping(address => Types.Asset) storage assets
+    ) internal view returns (bool) {
+        uint256 userConfig = _params.config.userDebtAndCollateral(_redeemFrom);
+
+        Types.Asset memory redeemAsset = assets[_params.userParams.asset];
+        if (!userConfig.isUsingAsCollateral(redeemAsset.index)) {
+            return true;
+        }
+        uint256 maxDebtAllowed = ExternalUtils.borrowLimitInternal(
+            _params.config,
+            _params.priceOracle,
+            _redeemFrom,
+            _params.userParams.asset,
+            _params.underlyings,
+            assets
+        );
+
+        uint256 currentDebts = ExternalUtils.getUserDebts(
+            _redeemFrom,
+            _params.config.userDebtAndCollateral(_redeemFrom),
+            _params.underlyings,
+            _params.userParams.asset,
+            _params.priceOracle,
+            assets
+        );
+
+        return currentDebts <= maxDebtAllowed;
+    }
+
     function recordRedeem(
         Types.RedeemParams memory _params,
         uint256 _totalSupplies,
         uint256 _newInterest,
         address _redeemFrom,
-        mapping(address => uint256) storage accFees
+        mapping(address => uint256) storage accFees,
+        mapping(address => Types.Asset) storage assets
     ) external returns (uint256 underlyingAmount, uint256 fee) {
         return
             recordRedeemInternal(
@@ -78,7 +115,8 @@ library RedeemLogic {
                 _totalSupplies,
                 _newInterest,
                 _redeemFrom,
-                accFees
+                accFees,
+                assets
             );
     }
 
@@ -105,7 +143,8 @@ library RedeemLogic {
         uint256 _totalSupplies,
         uint256 _newInterest,
         address _redeemFrom,
-        mapping(address => uint256) storage accFees
+        mapping(address => uint256) storage accFees,
+        mapping(address => Types.Asset) storage assets
     ) internal returns (uint256 underlyingAmount, uint256 fee) {
         uint256 accFee = ExternalUtils.updateAccFee(
             _params.userParams.asset,
@@ -114,38 +153,46 @@ library RedeemLogic {
             accFees
         ) - _params.collectedFee;
 
-        uint256 sTokenAmount = _params.asset.sToken.unscaledAmount(
+        Types.Asset memory redeemAsset = assets[_params.userParams.asset];
+        uint256 sTokenAmount = redeemAsset.sToken.unscaledAmount(
             _params.userParams.amount,
             _totalSupplies
         );
 
         // to prevent stack too deep
         {
-            uint256 sTokenBalance = _params.asset.sToken.balanceOf(_redeemFrom);
+            uint256 sTokenBalance = redeemAsset.sToken.balanceOf(_redeemFrom);
             if (sTokenAmount >= sTokenBalance) {
                 sTokenAmount = sTokenBalance;
                 _params.collateralable = false;
             }
         }
 
-        (underlyingAmount, fee) = _params.asset.sToken.burn(
+        (_params.userParams.amount, fee) = redeemAsset.sToken.burn(
             _redeemFrom,
             sTokenAmount,
             _totalSupplies,
             accFee
         );
 
+        underlyingAmount = _params.userParams.amount;
+
         _params.rewards.stopMiningSupplyReward(
             _params.userParams.asset,
             _redeemFrom,
             sTokenAmount,
-            _params.asset.sToken.totalSupply() + sTokenAmount
+            redeemAsset.sToken.totalSupply() + sTokenAmount
         );
 
         _params.config.setUsingAsCollateral(
             _redeemFrom,
-            _params.asset.index,
-            _params.asset.collateralable && _params.collateralable
+            redeemAsset.index,
+            redeemAsset.collateralable && _params.collateralable
+        );
+
+        require(
+            redeemAllowed(_params, _redeemFrom, assets),
+            "RedeemLogic: insufficient collateral"
         );
 
         emit Redeemed(_redeemFrom, _params.userParams.asset, underlyingAmount);

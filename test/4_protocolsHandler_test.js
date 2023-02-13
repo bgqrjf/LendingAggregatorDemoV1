@@ -206,6 +206,8 @@ describe("ProtocolsHandler tests", function () {
       0
     );
 
+    // console.log(borrowAmount)
+
     await protocolsHandler.redeemAndBorrow(
       token0.address,
       borrowAmount,
@@ -215,6 +217,9 @@ describe("ProtocolsHandler tests", function () {
     );
 
     let [, totalAmount] = await protocolsHandler.totalBorrowed(token0.address);
+
+    // console.log(await protocolsHandler.totalBorrowed(token0.address));
+
     expect(totalAmount).to.equal(borrowAmount);
   });
 
@@ -277,7 +282,7 @@ describe("ProtocolsHandler tests", function () {
 
     [, totalAmount] = await protocolsHandler.totalBorrowed(token0.address);
 
-    expect(totalAmount).to.equal(640697868);
+    expect(totalAmount).to.equal(237339448);
   });
 
   it("should simulateLendings properly", async () => {
@@ -331,10 +336,10 @@ describe("ProtocolsHandler tests", function () {
     );
 
     expect(lendings.totalLending).to.equal(
-      ethers.BigNumber.from("500000636222529406")
+      ethers.BigNumber.from("500000414896903393")
     );
     expect(lendings.newInterest).to.equal(
-      ethers.BigNumber.from("310592886212")
+      ethers.BigNumber.from("414896903393")
     );
   });
 

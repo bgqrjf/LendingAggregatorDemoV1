@@ -10,6 +10,8 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
+    using TransferHelper for address;
+
     IStrategy public strategy;
     IProtocol[] public protocols;
 
@@ -67,9 +69,10 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         returns (uint256 redeemAmount, uint256 borrowAmount)
     {
         redeemAmount = redeem(_asset, _amount, supplies, _totalSupplied, _to);
+
         if (redeemAmount < _amount) {
             borrowAmount = _amount - redeemAmount;
-            borrow(_asset, _amount, _to);
+            borrow(_asset, borrowAmount, _to);
         }
     }
 
@@ -314,7 +317,7 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
 
         if (amount > 0) {
             redeemAndSupply(_asset, supplies, _totalSupplied - amount);
-            TransferHelper.safeTransfer(_asset, _to, amount, 0);
+            _asset.safeTransfer(_to, amount, 0);
             emit Redeemed(_asset, amount);
         }
     }
@@ -338,13 +341,13 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
                     abi.encodeWithSelector(
                         protocolsCache[i].borrow.selector,
                         _asset,
-                        _amount
+                        amounts[i]
                     )
                 );
             }
         }
 
-        TransferHelper.safeTransfer(_asset, _to, _amount, 0);
+        _asset.safeTransfer(_to, _amount, 0);
 
         emit Borrowed(_asset, _amount);
 
@@ -375,7 +378,7 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
                     abi.encodeWithSelector(
                         protocolsCache[i].repay.selector,
                         _asset,
-                        _amount
+                        amounts[i]
                     )
                 );
             }
@@ -409,7 +412,7 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
     {
         for (uint256 i = 0; i < protocols.length; ++i) {
             address token = protocols[i].rewardToken();
-            TransferHelper.safeTransfer(token, _account, _amounts[i], 0);
+            token.safeTransfer(_account, _amounts[i], 0);
         }
     }
 }

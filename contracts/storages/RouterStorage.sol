@@ -26,5 +26,5 @@ abstract contract RouterStorage is IRouter {
 
     // address0 => block all
     // tokenAddress => block token
-    mapping(address => Action) public blockedActions;
+    mapping(address => uint256) public blockedActions;
 }
