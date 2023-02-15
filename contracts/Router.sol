@@ -743,7 +743,6 @@ contract Router is RouterStorage, OwnableUpgradeable {
             _newAsset.executeSupplyThreshold
         );
 
-
         emit AddAsset(asset);
     }
 
