@@ -68,6 +68,8 @@ interface IRouter {
 
     event TokenPaused(address asset);
 
+    event AddAsset(Types.Asset asset);
+
     function supply(
         Types.UserAssetParams memory _params,
         bool _collateralable,
