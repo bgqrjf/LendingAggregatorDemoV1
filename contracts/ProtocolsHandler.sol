@@ -384,7 +384,7 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
             }
         }
 
-        emit Repayed(_asset, amount);
+        emit Repaid(_asset, amount);
     }
 
     function addProtocol(IProtocol _protocol) external override onlyOwner {

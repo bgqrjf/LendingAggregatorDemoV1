@@ -38,11 +38,13 @@ interface IRouter {
         uint256 amount
     );
 
-    event Repayed(
+    event Repaid(
         address indexed borrower,
         address indexed asset,
         uint256 amount
     );
+
+    event Liquidate(Types.UserAssetParams redeemParams,address liquidator);
 
     event FeeCollected(
         address indexed asset,
@@ -68,7 +70,23 @@ interface IRouter {
 
     event TokenPaused(address asset);
 
-    event AddAsset(Types.Asset asset);
+    event ProtocolAdded(IProtocol protocol);
+
+    event ProtocolUpdated(IProtocol old,IProtocol _new);
+
+    event AssetAdded(Types.Asset asset);
+
+    event ReservePoolConfigUpdated(address asset,uint256 maxReserve,uint256 executeSupplyThreshold);
+
+    event STokenUpdated(address sToken);
+
+    event DTokenUpdated(address dToken);
+
+    event ConfigUpdated(IConfig config);
+
+    event ProtocolsHandlerUpdated(IProtocolsHandler protocolsHandler);
+
+    event PriceOracleUpdated(IPriceOracle priceOracle);
 
     function supply(
         Types.UserAssetParams memory _params,

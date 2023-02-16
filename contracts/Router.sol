@@ -195,6 +195,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
             collectedFees,
             feeIndexes
         );
+        emit Liquidate(_redeemParams,msg.sender);
     }
 
     function claimRewards(address _account) external override {
@@ -691,6 +692,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
     function addProtocol(IProtocol _protocol) external override onlyOwner {
         protocols.addProtocol(_protocol);
         rewards.addProtocol(_protocol);
+        emit ProtocolAdded(_protocol);
     }
 
     function updateProtocol(IProtocol _old, IProtocol _new)
@@ -699,6 +701,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
         onlyOwner
     {
         protocols.updateProtocol(_old, _new);
+        emit ProtocolUpdated(_old,_new);
     }
 
     function addAsset(Types.NewAssetParams memory _newAsset)
@@ -743,8 +746,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
             _newAsset.executeSupplyThreshold
         );
 
-
-        emit AddAsset(asset);
+        emit AssetAdded(asset);
     }
 
     function updateReservePoolConfig(
@@ -762,19 +764,23 @@ contract Router is RouterStorage, OwnableUpgradeable {
     ) internal {
         if (address(reservePool) != address(0)) {
             reservePool.setConfig(_asset, _maxReserve, _executeSupplyThreshold);
+            emit ReservePoolConfigUpdated(_asset,_maxReserve,_executeSupplyThreshold);
         }
     }
 
     function updateSToken(address _sToken) external override onlyOwner {
         sTokenImplement = _sToken;
+        emit STokenUpdated(_sToken);
     }
 
     function updateDToken(address _dToken) external override onlyOwner {
         dTokenImplement = _dToken;
+        emit DTokenUpdated(_dToken);
     }
 
     function updateConfig(IConfig _config) external override onlyOwner {
         config = _config;
+        emit ConfigUpdated(_config);
     }
 
     function updateProtocolsHandler(IProtocolsHandler _protocolsHandler)
@@ -783,6 +789,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
         onlyOwner
     {
         protocols = _protocolsHandler;
+        emit ProtocolsHandlerUpdated(_protocolsHandler);
     }
 
     function updatePriceOracle(IPriceOracle _priceOracle)
@@ -791,5 +798,6 @@ contract Router is RouterStorage, OwnableUpgradeable {
         onlyOwner
     {
         priceOracle = _priceOracle;
+        emit PriceOracleUpdated(_priceOracle);
     }
 }

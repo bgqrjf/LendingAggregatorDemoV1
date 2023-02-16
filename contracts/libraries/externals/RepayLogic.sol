@@ -17,7 +17,7 @@ library RepayLogic {
         uint256 amount
     );
 
-    event Repayed(
+    event Repaid(
         address indexed borrower,
         address indexed asset,
         uint256 amount
@@ -196,7 +196,7 @@ library RepayLogic {
             dTokenTotalSupply
         );
 
-        emit Repayed(
+        emit Repaid(
             _params.userParams.to,
             _params.userParams.asset,
             repayAmount
