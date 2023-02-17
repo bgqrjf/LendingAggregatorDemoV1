@@ -729,7 +729,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
 
     function toggleToken(address _asset) external onlyOwner {
         assets[_asset].paused = !assets[_asset].paused;
-        emit TokenPaused(_asset);
+        emit TokenPausedSet(_asset,assets[_asset].paused);
     }
 
     function addProtocol(IProtocol _protocol) external override onlyOwner {

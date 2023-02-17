@@ -68,7 +68,7 @@ interface IRouter {
 
     event BlockActionsSet(address asset, uint256 actions);
 
-    event TokenPaused(address asset);
+    event TokenPausedSet(address asset,bool isPaused);
 
     event ProtocolAdded(IProtocol protocol);
 
