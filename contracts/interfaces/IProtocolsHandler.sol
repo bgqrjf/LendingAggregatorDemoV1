@@ -13,7 +13,7 @@ interface IProtocolsHandler {
     event Borrowed(address indexed asset, uint256 amount);
     event Repayed(address indexed asset, uint256 amount);
 
-    function rebalance(address _asset) external;
+    function rebalanceAllProtocols(address _asset) external;
 
     function repayAndSupply(
         address _asset,

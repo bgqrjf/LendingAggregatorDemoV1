@@ -188,6 +188,11 @@ interface IRouter {
 
     function totalBorrowed(address _underlying) external view returns (uint256);
 
+    function isPoisitionHealthy(address _underlying, address _account)
+        external
+        view
+        returns (bool);
+
     // --- admin functions
     function addProtocol(IProtocol _protocol) external;
 
@@ -207,4 +212,10 @@ interface IRouter {
     function updateProtocol(IProtocol _old, IProtocol _new) external;
 
     function updatePriceOracle(IPriceOracle _priceOracle) external;
+
+    // --- getters
+    function getAsset(address _underlying)
+        external
+        view
+        returns (Types.Asset memory asset);
 }

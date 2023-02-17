@@ -30,7 +30,7 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         strategy = IStrategy(_strategy);
     }
 
-    function rebalance(address _asset) external override {
+    function rebalanceAllProtocols(address _asset) external override {
         (uint256[] memory supplies, uint256 totalSupplies) = totalSupplied(
             _asset
         );

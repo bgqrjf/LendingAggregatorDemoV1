@@ -48,8 +48,7 @@ library RedeemLogic {
                     totalLendings
                 );
 
-            uint256 uncollectedFee;
-            (_params.userParams.amount, uncollectedFee) = recordRedeemInternal(
+            (_params.userParams.amount, ) = recordRedeemInternal(
                 _params,
                 totalBorrowedAmountWithFee,
                 newInterest,
@@ -63,42 +62,21 @@ library RedeemLogic {
                 supplies,
                 protocolsSupplies,
                 totalLending,
-                uncollectedFee,
                 totalLendings
             );
         }
-    }
 
-    function redeemAllowed(
-        Types.RedeemParams memory _params,
-        address _redeemFrom,
-        mapping(address => Types.Asset) storage assets
-    ) internal view returns (bool) {
-        uint256 userConfig = _params.config.userDebtAndCollateral(_redeemFrom);
-
-        Types.Asset memory redeemAsset = assets[_params.userParams.asset];
-        if (!userConfig.isUsingAsCollateral(redeemAsset.index)) {
-            return true;
-        }
-        uint256 maxDebtAllowed = ExternalUtils.borrowLimitInternal(
-            _params.config,
-            _params.priceOracle,
-            _redeemFrom,
-            _params.userParams.asset,
-            _params.underlyings,
-            assets
+        require(
+            ExternalUtils.isPositionHealthy(
+                _params.config,
+                _params.priceOracle,
+                msg.sender,
+                _params.userParams.asset,
+                _params.underlyings,
+                assets
+            ),
+            "RedeemLogic: insufficient collateral"
         );
-
-        uint256 currentDebts = ExternalUtils.getUserDebts(
-            _redeemFrom,
-            _params.config.userDebtAndCollateral(_redeemFrom),
-            _params.underlyings,
-            _params.userParams.asset,
-            _params.priceOracle,
-            assets
-        );
-
-        return currentDebts <= maxDebtAllowed;
     }
 
     function recordRedeem(
@@ -125,7 +103,6 @@ library RedeemLogic {
         uint256[] memory _supplies,
         uint256 _protocolsSupplies,
         uint256 _totalLending,
-        uint256 _uncollectedFee,
         mapping(address => uint256) storage totalLendings
     ) external {
         executeRedeemInternal(
@@ -133,7 +110,6 @@ library RedeemLogic {
             _supplies,
             _protocolsSupplies,
             _totalLending,
-            _uncollectedFee,
             totalLendings
         );
     }
@@ -164,7 +140,6 @@ library RedeemLogic {
             uint256 sTokenBalance = redeemAsset.sToken.balanceOf(_redeemFrom);
             if (sTokenAmount >= sTokenBalance) {
                 sTokenAmount = sTokenBalance;
-                _params.collateralable = false;
             }
         }
 
@@ -186,13 +161,8 @@ library RedeemLogic {
 
         _params.config.setUsingAsCollateral(
             _redeemFrom,
-            redeemAsset.index,
+            _params.userParams.asset,
             redeemAsset.collateralable && _params.collateralable
-        );
-
-        require(
-            redeemAllowed(_params, _redeemFrom, assets),
-            "RedeemLogic: insufficient collateral"
         );
 
         emit Redeemed(_redeemFrom, _params.userParams.asset, underlyingAmount);
@@ -203,7 +173,6 @@ library RedeemLogic {
         uint256[] memory _supplies,
         uint256 _protocolsSupplies,
         uint256 _totalLending,
-        uint256 _uncollectedFee,
         mapping(address => uint256) storage totalLendings
     ) internal {
         IProtocolsHandler protocolsCache = _params.protocols;
@@ -216,7 +185,7 @@ library RedeemLogic {
             _params.userParams.to
         );
 
-        uint256 totalLendingDelta = borrowed + _uncollectedFee;
+        uint256 totalLendingDelta = borrowed;
         if (totalLendingDelta > 0) {
             //  uncollectedFee may cause underflow
             _totalLending = _totalLending > totalLendingDelta

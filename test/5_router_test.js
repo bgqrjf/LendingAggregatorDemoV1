@@ -1052,7 +1052,7 @@ describe("Router tests", function () {
             amount: supplyAmount.mul(2),
             to: deployer.address,
           },
-          true,
+          false,
           true
         );
         let userBalanceAfter = await token0.balanceOf(deployer.address);
@@ -1081,7 +1081,6 @@ describe("Router tests", function () {
         expect(routerBalance).to.equal(0);
         expect(protocolsHandlerBalance).to.equal(0);
         expect(accFee).to.equal(0);
-        //even though true is set by user, collateral still set to false, because there is no supply remainning.
         expect(collateralStatusBefore).to.equal(2);
         expect(collateralStatusAfter).to.equal(0);
       });
@@ -1173,7 +1172,7 @@ describe("Router tests", function () {
             amount: supplyAmount.mul(2),
             to: deployer.address,
           },
-          true,
+          false,
           true
         );
         let userBalanceAfter = await token0.balanceOf(deployer.address);
@@ -1200,11 +1199,10 @@ describe("Router tests", function () {
         expect(cToken0WithdrawedAmount).to.equal(expectRedeemedAmount);
         expect(sToken0BurntAmount).to.equal(supplyAmount);
         expect(totalLendingsBefore).to.equal("200000001165687690");
-        expect(totalLendingsAfter).to.equal(0);
+        expect(totalLendingsAfter).to.equal("6334310048");
         expect(routerBalance).to.equal(0);
         expect(protocolsHandlerBalance).to.equal(0);
         expect(accFee).to.equal("6334310048");
-        //even though true is set by user, collateral still set to false, because there is no supply remainning.
         expect(collateralStatusBefore).to.equal(11);
         expect(collateralStatusAfter).to.equal(9);
       });
@@ -1227,7 +1225,7 @@ describe("Router tests", function () {
             amount: supplyAmount.mul(2),
             to: deployer.address,
           },
-          true,
+          false,
           true
         );
 
@@ -1269,7 +1267,7 @@ describe("Router tests", function () {
           .withArgs(token0.address, expectRedeemedAmount);
         await expect(tx)
           .to.emit(router, "TotalLendingsUpdated")
-          .withArgs(token0.address, 0);
+          .withArgs(token0.address, "6334310048");
         await expect(tx)
           .to.emit(router, "Redeemed")
           .withArgs(deployer.address, token0.address, expectRedeemedAmount);
@@ -1352,7 +1350,7 @@ describe("Router tests", function () {
             amount: supplyAmount.mul(2),
             to: deployer.address,
           },
-          true,
+          false,
           true
         );
         let cETHBalanceAfter = await provider.getBalance(cETH.address);
@@ -1377,7 +1375,6 @@ describe("Router tests", function () {
         expect(routerBalance).to.equal(0);
         expect(protocolsHandlerBalance).to.equal(0);
         expect(accFee).to.equal(0);
-        //even though true is set by user, collateral still set to false, because there is no supply remainning.
         expect(collateralStatusBefore).to.equal(32);
         expect(collateralStatusAfter).to.equal(0);
       });
@@ -1452,7 +1449,7 @@ describe("Router tests", function () {
             amount: supplyAmount.mul(2),
             to: deployer.address,
           },
-          true,
+          false,
           true
         );
         let cETHBalanceAfter = await provider.getBalance(cETH.address);
@@ -1476,7 +1473,7 @@ describe("Router tests", function () {
         expect(cETHWithdrawedAmount).to.equal(expectRedeemedAmount);
         expect(sETHBurntAmount).to.equal(supplyAmount);
         expect(totalLendingsBefore).to.equal("200000001165687479");
-        expect(totalLendingsAfter).to.equal(0);
+        expect(totalLendingsAfter).to.equal("6333588212");
         expect(routerBalance).to.equal(0);
         expect(protocolsHandlerBalance).to.equal(0);
         expect(accFee).to.equal("6333588212");
@@ -1502,7 +1499,7 @@ describe("Router tests", function () {
             amount: supplyAmount.mul(2),
             to: deployer.address,
           },
-          true,
+          false,
           true
         );
 
@@ -1530,7 +1527,7 @@ describe("Router tests", function () {
           .withArgs(ETHAddress, expectRedeemedAmount);
         await expect(tx)
           .to.emit(router, "TotalLendingsUpdated")
-          .withArgs(ETHAddress, 0);
+          .withArgs(ETHAddress, "6333588212");
         await expect(tx)
           .to.emit(router, "Redeemed")
           .withArgs(deployer.address, ETHAddress, expectRedeemedAmount);
@@ -1636,10 +1633,13 @@ describe("Router tests", function () {
       it("should not borrow token0", async () => {
         const deploys = await loadFixture(RouterTestFixture);
         let deployer = deploys.deployer;
+        let feeCollected = deploys.feeCollector;
         let router = deploys.router;
         let token0 = deploys.token0;
 
         let borrowAmount = ethers.utils.parseUnits("0.1", "ether");
+
+        await supply(feeCollected, router, token0, borrowAmount.mul(10));
 
         let tx = router.borrow(
           {
@@ -1962,8 +1962,13 @@ describe("Router tests", function () {
       it("should not borrow ETH", async () => {
         const deploys = await loadFixture(RouterTestFixture);
         let deployer = deploys.deployer;
+        let feeCollector = deploys.feeCollector;
         let router = deploys.router;
+
         let borrowAmount = ethers.utils.parseUnits("0.1", "ether");
+
+        await supply(feeCollector, router, null, borrowAmount.mul(10));
+
         let tx = router.borrow(
           {
             asset: ETHAddress,

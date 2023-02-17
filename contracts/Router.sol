@@ -17,6 +17,8 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
 
+import "hardhat/console.sol";
+
 contract Router is RouterStorage, OwnableUpgradeable {
     using Math for uint256;
     using UserAssetBitMap for uint256;
@@ -377,7 +379,6 @@ contract Router is RouterStorage, OwnableUpgradeable {
             _supplies,
             _protocolsSupplies,
             _totalLending,
-            _uncollectedFee,
             totalLendings
         );
     }
@@ -664,6 +665,23 @@ contract Router is RouterStorage, OwnableUpgradeable {
     }
 
     // validations
+    function isPoisitionHealthy(address _underlying, address _account)
+        public
+        view
+        override
+        returns (bool)
+    {
+        return
+            ExternalUtils.isPositionHealthy(
+                config,
+                priceOracle,
+                _account,
+                _underlying,
+                underlyings,
+                assets
+            );
+    }
+
     function actionNotPaused(address _token, Action _action)
         internal
         view
@@ -791,5 +809,15 @@ contract Router is RouterStorage, OwnableUpgradeable {
         onlyOwner
     {
         priceOracle = _priceOracle;
+    }
+
+    // --- getters
+    function getAsset(address _underlying)
+        external
+        view
+        override
+        returns (Types.Asset memory asset)
+    {
+        return assets[_underlying];
     }
 }

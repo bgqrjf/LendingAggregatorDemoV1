@@ -343,4 +343,33 @@ library ExternalUtils {
             }
         }
     }
+
+    function isPositionHealthy(
+        IConfig _config,
+        IPriceOracle _priceOracle,
+        address _account,
+        address _underlying,
+        address[] memory _underlyings,
+        mapping(address => Types.Asset) storage assets
+    ) internal view returns (bool) {
+        uint256 maxDebtAllowed = ExternalUtils.borrowLimitInternal(
+            _config,
+            _priceOracle,
+            _account,
+            _underlying,
+            _underlyings,
+            assets
+        );
+
+        uint256 currentDebts = ExternalUtils.getUserDebts(
+            _account,
+            _config.userDebtAndCollateral(_account),
+            _underlyings,
+            _underlying,
+            _priceOracle,
+            assets
+        );
+
+        return currentDebts <= maxDebtAllowed;
+    }
 }

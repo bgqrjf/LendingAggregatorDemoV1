@@ -158,7 +158,7 @@ library RepayLogic {
             repayAmount = userDebts;
             _params.config.setBorrowing(
                 _params.userParams.to,
-                _params.asset.index,
+                _params.userParams.asset,
                 false
             );
         }

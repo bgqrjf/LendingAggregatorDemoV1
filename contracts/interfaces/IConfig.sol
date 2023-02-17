@@ -23,13 +23,13 @@ interface IConfig {
 
     function setUsingAsCollateral(
         address _account,
-        uint256 _reserveIndex,
+        address _asset,
         bool _usingAsCollateral
     ) external;
 
     function setBorrowing(
         address _account,
-        uint256 _reserveIndex,
+        address _asset,
         bool _borrowing
     ) external;
 

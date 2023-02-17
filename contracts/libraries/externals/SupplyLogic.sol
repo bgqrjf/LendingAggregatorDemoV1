@@ -75,6 +75,14 @@ library SupplyLogic {
                 totalLendings
             );
         }
+
+        if (_params.userParams.to == msg.sender) {
+            _params.config.setUsingAsCollateral(
+                _params.userParams.to,
+                _params.userParams.asset,
+                _params.asset.collateralable && _params.collateralable
+            );
+        }
     }
 
     function recordSupply(
@@ -126,12 +134,6 @@ library SupplyLogic {
             _params.userParams.to,
             sTokenAmount,
             _params.asset.sToken.totalSupply()
-        );
-
-        _params.config.setUsingAsCollateral(
-            _params.userParams.to,
-            _params.asset.index,
-            _params.asset.collateralable && _params.collateralable
         );
 
         emit Supplied(

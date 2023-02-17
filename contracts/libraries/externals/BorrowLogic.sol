@@ -34,10 +34,6 @@ library BorrowLogic {
             _params.userParams.amount > 0,
             "BorrowLogic: Borrow 0 token is not allowed"
         );
-        require(
-            borrowAllowed(_params, msg.sender, assets),
-            "BorrowLogic: Insufficient collateral"
-        );
 
         (
             ,
@@ -72,6 +68,18 @@ library BorrowLogic {
         } else {
             executeBorrowInternal(_params, totalLending, totalLendings);
         }
+
+        require(
+            ExternalUtils.isPositionHealthy(
+                _params.config,
+                _params.priceOracle,
+                msg.sender,
+                _params.userParams.asset,
+                _params.underlyings,
+                assets
+            ),
+            "BorrowLogic: Insufficient collateral"
+        );
     }
 
     function recordBorrow(
@@ -176,7 +184,11 @@ library BorrowLogic {
             dTokenTotalSupply
         );
 
-        _params.config.setBorrowing(_params.borrowBy, asset.index, true);
+        _params.config.setBorrowing(
+            _params.borrowBy,
+            _params.userParams.asset,
+            true
+        );
 
         emit Borrowed(
             _params.borrowBy,
@@ -209,31 +221,5 @@ library BorrowLogic {
             _totalLending + redeemed,
             totalLendings
         );
-    }
-
-    function borrowAllowed(
-        Types.BorrowParams memory _params,
-        address _borrower,
-        mapping(address => Types.Asset) storage assets
-    ) internal view returns (bool) {
-        uint256 maxDebtAllowed = ExternalUtils.borrowLimitInternal(
-            _params.config,
-            _params.priceOracle,
-            _borrower,
-            _params.userParams.asset,
-            _params.underlyings,
-            assets
-        );
-
-        uint256 currentDebts = ExternalUtils.getUserDebts(
-            _borrower,
-            _params.config.userDebtAndCollateral(_borrower),
-            _params.underlyings,
-            _params.userParams.asset,
-            _params.priceOracle,
-            assets
-        );
-
-        return currentDebts + _params.userParams.amount <= maxDebtAllowed;
     }
 }

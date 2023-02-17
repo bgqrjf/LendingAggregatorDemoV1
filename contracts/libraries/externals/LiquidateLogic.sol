@@ -85,8 +85,7 @@ library LiquidateLogic {
             );
             _params.redeemParams.userParams.amount = redeemAmount;
         }
-        uint256 uncollectedFee;
-        (_params.redeemParams.userParams.amount, uncollectedFee) = RedeemLogic
+        (_params.redeemParams.userParams.amount, ) = RedeemLogic
             .recordRedeemInternal(
                 _params.redeemParams,
                 protocolsSupplies + totalLending,
@@ -101,15 +100,12 @@ library LiquidateLogic {
             supplies,
             protocolsSupplies,
             totalLending,
-            uncollectedFee,
             totalLendings
         );
 
         // emit Liquidated(
-        //     _params.repayedParams.to,
+        //    msg.sender,
         //     _params.redeemParams.to,
-        //     _params.repayedParams.asset,
-        //     _params.repayedParams.amount,
         //     _params.redeemedAmount.asset,
         //     _params.redeemedAmount.amount,
         // );

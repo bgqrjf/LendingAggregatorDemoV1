@@ -2,6 +2,7 @@
 pragma solidity ^0.8.14;
 
 import "./interfaces/IConfig.sol";
+import "./interfaces/IRouter.sol";
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./libraries/internals/UserAssetBitMap.sol";
@@ -43,41 +44,51 @@ contract Config is IConfig, Ownable {
 
     function setUsingAsCollateral(
         address _account,
-        uint256 _reserveIndex,
+        address _underlying,
         bool _usingAsCollateral
     ) external override {
         require(
             msg.sender == router || msg.sender == _account,
             "Config: Only Router/User"
         );
-        require(
-            _reserveIndex < UserAssetBitMap.MAX_RESERVES_COUNT,
-            "Config: ID out of range"
-        );
-        uint256 bit = 1 << ((_reserveIndex << 1) + 1);
-        uint256 oldUserConfig = userDebtAndCollateral[_account];
-        uint256 newUserConfig;
-        if (_usingAsCollateral) {
-            newUserConfig = oldUserConfig | bit;
-        } else {
-            newUserConfig = oldUserConfig & ~bit;
-        }
 
-        userDebtAndCollateral[_account] = newUserConfig;
+        Types.Asset memory asset = IRouter(router).getAsset(_underlying);
+        uint256 oldUserConfig = userDebtAndCollateral[_account];
+
+        uint256 newUserConfig;
+        if (
+            UserAssetBitMap.isUsingAsCollateral(oldUserConfig, asset.index) !=
+            _usingAsCollateral
+        ) {
+            uint256 bit = 1 << ((asset.index << 1) + 1);
+            if (_usingAsCollateral) {
+                newUserConfig = oldUserConfig | bit;
+            } else {
+                newUserConfig = oldUserConfig & ~bit;
+            }
+
+            userDebtAndCollateral[_account] = newUserConfig;
+
+            if (
+                !_usingAsCollateral &&
+                !IRouter(router).isPoisitionHealthy(_underlying, _account)
+            ) {
+                newUserConfig = oldUserConfig;
+                userDebtAndCollateral[_account] = oldUserConfig;
+            }
+        }
 
         emit UserDebtAndCollateralSet(_account, oldUserConfig, newUserConfig);
     }
 
     function setBorrowing(
         address _account,
-        uint256 _reserveIndex,
+        address _underlying,
         bool _borrowing
     ) external override onlyRouter {
-        require(
-            _reserveIndex < UserAssetBitMap.MAX_RESERVES_COUNT,
-            "Config: ID out of range"
-        );
-        uint256 bit = 1 << (_reserveIndex << 1);
+        Types.Asset memory asset = IRouter(router).getAsset(_underlying);
+
+        uint256 bit = 1 << (asset.index << 1);
         uint256 oldUserConfig = userDebtAndCollateral[_account];
         uint256 newUserConfig;
         if (_borrowing) {
