@@ -112,8 +112,7 @@ contract ReservePool is IReservePool, OwnableUpgradeable {
             uint256 newInterest
         ) = IRouter(owner()).getSupplyStatus(_params.asset);
 
-        uint256 uncollectedFee;
-        (_params.amount, uncollectedFee) = IRouter(owner()).recordRedeem(
+        (_params.amount, ) = IRouter(owner()).recordRedeem(
             Types.UserAssetParams(_params.asset, _params.amount, _params.to),
             totalSuppliedAmountWithFee,
             newInterest,
@@ -133,8 +132,7 @@ contract ReservePool is IReservePool, OwnableUpgradeable {
                 _params,
                 supplies,
                 protocolsSupplies,
-                totalLending,
-                uncollectedFee
+                totalLending
             );
         } else {
             require(

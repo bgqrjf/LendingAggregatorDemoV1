@@ -122,8 +122,7 @@ interface IRouter {
         Types.UserAssetParams memory _params,
         uint256[] memory _supplies,
         uint256 _protocolsSupplies,
-        uint256 _totalLending,
-        uint256 _uncollectedFee
+        uint256 _totalLending
     ) external;
 
     function executeBorrow(Types.UserAssetParams memory _params) external;
@@ -189,6 +188,16 @@ interface IRouter {
     function totalBorrowed(address _underlying) external view returns (uint256);
 
     function isPoisitionHealthy(address _underlying, address _account)
+        external
+        view
+        returns (bool);
+
+    function isUsingAsCollateral(address _underlying, address _account)
+        external
+        view
+        returns (bool);
+
+    function isBorrowing(address _underlying, address _account)
         external
         view
         returns (bool);

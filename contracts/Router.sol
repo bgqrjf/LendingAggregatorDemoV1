@@ -359,8 +359,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
         Types.UserAssetParams memory _params,
         uint256[] memory _supplies,
         uint256 _protocolsSupplies,
-        uint256 _totalLending,
-        uint256 _uncollectedFee
+        uint256 _totalLending
     ) external override onlyReservePool {
         RedeemLogic.executeRedeem(
             Types.RedeemParams(
@@ -679,6 +678,32 @@ contract Router is RouterStorage, OwnableUpgradeable {
                 _underlying,
                 underlyings,
                 assets
+            );
+    }
+
+    function isUsingAsCollateral(address _underlying, address _account)
+        public
+        view
+        override
+        returns (bool)
+    {
+        return
+            UserAssetBitMap.isUsingAsCollateral(
+                config.userDebtAndCollateral(_account),
+                assets[_underlying].index
+            );
+    }
+
+    function isBorrowing(address _underlying, address _account)
+        public
+        view
+        override
+        returns (bool)
+    {
+        return
+            UserAssetBitMap.isBorrowing(
+                config.userDebtAndCollateral(_account),
+                assets[_underlying].index
             );
     }
 

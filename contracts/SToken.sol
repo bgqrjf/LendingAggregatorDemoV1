@@ -52,6 +52,22 @@ contract SToken is ISToken, OwnableUpgradeable, ERC20Upgradeable {
         _burn(_from, _amount);
     }
 
+    function _afterTokenTransfer(
+        address _from,
+        address _to,
+        uint256 _amount
+    ) internal override {
+        // if using as collateral
+        if (_from != address(0)) {
+            if (IRouter(owner()).isUsingAsCollateral(underlying, _from)) {
+                require(
+                    IRouter(owner()).isPoisitionHealthy(underlying, _from),
+                    "SToken: insufficient collateral"
+                );
+            }
+        }
+    }
+
     function scaledBalanceOf(address _account)
         public
         view
