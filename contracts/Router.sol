@@ -745,8 +745,8 @@ contract Router is RouterStorage, OwnableUpgradeable {
             _newAsset.maxReserve,
             _newAsset.executeSupplyThreshold
         );
-        
-        emit AssetAdded(asset);
+
+        emit AssetAdded(_newAsset.underlying,asset);
     }
 
     function updateReservePoolConfig(

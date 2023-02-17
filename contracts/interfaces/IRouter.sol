@@ -74,7 +74,7 @@ interface IRouter {
 
     event ProtocolUpdated(IProtocol old,IProtocol _new);
 
-    event AssetAdded(Types.Asset asset);
+    event AssetAdded(address underlying,Types.Asset asset);
 
     event ReservePoolConfigUpdated(address asset,uint256 maxReserve,uint256 executeSupplyThreshold);
 
