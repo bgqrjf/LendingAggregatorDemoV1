@@ -56,8 +56,7 @@ contract SToken is ISToken, OwnableUpgradeable, ERC20Upgradeable {
         address _from,
         address _to,
         uint256 _amount
-    ) internal override {
-        // if using as collateral
+    ) internal view override {
         if (_from != address(0)) {
             if (IRouter(owner()).isUsingAsCollateral(underlying, _from)) {
                 require(

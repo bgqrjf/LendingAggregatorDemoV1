@@ -173,6 +173,7 @@ describe("Reserve pool tests", function () {
         BorrowLogic: borrowLogic.address,
         RepayLogic: repayLogic.address,
         LiquidateLogic: liquidateLogic.address,
+        RewardLogic: ethers.constants.AddressZero,
       },
       initializeParams: [
         protocolsHandler.address,

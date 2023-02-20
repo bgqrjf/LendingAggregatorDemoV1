@@ -184,4 +184,13 @@ library Types {
         bool actionNotPaused;
         address[] underlyings;
     }
+
+    struct ClaimRewardsParams {
+        bool actionNotPaused;
+        address account;
+        IProtocolsHandler protocols;
+        IConfig config;
+        IRewards rewards;
+        address[] underlyings;
+    }
 }

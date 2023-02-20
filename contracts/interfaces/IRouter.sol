@@ -44,7 +44,7 @@ interface IRouter {
         uint256 amount
     );
 
-    event Liquidate(Types.UserAssetParams redeemParams,address liquidator);
+    event Liquidate(Types.UserAssetParams redeemParams, address liquidator);
 
     event FeeCollected(
         address indexed asset,
@@ -68,15 +68,19 @@ interface IRouter {
 
     event BlockActionsSet(address asset, uint256 actions);
 
-    event TokenPausedSet(address asset,bool isPaused);
+    event TokenPausedSet(address asset, bool isPaused);
 
     event ProtocolAdded(IProtocol protocol);
 
-    event ProtocolUpdated(IProtocol old,IProtocol _new);
+    event ProtocolUpdated(IProtocol old, IProtocol _new);
 
-    event AssetAdded(address underlying,Types.Asset asset);
+    event AssetAdded(address underlying, Types.Asset asset);
 
-    event ReservePoolConfigUpdated(address asset,uint256 maxReserve,uint256 executeSupplyThreshold);
+    event ReservePoolConfigUpdated(
+        address asset,
+        uint256 maxReserve,
+        uint256 executeSupplyThreshold
+    );
 
     event STokenUpdated(address sToken);
 
@@ -191,15 +195,6 @@ interface IRouter {
             uint256 totalLending,
             uint256 newInterest
         );
-
-    function getSupplyRate(address _underlying) external view returns (uint256);
-
-    function getBorrowRate(address _underlying) external view returns (uint256);
-
-    function getLendingRate(address _underlying)
-        external
-        view
-        returns (uint256);
 
     function totalSupplied(address _underlying) external view returns (uint256);
 

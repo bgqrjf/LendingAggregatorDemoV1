@@ -8,20 +8,17 @@ import "./libraries/externals/RedeemLogic.sol";
 import "./libraries/externals/BorrowLogic.sol";
 import "./libraries/externals/RepayLogic.sol";
 import "./libraries/externals/LiquidateLogic.sol";
+import "./libraries/externals/RewardLogic.sol";
 
 import "./libraries/internals/TransferHelper.sol";
-import "./libraries/internals/UserAssetBitMap.sol";
 import "./libraries/internals/Utils.sol";
 
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
 
-import "hardhat/console.sol";
-
 contract Router is RouterStorage, OwnableUpgradeable {
     using Math for uint256;
-    using UserAssetBitMap for uint256;
 
     modifier onlyReservePool() {
         require(msg.sender == address(reservePool), "Router: onlyReservePool");
@@ -197,46 +194,21 @@ contract Router is RouterStorage, OwnableUpgradeable {
             collectedFees,
             feeIndexes
         );
-        emit Liquidate(_redeemParams,msg.sender);
+        emit Liquidate(_redeemParams, msg.sender);
     }
 
     function claimRewards(address _account) external override {
-        actionNotPaused(address(0), Action.claimRewards);
-        uint256 userConfig = config.userDebtAndCollateral(_account);
-        uint256[] memory rewardsToClaim;
-
-        for (uint256 i = 0; i < underlyings.length; ++i) {
-            if (userConfig.isUsingAsCollateralOrBorrowing(i)) {
-                Types.Asset memory asset = assets[underlyings[i]];
-
-                if (userConfig.isUsingAsCollateral(i)) {
-                    address underlying = asset.sToken.underlying();
-                    uint256[] memory amounts = rewards.claim(
-                        underlying,
-                        _account,
-                        asset.sToken.totalSupply()
-                    );
-
-                    for (uint256 j = 0; j < amounts.length; j++) {
-                        rewardsToClaim[j] += amounts[j];
-                    }
-                }
-
-                if (userConfig.isBorrowing(i)) {
-                    address underlying = asset.dToken.underlying();
-                    uint256[] memory amounts = rewards.claim(
-                        underlying,
-                        _account,
-                        asset.dToken.totalSupply()
-                    );
-                    for (uint256 j = 0; j < amounts.length; j++) {
-                        rewardsToClaim[j] += amounts[j];
-                    }
-                }
-            }
-        }
-
-        protocols.claimRewards(_account, rewardsToClaim);
+        RewardLogic.claimRewards(
+            Types.ClaimRewardsParams(
+                actionNotPaused(address(0), Action.claimRewards),
+                _account,
+                protocols,
+                config,
+                rewards,
+                underlyings
+            ),
+            assets
+        );
     }
 
     function sync(address _asset) external override {
@@ -551,86 +523,6 @@ contract Router is RouterStorage, OwnableUpgradeable {
             );
     }
 
-    function getSupplyRate(address _underlying)
-        external
-        view
-        override
-        returns (uint256)
-    {
-        (
-            ,
-            uint256 protocolsSupplies,
-            uint256 totalLending,
-            uint256 totalSuppliedAmountWithFee,
-
-        ) = ExternalUtils.getSupplyStatus(
-                _underlying,
-                reservePool,
-                protocols,
-                totalLendings
-            );
-
-        (uint256 protocolsSupplyRate, uint256 protocolsBorrowRate) = protocols
-            .getRates(_underlying);
-
-        uint256 lendingRate = ((protocolsBorrowRate - protocolsSupplyRate) *
-            (totalBorrowed(_underlying))) / (totalSuppliedAmountWithFee);
-
-        return
-            (protocolsSupplyRate *
-                protocolsSupplies +
-                lendingRate *
-                totalLending) / (totalSuppliedAmountWithFee * Utils.MILLION);
-    }
-
-    function getBorrowRate(address _underlying)
-        external
-        view
-        override
-        returns (uint256)
-    {
-        (
-            uint256[] memory borrows,
-            uint256 totalBorrowedAmount,
-            uint256 totalLending,
-
-        ) = ExternalUtils.getBorrowStatus(
-                _underlying,
-                reservePool,
-                protocols,
-                totalLendings
-            );
-
-        (uint256 protocolsSupplyRate, uint256 protocolsBorrowRate) = protocols
-            .getRates(_underlying);
-
-        uint256 lendingRate = ((protocolsBorrowRate - protocolsSupplyRate) *
-            (totalBorrowedAmount)) / (totalSupplied(_underlying));
-
-        uint256 protocolsBorrows = Utils.samOf(borrows);
-
-        return
-            (protocolsBorrowRate *
-                protocolsBorrows +
-                lendingRate *
-                totalLending) / (totalBorrowedAmount * Utils.MILLION);
-    }
-
-    function getLendingRate(address _underlying)
-        external
-        view
-        override
-        returns (uint256 lendingRate)
-    {
-        (uint256 protocolsSupplyRate, uint256 protocolsBorrowRate) = protocols
-            .getRates(_underlying);
-
-        lendingRate =
-            ((protocolsBorrowRate - protocolsSupplyRate) *
-                (totalBorrowed(_underlying))) /
-            (totalSupplied(_underlying));
-    }
-
     function totalSupplied(address _underlying)
         public
         view
@@ -729,7 +621,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
 
     function toggleToken(address _asset) external onlyOwner {
         assets[_asset].paused = !assets[_asset].paused;
-        emit TokenPausedSet(_asset,assets[_asset].paused);
+        emit TokenPausedSet(_asset, assets[_asset].paused);
     }
 
     function addProtocol(IProtocol _protocol) external override onlyOwner {
@@ -744,7 +636,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
         onlyOwner
     {
         protocols.updateProtocol(_old, _new);
-        emit ProtocolUpdated(_old,_new);
+        emit ProtocolUpdated(_old, _new);
     }
 
     function addAsset(Types.NewAssetParams memory _newAsset)
@@ -789,7 +681,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
             _newAsset.executeSupplyThreshold
         );
 
-        emit AssetAdded(_newAsset.underlying,asset);
+        emit AssetAdded(_newAsset.underlying, asset);
     }
 
     function updateReservePoolConfig(
@@ -807,7 +699,11 @@ contract Router is RouterStorage, OwnableUpgradeable {
     ) internal {
         if (address(reservePool) != address(0)) {
             reservePool.setConfig(_asset, _maxReserve, _executeSupplyThreshold);
-            emit ReservePoolConfigUpdated(_asset,_maxReserve,_executeSupplyThreshold);
+            emit ReservePoolConfigUpdated(
+                _asset,
+                _maxReserve,
+                _executeSupplyThreshold
+            );
         }
     }
 

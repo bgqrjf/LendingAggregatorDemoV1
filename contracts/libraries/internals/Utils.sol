@@ -26,7 +26,7 @@ library Utils {
         return a > b ? a : b;
     }
 
-    function samOf(uint256[] memory a) internal pure returns (uint256 sum) {
+    function sumOf(uint256[] memory a) internal pure returns (uint256 sum) {
         uint256 i;
         while (i < a.length) {
             sum = sum + a[i];
