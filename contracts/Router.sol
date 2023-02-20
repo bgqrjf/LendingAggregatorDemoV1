@@ -194,7 +194,6 @@ contract Router is RouterStorage, OwnableUpgradeable {
             collectedFees,
             feeIndexes
         );
-        emit Liquidate(_redeemParams, msg.sender);
     }
 
     function claimRewards(address _account) external override {

@@ -44,8 +44,6 @@ interface IRouter {
         uint256 amount
     );
 
-    event Liquidate(Types.UserAssetParams redeemParams, address liquidator);
-
     event FeeCollected(
         address indexed asset,
         address indexed collector,

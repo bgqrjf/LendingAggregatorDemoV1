@@ -17,13 +17,10 @@ library LiquidateLogic {
     using UserAssetBitMap for uint256;
 
     event Liquidated(
-        address borrower,
         address liquidator,
         address repayedToken,
         uint256 repayedAmount,
-        address redeemedToken,
-        uint256 redeemedAmount,
-        uint256 penaltyRatio
+        Types.UserAssetParams
     );
 
     // _redeemParams.amount is the minAmount redeem which is used as slippage validation
@@ -103,12 +100,12 @@ library LiquidateLogic {
             totalLendings
         );
 
-        // emit Liquidated(
-        //    msg.sender,
-        //     _params.redeemParams.to,
-        //     _params.redeemedAmount.asset,
-        //     _params.redeemedAmount.amount,
-        // );
+        emit Liquidated(
+            msg.sender,
+            _params.repayParams.userParams.asset,
+            _params.repayParams.userParams.amount,
+            _params.redeemParams.userParams
+        );
     }
 
     function getLiquidationData(
