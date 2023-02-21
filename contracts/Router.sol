@@ -407,6 +407,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
     function borrowLimit(address _account, address _borrowAsset)
         external
         view
+        override
         returns (uint256 amount)
     {
         return
@@ -443,6 +444,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
     function userStatus(address _account, address _quote)
         external
         view
+        override
         returns (
             uint256 collateralValue,
             uint256 borrowingValue,

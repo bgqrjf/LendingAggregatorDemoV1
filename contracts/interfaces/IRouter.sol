@@ -238,4 +238,9 @@ interface IRouter {
         external
         view
         returns (Types.Asset memory asset);
+
+    function borrowLimit(address _account, address _borrowAsset)
+        external
+        view
+        returns (uint256 amount);
 }
