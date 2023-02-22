@@ -46,6 +46,14 @@ contract QueryHelper is MulticallHelper {
         uint256 liquidationThreshold;
     }
 
+    struct SupplyMarket {
+        address underlying;
+        uint256 supplyAmount;
+        uint256 supplyValue;
+        uint256 matchAmount;
+        uint256[] supplies;
+    }
+
     function getSTokenConvertRate(ISToken sToken, IPriceOracle oracle)
         public
         view
@@ -228,6 +236,34 @@ contract QueryHelper is MulticallHelper {
             tokenInfoWithUser[i].borrowAmount = borrowAmount;
             tokenInfoWithUser[i].maxLTV = _conifg.maxLTV;
             tokenInfoWithUser[i].liquidationThreshold = _conifg.liquidateLTV;
+        }
+    }
+
+    function getSupplyMarkets(IRouter router, IPriceOracle oracle)
+        public
+        view
+        returns (SupplyMarket[] memory supplyMarket)
+    {
+        address[] memory _underlyings = router.getUnderlyings();
+
+        for (uint256 i = 0; i < _underlyings.length; ++i) {
+            (
+                uint256[] memory supplies,
+                ,
+                uint256 totalLending,
+                uint256 totalSuppliedAmountWithFee,
+
+            ) = router.getSupplyStatus(_underlyings[i]);
+
+            uint256 tokenPrice = oracle.getAssetPrice(_underlyings[i]);
+
+            supplyMarket[i].underlying = _underlyings[i];
+            supplyMarket[i].supplyAmount = totalSuppliedAmountWithFee;
+            supplyMarket[i].supplyValue =
+                (totalSuppliedAmountWithFee * tokenPrice) /
+                1e8;
+            supplyMarket[i].matchAmount = totalLending;
+            supplyMarket[i].supplies = supplies;
         }
     }
 }
