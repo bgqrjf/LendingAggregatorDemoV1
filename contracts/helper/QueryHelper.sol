@@ -8,17 +8,10 @@ import "../interfaces/IPriceOracle.sol";
 import "../interfaces/ISToken.sol";
 import "../interfaces/IDToken.sol";
 import "../interfaces/IRateGetter.sol";
+import "../interfaces/IConfig.sol";
 import "../libraries/internals/Types.sol";
 
 contract QueryHelper is MulticallHelper {
-    struct Asset {
-        uint8 index;
-        bool collateralable;
-        bool paused;
-        ISToken sToken; // supply token address
-        IDToken dToken; // debt token address
-    }
-
     struct MarketInfo {
         uint256 totalSupplied;
         uint256 supplyRate;
@@ -37,10 +30,20 @@ contract QueryHelper is MulticallHelper {
     }
 
     struct UserBorrowInfo {
-        uint256 totalDeposit;
-        uint256 totalBorrow;
-        uint256 totalCollateralValue;
+        address underlying;
+        uint256 borrowValue;
+        uint256 borrowApr;
         uint256 borrowLimit;
+        uint256 dailyEstInterest;
+    }
+
+    struct TokenInfoWithUser {
+        address underlying;
+        uint256 tokenPrice;
+        uint256 depositAmount;
+        uint256 borrowAmount;
+        uint256 maxLTV;
+        uint256 liquidationThreshold;
     }
 
     function getSTokenConvertRate(ISToken sToken, IPriceOracle oracle)
@@ -50,7 +53,7 @@ contract QueryHelper is MulticallHelper {
     {
         address underlying = sToken.underlying();
         uint256 rate = sToken.totalSupply() > 0
-            ? sToken.scaledTotalSupply() / sToken.totalSupply()
+            ? (sToken.scaledTotalSupply() * 1e18) / sToken.totalSupply()
             : 0;
         uint256 tokenPrice = oracle.getAssetPrice(underlying);
         uint256 sTokenPrice = (rate * tokenPrice) / 1e8;
@@ -64,7 +67,7 @@ contract QueryHelper is MulticallHelper {
     {
         address underlying = dToken.underlying();
         uint256 rate = dToken.totalSupply() > 0
-            ? dToken.totalDebt() / dToken.totalSupply()
+            ? (dToken.totalDebt() * 1e18) / dToken.totalSupply()
             : 0;
         uint256 tokenPrice = oracle.getAssetPrice(underlying);
         uint256 dTokenPrice = (rate * tokenPrice) / 1e8;
@@ -169,6 +172,62 @@ contract QueryHelper is MulticallHelper {
                 _underlyings[i],
                 user
             );
+        }
+    }
+
+    function getUserBorrowed(
+        IRouter router,
+        IPriceOracle oracle,
+        IRateGetter rateGetter,
+        address user
+    ) public view returns (UserBorrowInfo[] memory userBorrowInfo) {
+        address[] memory _underlyings = router.getUnderlyings();
+        Types.Asset[] memory _assets = router.getAssets();
+        for (uint256 i = 0; i < _underlyings.length; ++i) {
+            Types.Asset memory _asset = _assets[i];
+            uint256 borrowAmount = _asset.dToken.scaledDebtOf(user);
+            if (borrowAmount == 0) {
+                continue;
+            }
+            uint256 tokenPrice = oracle.getAssetPrice(_underlyings[i]);
+            uint256 borrowApr = rateGetter.getBorrowRate(_underlyings[i]);
+
+            userBorrowInfo[i].underlying = _underlyings[i];
+            userBorrowInfo[i].borrowValue = (borrowAmount * tokenPrice) / 1e8;
+            userBorrowInfo[i].borrowApr = borrowApr;
+            userBorrowInfo[i].borrowLimit = router.borrowLimit(
+                user,
+                _underlyings[i]
+            );
+            userBorrowInfo[i].dailyEstInterest =
+                (((borrowAmount * tokenPrice) / 1e8) * borrowApr) /
+                365; //maybe wrong,will check later
+        }
+    }
+
+    function getTokenInfo(
+        IRouter router,
+        IPriceOracle oracle,
+        IConfig config,
+        address user
+    ) public view returns (TokenInfoWithUser[] memory tokenInfoWithUser) {
+        address[] memory _underlyings = router.getUnderlyings();
+        Types.Asset[] memory _assets = router.getAssets();
+        for (uint256 i = 0; i < _underlyings.length; ++i) {
+            Types.Asset memory _asset = _assets[i];
+            Types.AssetConfig memory _conifg = config.assetConfigs(
+                _underlyings[i]
+            );
+            uint256 depositAmount = _asset.sToken.scaledBalanceOf(user);
+            uint256 borrowAmount = _asset.dToken.scaledDebtOf(user);
+            uint256 tokenPrice = oracle.getAssetPrice(_underlyings[i]);
+
+            tokenInfoWithUser[i].underlying = _underlyings[i];
+            tokenInfoWithUser[i].tokenPrice = tokenPrice;
+            tokenInfoWithUser[i].depositAmount = depositAmount;
+            tokenInfoWithUser[i].borrowAmount = borrowAmount;
+            tokenInfoWithUser[i].maxLTV = _conifg.maxLTV;
+            tokenInfoWithUser[i].liquidationThreshold = _conifg.liquidateLTV;
         }
     }
 }
