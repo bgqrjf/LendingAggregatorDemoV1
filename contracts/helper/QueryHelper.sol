@@ -205,7 +205,7 @@ contract QueryHelper is MulticallHelper {
         }
     }
 
-    function getTokenInfo(
+    function getTokenInfoWithUser(
         IRouter router,
         IPriceOracle oracle,
         IConfig config,
