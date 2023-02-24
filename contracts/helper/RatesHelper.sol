@@ -13,7 +13,7 @@ contract RateGetter is MulticallHelper {
         router = IRouter(_router);
     }
 
-    function getSupplyRate(address _underlying)
+    function getCurrentSupplyRate(address _underlying)
         external
         view
         returns (uint256)
@@ -40,7 +40,7 @@ contract RateGetter is MulticallHelper {
                 totalLending) / (totalSuppliedAmountWithFee * Utils.MILLION);
     }
 
-    function getBorrowRate(address _underlying)
+    function getCurrentBorrowRate(address _underlying)
         external
         view
         returns (uint256)

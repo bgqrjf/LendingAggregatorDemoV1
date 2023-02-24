@@ -54,6 +54,14 @@ contract QueryHelper is MulticallHelper {
         uint256[] supplies;
     }
 
+    struct BorrowMarket {
+        address underlying;
+        uint256 borrowAmount;
+        uint256 borrowValue;
+        uint256 matchAmount;
+        uint256[] borrows;
+    }
+
     function getSTokenConvertRate(ISToken sToken, IPriceOracle oracle)
         public
         view
@@ -111,6 +119,44 @@ contract QueryHelper is MulticallHelper {
         return (totalDeposited, totalBorrowed, totalMatchAmount);
     }
 
+    function getCurrentSupplyRate(
+        IRateGetter aggregateGetter,
+        IRateGetter aaveLogic,
+        IRateGetter compLogic,
+        address _underlying
+    )
+        public
+        view
+        returns (
+            uint256 aggSupplyRate,
+            uint256 aaveSupplyRate,
+            uint256 compSupplyRate
+        )
+    {
+        aggSupplyRate = aggregateGetter.getCurrentSupplyRate(_underlying);
+        aaveSupplyRate = aaveLogic.getCurrentSupplyRate(_underlying);
+        compSupplyRate = compLogic.getCurrentSupplyRate(_underlying);
+    }
+
+    function getCurrentBorrowRate(
+        IRateGetter aggregateGetter,
+        IRateGetter aaveLogic,
+        IRateGetter compLogic,
+        address _underlying
+    )
+        public
+        view
+        returns (
+            uint256 aggBorrowRate,
+            uint256 aaveBorrowRate,
+            uint256 compBorrowRate
+        )
+    {
+        aggBorrowRate = aggregateGetter.getCurrentBorrowRate(_underlying);
+        aaveBorrowRate = aaveLogic.getCurrentBorrowRate(_underlying);
+        compBorrowRate = compLogic.getCurrentBorrowRate(_underlying);
+    }
+
     function getMarketsInfo(
         IRouter router,
         IPriceOracle oracle,
@@ -122,11 +168,15 @@ contract QueryHelper is MulticallHelper {
             markets[i].totalSupplied =
                 (router.totalSupplied(_underlyings[i]) * tokenPrice) /
                 1e8;
-            markets[i].supplyRate = rateGetter.getSupplyRate(_underlyings[i]);
+            markets[i].supplyRate = rateGetter.getCurrentSupplyRate(
+                _underlyings[i]
+            );
             markets[i].totalBorrowed =
                 (router.totalBorrowed(_underlyings[i]) * tokenPrice) /
                 1e8;
-            markets[i].supplyRate = rateGetter.getBorrowRate(_underlyings[i]);
+            markets[i].supplyRate = rateGetter.getCurrentBorrowRate(
+                _underlyings[i]
+            );
             (, , uint256 matchAmount, , ) = router.getSupplyStatus(
                 _underlyings[i]
             );
@@ -166,7 +216,9 @@ contract QueryHelper is MulticallHelper {
                 continue;
             }
             uint256 tokenPrice = oracle.getAssetPrice(_underlyings[i]);
-            uint256 depositApr = rateGetter.getSupplyRate(_underlyings[i]);
+            uint256 depositApr = rateGetter.getCurrentSupplyRate(
+                _underlyings[i]
+            );
 
             userSupplyInfo[i].underlying = _underlyings[i];
             userSupplyInfo[i].depositValue = (depositAmount * tokenPrice) / 1e8;
@@ -198,7 +250,9 @@ contract QueryHelper is MulticallHelper {
                 continue;
             }
             uint256 tokenPrice = oracle.getAssetPrice(_underlyings[i]);
-            uint256 borrowApr = rateGetter.getBorrowRate(_underlyings[i]);
+            uint256 borrowApr = rateGetter.getCurrentBorrowRate(
+                _underlyings[i]
+            );
 
             userBorrowInfo[i].underlying = _underlyings[i];
             userBorrowInfo[i].borrowValue = (borrowAmount * tokenPrice) / 1e8;
@@ -264,6 +318,32 @@ contract QueryHelper is MulticallHelper {
                 1e8;
             supplyMarket[i].matchAmount = totalLending;
             supplyMarket[i].supplies = supplies;
+        }
+    }
+
+    function getBorrowMarkets(IRouter router, IPriceOracle oracle)
+        public
+        view
+        returns (BorrowMarket[] memory borrowMarket)
+    {
+        address[] memory _underlyings = router.getUnderlyings();
+
+        for (uint256 i = 0; i < _underlyings.length; ++i) {
+            (
+                uint256[] memory borrows,
+                uint256 totalBorrowedAmount,
+                uint256 totalLending,
+
+            ) = router.getBorrowStatus(_underlyings[i]);
+
+            uint256 tokenPrice = oracle.getAssetPrice(_underlyings[i]);
+            borrowMarket[i].underlying = _underlyings[i];
+            borrowMarket[i].borrowAmount = totalBorrowedAmount;
+            borrowMarket[i].borrowValue =
+                (totalBorrowedAmount * tokenPrice) /
+                1e8;
+            borrowMarket[i].matchAmount = totalLending;
+            borrowMarket[i].borrows = borrows;
         }
     }
 }
