@@ -1,2 +1,14 @@
 OKCTestnetNode =
 OKCTestnetPrivateKey =
+
+underlyings = 
+decimals = 
+symbols = 
+maxLTVs = 
+
+AAVELendingPool = 
+comptroller = 
+wETH = 
+cETH = 
+comp = 
+cTokens = 

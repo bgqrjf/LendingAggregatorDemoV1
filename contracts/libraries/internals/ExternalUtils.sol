@@ -309,11 +309,11 @@ library ExternalUtils {
     {
         uint256 userConfig = _config.userDebtAndCollateral(_account);
         for (uint256 i = 0; i < _underlyings.length; ++i) {
-            if (userConfig.isUsingAsCollateralOrBorrowing(i)) {
-                address underlying = _underlyings[i];
-                Types.Asset memory asset = assets[underlying];
+            address underlying = _underlyings[i];
+            Types.Asset memory asset = assets[underlying];
 
-                if (userConfig.isUsingAsCollateral(i)) {
+            if (userConfig.isUsingAsCollateralOrBorrowing(asset.index)) {
+                if (userConfig.isUsingAsCollateral(asset.index)) {
                     uint256 balance = asset.sToken.scaledBalanceOf(_account);
 
                     if (assets[underlying].paused) {
@@ -329,7 +329,7 @@ library ExternalUtils {
                     }
                 }
 
-                if (userConfig.isBorrowing(i)) {
+                if (userConfig.isBorrowing(asset.index)) {
                     uint256 balance = asset.dToken.scaledDebtOf(_account);
 
                     borrowingValue += underlying == _quote

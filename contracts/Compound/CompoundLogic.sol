@@ -169,7 +169,7 @@ contract CompoundLogic is IProtocol {
         uint256 cTokenBalance = cToken.balanceOf(_account);
 
         // Compound reverts redeemUnderlying(_underlyingAmount) calls when user cToken
-        // balance is 1. Floor division has been used to calculate cToken when
+        // balance is 1. Floor division has been applied to calculate cToken when
         // redeeming, which should be replaced by ceil division.This rounding error
         // may cause users to "redeem" underlying tokens without their cToken burnt.
         // This error can be applied by repeatedly redeeming small amounts of underlyings,

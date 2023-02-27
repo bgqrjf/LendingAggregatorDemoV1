@@ -40,6 +40,21 @@ library Types {
         uint256 executeSupplyThreshold;
     }
 
+    struct AAVEV2UsageParams {
+        uint256 totalSupplied; // not balance
+        uint256 totalBorrowed;
+        uint256 totalBorrowedStable;
+        uint256 totalBorrowedVariable;
+        uint256 slopeV1;
+        uint256 slopeV2;
+        uint256 slopeS1;
+        uint256 slopeS2;
+        uint256 baseV;
+        uint256 optimalLTV;
+        uint256 reserveFactor;
+        uint256 maxExcessUsageRatio;
+    }
+
     struct AAVEUsageParams {
         uint256 totalSupplied; // not balance
         uint256 totalBorrowed;
