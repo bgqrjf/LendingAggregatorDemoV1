@@ -69,21 +69,6 @@ async function main() {
     await tx.wait();
   }
 
-  // priceOracle
-  let PriceOracle = await ethers.getContractFactory("MockPriceOracle");
-  let priceOracle = await PriceOracle.deploy();
-  await priceOracle.deployed();
-  m.log("priceOracle:", priceOracle.address);
-
-  for (i = 0; i < underlyings.length; i++) {
-    tx = await priceOracle.addAsset(underlyings[i], decimals[i]);
-    await tx.wait();
-  }
-
-  //   await priceOracle.setAssetPrice(token0.address, 10000000000); // set price to 100.00
-  //   await priceOracle.setAssetPrice(usdt.address, 100000000); // set price to 1.00
-  //   await priceOracle.setAssetPrice(ETHAddress, 200000000000); // set price to 2000.00
-
   // config
   let Config = await ethers.getContractFactory("Config");
   let config = await Config.deploy();
@@ -156,7 +141,7 @@ async function main() {
     },
     initializeParams: [
       protocolsHandler.address,
-      priceOracle.address,
+      process.env.priceOracle,
       config.address,
       rewards.address,
       sToken.address,
@@ -201,6 +186,15 @@ async function main() {
     });
     await tx.wait();
   }
+
+  let QueryHelper = await ethers.getContractFactory("QueryHelper");
+  let queryHelper = await QueryHelper.deploy(
+    router.address,
+    aaveHandler.address,
+    compoundHandler.address
+  );
+  await queryHelper.deployed();
+  m.log("queryHelper:", queryHelper.address);
 }
 
 main().catch((error) => {

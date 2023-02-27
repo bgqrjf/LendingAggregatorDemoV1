@@ -2,16 +2,15 @@
 pragma solidity ^0.8.14;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "./MulticallHelper.sol";
+import "./RatesHelper.sol";
 import "../interfaces/IRouter.sol";
 import "../interfaces/IPriceOracle.sol";
 import "../interfaces/ISToken.sol";
 import "../interfaces/IDToken.sol";
-import "../interfaces/IRateGetter.sol";
 import "../interfaces/IConfig.sol";
 import "../libraries/internals/Types.sol";
 
-contract QueryHelper is MulticallHelper {
+contract QueryHelper is RateGetter {
     struct MarketInfo {
         uint256 totalSupplied;
         uint256 supplyRate;
@@ -60,6 +59,18 @@ contract QueryHelper is MulticallHelper {
         uint256 borrowValue;
         uint256 matchAmount;
         uint256[] borrows;
+    }
+
+    IProtocol public aaveLogic;
+    IProtocol public compoundLogic;
+
+    constructor(
+        address _router,
+        address _aaveLogic,
+        address _compoundLogic
+    ) RateGetter(_router) {
+        aaveLogic = IProtocol(_aaveLogic);
+        compoundLogic = IProtocol(_compoundLogic);
     }
 
     function getSTokenConvertRate(ISToken sToken, IPriceOracle oracle)
@@ -119,12 +130,7 @@ contract QueryHelper is MulticallHelper {
         return (totalDeposited, totalBorrowed, totalMatchAmount);
     }
 
-    function getCurrentSupplyRate(
-        IRateGetter aggregateGetter,
-        IRateGetter aaveLogic,
-        IRateGetter compLogic,
-        address _underlying
-    )
+    function getCurrentSupplyRates(address _underlying)
         public
         view
         returns (
@@ -133,17 +139,12 @@ contract QueryHelper is MulticallHelper {
             uint256 compSupplyRate
         )
     {
-        aggSupplyRate = aggregateGetter.getCurrentSupplyRate(_underlying);
+        aggSupplyRate = getCurrentSupplyRate(_underlying);
         aaveSupplyRate = aaveLogic.getCurrentSupplyRate(_underlying);
-        compSupplyRate = compLogic.getCurrentSupplyRate(_underlying);
+        compSupplyRate = compoundLogic.getCurrentSupplyRate(_underlying);
     }
 
-    function getCurrentBorrowRate(
-        IRateGetter aggregateGetter,
-        IRateGetter aaveLogic,
-        IRateGetter compLogic,
-        address _underlying
-    )
+    function getCurrentBorrowRates(address _underlying)
         public
         view
         returns (
@@ -152,31 +153,27 @@ contract QueryHelper is MulticallHelper {
             uint256 compBorrowRate
         )
     {
-        aggBorrowRate = aggregateGetter.getCurrentBorrowRate(_underlying);
+        aggBorrowRate = getCurrentBorrowRate(_underlying);
         aaveBorrowRate = aaveLogic.getCurrentBorrowRate(_underlying);
-        compBorrowRate = compLogic.getCurrentBorrowRate(_underlying);
+        compBorrowRate = compoundLogic.getCurrentBorrowRate(_underlying);
     }
 
-    function getMarketsInfo(
-        IRouter router,
-        IPriceOracle oracle,
-        IRateGetter rateGetter
-    ) public view returns (MarketInfo[] memory markets) {
+    function getMarketsInfo(IRouter router, IPriceOracle oracle)
+        public
+        view
+        returns (MarketInfo[] memory markets)
+    {
         address[] memory _underlyings = router.getUnderlyings();
         for (uint256 i = 0; i < _underlyings.length; ++i) {
             uint256 tokenPrice = oracle.getAssetPrice(_underlyings[i]);
             markets[i].totalSupplied =
                 (router.totalSupplied(_underlyings[i]) * tokenPrice) /
                 1e8;
-            markets[i].supplyRate = rateGetter.getCurrentSupplyRate(
-                _underlyings[i]
-            );
+            markets[i].supplyRate = getCurrentSupplyRate(_underlyings[i]);
             markets[i].totalBorrowed =
                 (router.totalBorrowed(_underlyings[i]) * tokenPrice) /
                 1e8;
-            markets[i].supplyRate = rateGetter.getCurrentBorrowRate(
-                _underlyings[i]
-            );
+            markets[i].supplyRate = getCurrentBorrowRate(_underlyings[i]);
             (, , uint256 matchAmount, , ) = router.getSupplyStatus(
                 _underlyings[i]
             );
@@ -204,7 +201,6 @@ contract QueryHelper is MulticallHelper {
     function getUserSupplied(
         IRouter router,
         IPriceOracle oracle,
-        IRateGetter rateGetter,
         address user
     ) public view returns (UserSupplyInfo[] memory userSupplyInfo) {
         address[] memory _underlyings = router.getUnderlyings();
@@ -216,9 +212,7 @@ contract QueryHelper is MulticallHelper {
                 continue;
             }
             uint256 tokenPrice = oracle.getAssetPrice(_underlyings[i]);
-            uint256 depositApr = rateGetter.getCurrentSupplyRate(
-                _underlyings[i]
-            );
+            uint256 depositApr = getCurrentSupplyRate(_underlyings[i]);
 
             userSupplyInfo[i].underlying = _underlyings[i];
             userSupplyInfo[i].depositValue = (depositAmount * tokenPrice) / 1e8;
@@ -238,7 +232,6 @@ contract QueryHelper is MulticallHelper {
     function getUserBorrowed(
         IRouter router,
         IPriceOracle oracle,
-        IRateGetter rateGetter,
         address user
     ) public view returns (UserBorrowInfo[] memory userBorrowInfo) {
         address[] memory _underlyings = router.getUnderlyings();
@@ -250,9 +243,7 @@ contract QueryHelper is MulticallHelper {
                 continue;
             }
             uint256 tokenPrice = oracle.getAssetPrice(_underlyings[i]);
-            uint256 borrowApr = rateGetter.getCurrentBorrowRate(
-                _underlyings[i]
-            );
+            uint256 borrowApr = getCurrentBorrowRate(_underlyings[i]);
 
             userBorrowInfo[i].underlying = _underlyings[i];
             userBorrowInfo[i].borrowValue = (borrowAmount * tokenPrice) / 1e8;

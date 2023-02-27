@@ -7,14 +7,14 @@ import "../libraries/internals/Utils.sol";
 import "./MulticallHelper.sol";
 
 contract RateGetter is MulticallHelper {
-    IRouter router;
+    IRouter public router;
 
     constructor(address _router) {
         router = IRouter(_router);
     }
 
     function getCurrentSupplyRate(address _underlying)
-        external
+        public
         view
         returns (uint256)
     {
@@ -30,18 +30,27 @@ contract RateGetter is MulticallHelper {
             .protocols()
             .getRates(_underlying);
 
-        uint256 lendingRate = ((protocolsBorrowRate - protocolsSupplyRate) *
-            (router.totalBorrowed(_underlying))) / (totalSuppliedAmountWithFee);
+        uint256 routerBorrowed = router.totalBorrowed(_underlying);
+        uint256 lendingRate = totalSuppliedAmountWithFee > 0 &&
+            protocolsBorrowRate > protocolsSupplyRate
+            ? protocolsSupplyRate +
+                ((protocolsBorrowRate - protocolsSupplyRate) * routerBorrowed) /
+                totalSuppliedAmountWithFee
+            : protocolsSupplyRate;
 
         return
-            (protocolsSupplyRate *
-                protocolsSupplies +
-                lendingRate *
-                totalLending) / (totalSuppliedAmountWithFee * Utils.MILLION);
+            totalSuppliedAmountWithFee > 0
+                ? (protocolsSupplyRate *
+                    protocolsSupplies +
+                    lendingRate *
+                    totalLending) / (totalSuppliedAmountWithFee * Utils.MILLION)
+                : routerBorrowed > 0
+                ? lendingRate
+                : protocolsSupplyRate;
     }
 
     function getCurrentBorrowRate(address _underlying)
-        external
+        public
         view
         returns (uint256)
     {
@@ -56,30 +65,41 @@ contract RateGetter is MulticallHelper {
             .protocols()
             .getRates(_underlying);
 
-        uint256 lendingRate = ((protocolsBorrowRate - protocolsSupplyRate) *
-            (totalBorrowedAmount)) / (router.totalSupplied(_underlying));
+        uint256 routerSupplied = router.totalSupplied(_underlying);
+        uint256 lendingRate = routerSupplied > 0 &&
+            protocolsBorrowRate > protocolsSupplyRate
+            ? protocolsSupplyRate +
+                ((protocolsBorrowRate - protocolsSupplyRate) *
+                    totalBorrowedAmount) /
+                routerSupplied
+            : protocolsSupplyRate;
 
         uint256 protocolsBorrows = Utils.sumOf(borrows);
 
         return
-            (protocolsBorrowRate *
-                protocolsBorrows +
-                lendingRate *
-                totalLending) / (totalBorrowedAmount * Utils.MILLION);
+            totalBorrowedAmount > 0
+                ? (protocolsBorrowRate *
+                    protocolsBorrows +
+                    lendingRate *
+                    totalLending) / (totalBorrowedAmount * Utils.MILLION)
+                : routerSupplied > 0
+                ? lendingRate
+                : protocolsBorrowRate;
     }
 
-    function getLendingRate(address _underlying)
-        external
-        view
-        returns (uint256 lendingRate)
-    {
+    function getLendingRate(address _underlying) public view returns (uint256) {
         (uint256 protocolsSupplyRate, uint256 protocolsBorrowRate) = router
             .protocols()
             .getRates(_underlying);
 
-        lendingRate =
-            ((protocolsBorrowRate - protocolsSupplyRate) *
-                (router.totalBorrowed(_underlying))) /
-            (router.totalSupplied(_underlying));
+        uint256 routerSupplied = router.totalSupplied(_underlying);
+
+        return
+            routerSupplied > 0 && protocolsBorrowRate > protocolsSupplyRate
+                ? protocolsSupplyRate +
+                    ((protocolsBorrowRate - protocolsSupplyRate) *
+                        router.totalBorrowed(_underlying)) /
+                    routerSupplied
+                : protocolsSupplyRate;
     }
 }

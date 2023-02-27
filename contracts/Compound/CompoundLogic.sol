@@ -15,7 +15,7 @@ contract CompoundLogic is IProtocol {
 
     CompoundLogicStorage public immutable LOGIC_STORAGE;
     uint256 public immutable BASE = 1e12;
-    uint256 public immutable BLOCK_PER_YEAR = 2102400;
+    uint256 public immutable BLOCK_PER_YEAR = 8299000;
 
     constructor(
         address _protocolsHandler,
