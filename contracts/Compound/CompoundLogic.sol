@@ -15,7 +15,7 @@ contract CompoundLogic is IProtocol {
 
     CompoundLogicStorage public immutable LOGIC_STORAGE;
     uint256 public immutable BASE = 1e12;
-    uint256 public immutable BLOCK_PER_YEAR = 8299000;
+    uint256 public immutable BLOCK_PER_YEAR = 2102400;
 
     constructor(
         address _protocolsHandler,
@@ -118,20 +118,30 @@ contract CompoundLogic is IProtocol {
             CETHInterface(cToken).mint{value: _amount}();
         } else {
             TransferHelper.approve(_underlying, cToken, _amount);
-            CERC20Interface(cToken).mint(_amount);
+            require(
+                CERC20Interface(cToken).mint(_amount) == 0,
+                "CompoundLogic: compound mint revert"
+            );
         }
 
         addAsset(_underlying);
     }
 
     function redeem(address _underlying, uint256 _amount) external {
-        CERC20Interface(LOGIC_STORAGE.cTokens(_underlying)).redeemUnderlying(
-            _amount
+        require(
+            CERC20Interface(LOGIC_STORAGE.cTokens(_underlying))
+                .redeemUnderlying(_amount) == 0,
+            "CompoundLogic: compound redeem underlying revert"
         );
     }
 
     function borrow(address _underlying, uint256 _amount) external {
-        CERC20Interface(LOGIC_STORAGE.cTokens(_underlying)).borrow(_amount);
+        require(
+            CERC20Interface(LOGIC_STORAGE.cTokens(_underlying)).borrow(
+                _amount
+            ) == 0,
+            "CompoundLogic: compound borrow reverts"
+        );
     }
 
     function repay(address _underlying, uint256 _amount) external {
@@ -140,7 +150,11 @@ contract CompoundLogic is IProtocol {
             CETHInterface(cToken).repayBorrow{value: _amount}();
         } else {
             TransferHelper.approve(_underlying, cToken, _amount);
-            CERC20Interface(cToken).repayBorrow(_amount);
+
+            require(
+                CERC20Interface(cToken).repayBorrow(_amount) == 0,
+                "CompoundLogic: compound repay revert"
+            );
         }
     }
 
