@@ -196,7 +196,7 @@ contract QueryHelper is RateGetter {
         borrowLimit = router.borrowLimit(user, _quote);
     }
 
-    function getUserSupplied(address user)
+    function getUserSupplied(address user, address quote)
         public
         view
         returns (UserSupplyInfo[] memory userSupplyInfo)
@@ -204,24 +204,27 @@ contract QueryHelper is RateGetter {
         address[] memory _underlyings = router.getUnderlyings();
         userSupplyInfo = new UserSupplyInfo[](_underlyings.length);
         Types.Asset[] memory _assets = router.getAssets();
+
+        IPriceOracle priceOracle = router.priceOracle();
         for (uint256 i = 0; i < _underlyings.length; ++i) {
             Types.Asset memory _asset = _assets[i];
             uint256 depositAmount = _asset.sToken.scaledBalanceOf(user);
             if (depositAmount == 0) {
                 continue;
             }
-            uint256 tokenPrice = router.priceOracle().getAssetPrice(
-                _underlyings[i]
-            );
             uint256 depositApr = getCurrentSupplyRate(_underlyings[i]);
 
             userSupplyInfo[i].underlying = _underlyings[i];
-            userSupplyInfo[i].depositValue = (depositAmount * tokenPrice) / 1e8;
+            userSupplyInfo[i].depositValue = priceOracle.valueOfAsset(
+                _underlyings[i],
+                quote,
+                depositAmount
+            );
             userSupplyInfo[i].depositApr = depositApr;
             userSupplyInfo[i].availableBalance = IERC20(_underlyings[i])
                 .balanceOf(user);
             userSupplyInfo[i].dailyEstProfit =
-                (((depositAmount * tokenPrice) / 1e8) * depositApr) /
+                (userSupplyInfo[i].depositValue * depositApr) /
                 365; //maybe wrong,will check later
             userSupplyInfo[i].collateral = router.isUsingAsCollateral(
                 _underlyings[i],
@@ -230,7 +233,7 @@ contract QueryHelper is RateGetter {
         }
     }
 
-    function getUserBorrowed(address user)
+    function getUserBorrowed(address user, address quote)
         public
         view
         returns (UserBorrowInfo[] memory userBorrowInfo)
@@ -238,26 +241,28 @@ contract QueryHelper is RateGetter {
         address[] memory _underlyings = router.getUnderlyings();
         userBorrowInfo = new UserBorrowInfo[](_underlyings.length);
         Types.Asset[] memory _assets = router.getAssets();
+        IPriceOracle priceOracle = router.priceOracle();
         for (uint256 i = 0; i < _underlyings.length; ++i) {
             Types.Asset memory _asset = _assets[i];
             uint256 borrowAmount = _asset.dToken.scaledDebtOf(user);
             if (borrowAmount == 0) {
                 continue;
             }
-            uint256 tokenPrice = router.priceOracle().getAssetPrice(
-                _underlyings[i]
-            );
             uint256 borrowApr = getCurrentBorrowRate(_underlyings[i]);
 
             userBorrowInfo[i].underlying = _underlyings[i];
-            userBorrowInfo[i].borrowValue = (borrowAmount * tokenPrice) / 1e8;
+            userBorrowInfo[i].borrowValue = priceOracle.valueOfAsset(
+                _underlyings[i],
+                quote,
+                borrowAmount
+            );
             userBorrowInfo[i].borrowApr = borrowApr;
             userBorrowInfo[i].borrowLimit = router.borrowLimit(
                 user,
                 _underlyings[i]
             );
             userBorrowInfo[i].dailyEstInterest =
-                (((borrowAmount * tokenPrice) / 1e8) * borrowApr) /
+                (userBorrowInfo[i].borrowValue * borrowApr) /
                 365; //maybe wrong,will check later
         }
     }
