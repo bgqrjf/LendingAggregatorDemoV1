@@ -22,6 +22,16 @@ module.exports = {
       accounts: [process.env.OKCTestnetPrivateKey],
       allowUnlimitedContractSize: true,
     },
+    OKCMainnet: {
+      url: process.env.OKCMainnet,
+      blockGasLimit: 10000000,
+      gas: 10000000,
+      chainId: 66,
+      throwOnTransactionFailures: true,
+      throwOnCallFailures: true,
+      accounts: [process.env.OKCTestnetPrivateKey],
+      allowUnlimitedContractSize: true,
+    },
   },
   solidity: {
     compilers: [

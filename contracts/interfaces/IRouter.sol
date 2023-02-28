@@ -234,6 +234,10 @@ interface IRouter {
     function updatePriceOracle(IPriceOracle _priceOracle) external;
 
     // --- getters
+    function priceOracle() external view returns (IPriceOracle);
+
+    function config() external view returns (IConfig);
+
     function getAsset(address _underlying)
         external
         view

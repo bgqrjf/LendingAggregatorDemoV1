@@ -5,8 +5,8 @@ pragma solidity ^0.8.14;
 import "../interfaces/IRouter.sol";
 
 abstract contract RouterStorage is IRouter {
-    IConfig public config;
-    IPriceOracle public priceOracle;
+    IConfig public override config;
+    IPriceOracle public override priceOracle;
     IProtocolsHandler public protocols;
     IRewards public rewards;
     IReservePool public reservePool;
