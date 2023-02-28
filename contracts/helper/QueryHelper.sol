@@ -199,12 +199,15 @@ contract QueryHelper is RateGetter {
     function getUserSupplied(address user, address quote)
         public
         view
-        returns (UserSupplyInfo[] memory userSupplyInfo)
+        returns (UserSupplyInfo[] memory userSupplyInfos)
     {
         address[] memory _underlyings = router.getUnderlyings();
-        userSupplyInfo = new UserSupplyInfo[](_underlyings.length);
+        UserSupplyInfo[] memory userSupplyInfo = new UserSupplyInfo[](
+            _underlyings.length
+        );
         Types.Asset[] memory _assets = router.getAssets();
 
+        uint256 countValid;
         IPriceOracle priceOracle = router.priceOracle();
         for (uint256 i = 0; i < _underlyings.length; ++i) {
             Types.Asset memory _asset = _assets[i];
@@ -230,18 +233,31 @@ contract QueryHelper is RateGetter {
                 _underlyings[i],
                 user
             );
+            ++countValid;
+        }
+
+        userSupplyInfos = new UserSupplyInfo[](countValid);
+        uint256 j = 0;
+        for (uint256 i = 0; i < userSupplyInfo.length; ++i) {
+            if (userSupplyInfo[i].underlying != address(0)) {
+                userSupplyInfos[j] = userSupplyInfo[i];
+                ++j;
+            }
         }
     }
 
     function getUserBorrowed(address user, address quote)
         public
         view
-        returns (UserBorrowInfo[] memory userBorrowInfo)
+        returns (UserBorrowInfo[] memory userBorrowInfos)
     {
         address[] memory _underlyings = router.getUnderlyings();
-        userBorrowInfo = new UserBorrowInfo[](_underlyings.length);
+        UserBorrowInfo[] memory userBorrowInfoTemp = new UserBorrowInfo[](
+            _underlyings.length
+        );
         Types.Asset[] memory _assets = router.getAssets();
         IPriceOracle priceOracle = router.priceOracle();
+        uint256 countValid;
         for (uint256 i = 0; i < _underlyings.length; ++i) {
             Types.Asset memory _asset = _assets[i];
             uint256 borrowAmount = _asset.dToken.scaledDebtOf(user);
@@ -250,20 +266,31 @@ contract QueryHelper is RateGetter {
             }
             uint256 borrowApr = getCurrentBorrowRate(_underlyings[i]);
 
-            userBorrowInfo[i].underlying = _underlyings[i];
-            userBorrowInfo[i].borrowValue = priceOracle.valueOfAsset(
+            userBorrowInfoTemp[i].underlying = _underlyings[i];
+            userBorrowInfoTemp[i].borrowValue = priceOracle.valueOfAsset(
                 _underlyings[i],
                 quote,
                 borrowAmount
             );
-            userBorrowInfo[i].borrowApr = borrowApr;
-            userBorrowInfo[i].borrowLimit = router.borrowLimit(
+            userBorrowInfoTemp[i].borrowApr = borrowApr;
+            userBorrowInfoTemp[i].borrowLimit = router.borrowLimit(
                 user,
                 _underlyings[i]
             );
-            userBorrowInfo[i].dailyEstInterest =
-                (userBorrowInfo[i].borrowValue * borrowApr) /
+            userBorrowInfoTemp[i].dailyEstInterest =
+                (userBorrowInfoTemp[i].borrowValue * borrowApr) /
                 365; //maybe wrong,will check later
+
+            ++countValid;
+        }
+
+        userBorrowInfos = new UserBorrowInfo[](countValid);
+        uint256 j;
+        for (uint256 i = 0; i < userBorrowInfoTemp.length; ++i) {
+            if (userBorrowInfoTemp[i].underlying != address(0)) {
+                userBorrowInfos[j] = userBorrowInfoTemp[i];
+                ++j;
+            }
         }
     }
 

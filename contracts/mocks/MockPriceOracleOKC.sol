@@ -6,8 +6,12 @@ import "../interfaces/IExOraclePriceData.sol";
 contract MockPriceOracleOKC {
     mapping(address => uint256) public units;
     mapping(address => string) public assetSymbol;
+    mapping(address => uint256) public ratios;
+
     address public exOracleAddress;
     address public dataSource;
+
+    uint256 constant MILLION = 1000000;
 
     constructor(address _oracle, address _dataSource) {
         exOracleAddress = _oracle;
@@ -21,6 +25,7 @@ contract MockPriceOracleOKC {
     ) external {
         units[_asset] = 10**_decimals;
         assetSymbol[_asset] = symbol;
+        ratios[_asset] = MILLION;
     }
 
     function getAssetPrice(address _asset) public view returns (uint256) {
@@ -30,7 +35,11 @@ contract MockPriceOracleOKC {
             dataSource
         );
         value *= 100;
-        return value;
+        return (value * ratios[_asset]) / MILLION;
+    }
+
+    function setAssetRatio(address _asset, uint256 _ratio) external {
+        ratios[_asset] = _ratio;
     }
 
     function valueOfAsset(
