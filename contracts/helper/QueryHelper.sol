@@ -164,6 +164,7 @@ contract QueryHelper is RateGetter {
         returns (MarketInfo[] memory markets)
     {
         address[] memory _underlyings = router.getUnderlyings();
+        markets = new MarketInfo[](_underlyings.length);
         for (uint256 i = 0; i < _underlyings.length; ++i) {
             uint256 tokenPrice = oracle.getAssetPrice(_underlyings[i]);
             markets[i].totalSupplied =
@@ -204,6 +205,7 @@ contract QueryHelper is RateGetter {
         address user
     ) public view returns (UserSupplyInfo[] memory userSupplyInfo) {
         address[] memory _underlyings = router.getUnderlyings();
+        userSupplyInfo = new UserSupplyInfo[](_underlyings.length);
         Types.Asset[] memory _assets = router.getAssets();
         for (uint256 i = 0; i < _underlyings.length; ++i) {
             Types.Asset memory _asset = _assets[i];
@@ -235,6 +237,7 @@ contract QueryHelper is RateGetter {
         address user
     ) public view returns (UserBorrowInfo[] memory userBorrowInfo) {
         address[] memory _underlyings = router.getUnderlyings();
+        userBorrowInfo = new UserBorrowInfo[](_underlyings.length);
         Types.Asset[] memory _assets = router.getAssets();
         for (uint256 i = 0; i < _underlyings.length; ++i) {
             Types.Asset memory _asset = _assets[i];
@@ -265,6 +268,7 @@ contract QueryHelper is RateGetter {
         address user
     ) public view returns (TokenInfoWithUser[] memory tokenInfoWithUser) {
         address[] memory _underlyings = router.getUnderlyings();
+        tokenInfoWithUser = new TokenInfoWithUser[](_underlyings.length);
         Types.Asset[] memory _assets = router.getAssets();
         for (uint256 i = 0; i < _underlyings.length; ++i) {
             Types.Asset memory _asset = _assets[i];
@@ -290,6 +294,7 @@ contract QueryHelper is RateGetter {
         returns (SupplyMarket[] memory supplyMarket)
     {
         address[] memory _underlyings = router.getUnderlyings();
+        supplyMarket = new SupplyMarket[](_underlyings.length);
 
         for (uint256 i = 0; i < _underlyings.length; ++i) {
             (
@@ -318,7 +323,7 @@ contract QueryHelper is RateGetter {
         returns (BorrowMarket[] memory borrowMarket)
     {
         address[] memory _underlyings = router.getUnderlyings();
-
+        borrowMarket = new BorrowMarket[](_underlyings.length);
         for (uint256 i = 0; i < _underlyings.length; ++i) {
             (
                 uint256[] memory borrows,
