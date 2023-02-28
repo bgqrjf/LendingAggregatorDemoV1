@@ -174,7 +174,7 @@ contract QueryHelper is RateGetter {
             markets[i].totalBorrowed =
                 (router.totalBorrowed(_underlyings[i]) * tokenPrice) /
                 1e8;
-            markets[i].supplyRate = getCurrentBorrowRate(_underlyings[i]);
+            markets[i].borrowRate = getCurrentBorrowRate(_underlyings[i]);
             (, , uint256 matchAmount, , ) = router.getSupplyStatus(
                 _underlyings[i]
             );
