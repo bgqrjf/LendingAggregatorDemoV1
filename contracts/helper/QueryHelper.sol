@@ -4,10 +4,6 @@ pragma solidity ^0.8.14;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./RatesHelper.sol";
 import "../interfaces/IRouter.sol";
-import "../interfaces/IPriceOracle.sol";
-import "../interfaces/ISToken.sol";
-import "../interfaces/IDToken.sol";
-import "../interfaces/IConfig.sol";
 import "../libraries/internals/Types.sol";
 
 contract QueryHelper is RateGetter {
