@@ -238,7 +238,7 @@ contract QueryHelper is RateGetter {
 
         userSupplyInfos = new UserSupplyInfo[](countValid);
         uint256 j = 0;
-        for (uint256 i = 0; i < userSupplyInfo.length; ++i) {
+        for (uint256 i = 0; i < userSupplyInfo.length && j < countValid; ++i) {
             if (userSupplyInfo[i].underlying != address(0)) {
                 userSupplyInfos[j] = userSupplyInfo[i];
                 ++j;
@@ -286,7 +286,11 @@ contract QueryHelper is RateGetter {
 
         userBorrowInfos = new UserBorrowInfo[](countValid);
         uint256 j;
-        for (uint256 i = 0; i < userBorrowInfoTemp.length; ++i) {
+        for (
+            uint256 i = 0;
+            i < userBorrowInfoTemp.length && j < countValid;
+            ++i
+        ) {
             if (userBorrowInfoTemp[i].underlying != address(0)) {
                 userBorrowInfos[j] = userBorrowInfoTemp[i];
                 ++j;
