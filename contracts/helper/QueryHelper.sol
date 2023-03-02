@@ -100,7 +100,7 @@ contract QueryHelper is RateGetter {
         return (rate, dTokenPrice);
     }
 
-    function getPlatformInfo()
+    function getPlatformInfo(address _quote)
         public
         view
         returns (
@@ -112,19 +112,27 @@ contract QueryHelper is RateGetter {
         uint256 totalDeposited;
         uint256 totalBorrowed;
         uint256 totalMatchAmount;
-        uint256 supplyedAmount;
-        uint256 borrowedAmount;
         uint256 matchAmount;
-        uint256 tokenPrice;
         address[] memory _underlyings = router.getUnderlyings();
+        IPriceOracle priceOracle = router.priceOracle();
         for (uint256 i = 0; i < _underlyings.length; ++i) {
-            supplyedAmount = router.totalSupplied(_underlyings[i]);
-            borrowedAmount = router.totalBorrowed(_underlyings[i]);
             (, , matchAmount, , ) = router.getSupplyStatus(_underlyings[i]);
-            tokenPrice = router.priceOracle().getAssetPrice(_underlyings[i]);
-            totalDeposited += (supplyedAmount * tokenPrice) / 1e8;
-            totalBorrowed += (borrowedAmount * tokenPrice) / 1e8;
-            totalMatchAmount += (matchAmount * tokenPrice) / 1e8;
+
+            totalDeposited += priceOracle.valueOfAsset(
+                _underlyings[i],
+                _quote,
+                router.totalSupplied(_underlyings[i])
+            );
+            totalBorrowed += priceOracle.valueOfAsset(
+                _underlyings[i],
+                _quote,
+                router.totalBorrowed(_underlyings[i])
+            );
+            totalMatchAmount += priceOracle.valueOfAsset(
+                _underlyings[i],
+                _quote,
+                matchAmount
+            );
         }
         return (totalDeposited, totalBorrowed, totalMatchAmount);
     }
@@ -240,7 +248,8 @@ contract QueryHelper is RateGetter {
             );
 
             userSupplyInfo[i].dailyEstProfit =
-                (userSupplyInfo[i].depositValue * userSupplyInfo[i].depositApr) /
+                (userSupplyInfo[i].depositValue *
+                    userSupplyInfo[i].depositApr) /
                 (Utils.MILLION * 365);
 
             ++countValid;
@@ -334,13 +343,14 @@ contract QueryHelper is RateGetter {
         }
     }
 
-    function getSupplyMarkets()
+    function getSupplyMarkets(address _quote)
         public
         view
         returns (SupplyMarket[] memory supplyMarket)
     {
         address[] memory _underlyings = router.getUnderlyings();
         supplyMarket = new SupplyMarket[](_underlyings.length);
+        IPriceOracle priceOracle = router.priceOracle();
 
         for (uint256 i = 0; i < _underlyings.length; ++i) {
             (
@@ -351,27 +361,26 @@ contract QueryHelper is RateGetter {
 
             ) = router.getSupplyStatus(_underlyings[i]);
 
-            uint256 tokenPrice = router.priceOracle().getAssetPrice(
-                _underlyings[i]
-            );
-
             supplyMarket[i].underlying = _underlyings[i];
             supplyMarket[i].supplyAmount = totalSuppliedAmountWithFee;
-            supplyMarket[i].supplyValue =
-                (totalSuppliedAmountWithFee * tokenPrice) /
-                1e8;
+            supplyMarket[i].supplyValue = priceOracle.valueOfAsset(
+                _underlyings[i],
+                _quote,
+                totalSuppliedAmountWithFee
+            );
             supplyMarket[i].matchAmount = totalLending;
             supplyMarket[i].supplies = supplies;
         }
     }
 
-    function getBorrowMarkets()
+    function getBorrowMarkets(address _quote)
         public
         view
         returns (BorrowMarket[] memory borrowMarket)
     {
         address[] memory _underlyings = router.getUnderlyings();
         borrowMarket = new BorrowMarket[](_underlyings.length);
+        IPriceOracle priceOracle = router.priceOracle();
         for (uint256 i = 0; i < _underlyings.length; ++i) {
             (
                 uint256[] memory borrows,
@@ -380,14 +389,13 @@ contract QueryHelper is RateGetter {
 
             ) = router.getBorrowStatus(_underlyings[i]);
 
-            uint256 tokenPrice = router.priceOracle().getAssetPrice(
-                _underlyings[i]
-            );
             borrowMarket[i].underlying = _underlyings[i];
             borrowMarket[i].borrowAmount = totalBorrowedAmount;
-            borrowMarket[i].borrowValue =
-                (totalBorrowedAmount * tokenPrice) /
-                1e8;
+            borrowMarket[i].borrowValue = priceOracle.valueOfAsset(
+                _underlyings[i],
+                _quote,
+                totalBorrowedAmount
+            );
             borrowMarket[i].matchAmount = totalLending;
             borrowMarket[i].borrows = borrows;
         }
