@@ -8,6 +8,7 @@ import "../libraries/internals/Types.sol";
 
 contract QueryHelper is RateGetter {
     struct MarketInfo {
+        address underlying;
         uint256 totalSupplied;
         uint256 supplyRate;
         uint256 totalBorrowed;
@@ -17,6 +18,7 @@ contract QueryHelper is RateGetter {
 
     struct UserSupplyInfo {
         address underlying;
+        uint256 depositAmount;
         uint256 depositValue;
         uint256 depositApr;
         uint256 availableBalance;
@@ -26,6 +28,7 @@ contract QueryHelper is RateGetter {
 
     struct UserBorrowInfo {
         address underlying;
+        uint256 borrowAmount;
         uint256 borrowValue;
         uint256 borrowApr;
         uint256 borrowLimit;
@@ -154,33 +157,43 @@ contract QueryHelper is RateGetter {
         compBorrowRate = compoundLogic.getCurrentBorrowRate(_underlying);
     }
 
-    function getMarketsInfo(address[] memory _underlyings)
+    function getMarketsInfo(address[] memory _underlyings, address _quote)
         public
         view
         returns (MarketInfo[] memory markets)
     {
         markets = new MarketInfo[](_underlyings.length);
         for (uint256 i = 0; i < _underlyings.length; ++i) {
-            markets[i] = getMarketInfo(_underlyings[i]);
+            markets[i] = getMarketInfo(_underlyings[i], _quote);
         }
     }
 
-    function getMarketInfo(address underlying)
+    function getMarketInfo(address _underlying, address _quote)
         public
         view
         returns (MarketInfo memory market)
     {
-        uint256 tokenPrice = router.priceOracle().getAssetPrice(underlying);
-        market.totalSupplied =
-            (router.totalSupplied(underlying) * tokenPrice) /
-            1e8;
-        market.supplyRate = getCurrentSupplyRate(underlying);
-        market.totalBorrowed =
-            (router.totalBorrowed(underlying) * tokenPrice) /
-            1e8;
-        market.borrowRate = getCurrentBorrowRate(underlying);
-        (, , uint256 matchAmount, , ) = router.getSupplyStatus(underlying);
-        market.totalMatched = (matchAmount * tokenPrice) / 1e8;
+        IPriceOracle priceOracle = router.priceOracle();
+
+        market.underlying = _underlying;
+        market.totalSupplied = priceOracle.valueOfAsset(
+            _underlying,
+            _quote,
+            router.totalSupplied(_underlying)
+        );
+        market.supplyRate = getCurrentSupplyRate(_underlying);
+        market.totalBorrowed = priceOracle.valueOfAsset(
+            _underlying,
+            _quote,
+            router.totalBorrowed(_underlying)
+        );
+        market.borrowRate = getCurrentBorrowRate(_underlying);
+        (, , uint256 matchAmount, , ) = router.getSupplyStatus(_underlying);
+        market.totalMatched = priceOracle.valueOfAsset(
+            _underlying,
+            _quote,
+            matchAmount
+        );
     }
 
     function getUserInfo(address user, address _quote)
@@ -215,24 +228,21 @@ contract QueryHelper is RateGetter {
             if (depositAmount == 0) {
                 continue;
             }
-            uint256 depositApr = getCurrentSupplyRate(_underlyings[i]);
 
-            userSupplyInfo[i].underlying = _underlyings[i];
-            userSupplyInfo[i].depositValue = priceOracle.valueOfAsset(
+            userSupplyInfo[i] = UserSupplyInfo(
                 _underlyings[i],
-                quote,
-                depositAmount
+                depositAmount,
+                priceOracle.valueOfAsset(_underlyings[i], quote, depositAmount),
+                getCurrentSupplyRate(_underlyings[i]),
+                IERC20(_underlyings[i]).balanceOf(user),
+                0,
+                router.isUsingAsCollateral(_underlyings[i], user)
             );
-            userSupplyInfo[i].depositApr = depositApr;
-            userSupplyInfo[i].availableBalance = IERC20(_underlyings[i])
-                .balanceOf(user);
+
             userSupplyInfo[i].dailyEstProfit =
-                (userSupplyInfo[i].depositValue * depositApr) /
-                365; //maybe wrong,will check later
-            userSupplyInfo[i].collateral = router.isUsingAsCollateral(
-                _underlyings[i],
-                user
-            );
+                (userSupplyInfo[i].depositValue * userSupplyInfo[i].depositApr) /
+                (Utils.MILLION * 365);
+
             ++countValid;
         }
 
@@ -264,22 +274,20 @@ contract QueryHelper is RateGetter {
             if (borrowAmount == 0) {
                 continue;
             }
-            uint256 borrowApr = getCurrentBorrowRate(_underlyings[i]);
 
-            userBorrowInfoTemp[i].underlying = _underlyings[i];
-            userBorrowInfoTemp[i].borrowValue = priceOracle.valueOfAsset(
+            userBorrowInfoTemp[i] = UserBorrowInfo(
                 _underlyings[i],
-                quote,
-                borrowAmount
+                borrowAmount,
+                priceOracle.valueOfAsset(_underlyings[i], quote, borrowAmount),
+                getCurrentBorrowRate(_underlyings[i]),
+                router.borrowLimit(user, _underlyings[i]),
+                0
             );
-            userBorrowInfoTemp[i].borrowApr = borrowApr;
-            userBorrowInfoTemp[i].borrowLimit = router.borrowLimit(
-                user,
-                _underlyings[i]
-            );
+
             userBorrowInfoTemp[i].dailyEstInterest =
-                (userBorrowInfoTemp[i].borrowValue * borrowApr) /
-                365; //maybe wrong,will check later
+                (userBorrowInfoTemp[i].borrowValue *
+                    userBorrowInfoTemp[i].borrowApr) /
+                (365 * Utils.MILLION);
 
             ++countValid;
         }

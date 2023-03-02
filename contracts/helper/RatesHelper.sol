@@ -43,7 +43,7 @@ contract RateGetter is MulticallHelper {
                 ? (protocolsSupplyRate *
                     protocolsSupplies +
                     lendingRate *
-                    totalLending) / (totalSuppliedAmountWithFee * Utils.MILLION)
+                    totalLending) / (totalSuppliedAmountWithFee)
                 : routerBorrowed > 0
                 ? lendingRate
                 : protocolsSupplyRate;
@@ -81,7 +81,7 @@ contract RateGetter is MulticallHelper {
                 ? (protocolsBorrowRate *
                     protocolsBorrows +
                     lendingRate *
-                    totalLending) / (totalBorrowedAmount * Utils.MILLION)
+                    totalLending) / (totalBorrowedAmount)
                 : routerSupplied > 0
                 ? lendingRate
                 : protocolsBorrowRate;
