@@ -69,17 +69,16 @@ library BorrowLogic {
             executeBorrowInternal(_params, totalLending, totalLendings);
         }
 
-        require(
-            ExternalUtils.isPositionHealthy(
-                _params.config,
-                _params.priceOracle,
-                msg.sender,
-                _params.userParams.asset,
-                _params.underlyings,
-                assets
-            ),
-            "BorrowLogic: Insufficient collateral"
+        (bool isHealthy, , ) = ExternalUtils.isPositionHealthy(
+            _params.config,
+            _params.priceOracle,
+            msg.sender,
+            _params.userParams.asset,
+            _params.underlyings,
+            assets
         );
+
+        require(isHealthy, "BorrowLogic: Insufficient collateral");
     }
 
     function recordBorrow(
@@ -118,7 +117,8 @@ library BorrowLogic {
     ) external view returns (uint256 amount) {
         return
             ExternalUtils.borrowLimitInternal(
-                _config,
+                _config.userDebtAndCollateral(_account),
+                _config.assetConfigs(_borrowAsset).maxLTV,
                 _priceOracle,
                 _account,
                 _borrowAsset,

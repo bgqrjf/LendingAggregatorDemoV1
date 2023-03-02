@@ -66,17 +66,16 @@ library RedeemLogic {
             );
         }
 
-        require(
-            ExternalUtils.isPositionHealthy(
-                _params.config,
-                _params.priceOracle,
-                msg.sender,
-                _params.userParams.asset,
-                _params.underlyings,
-                assets
-            ),
-            "RedeemLogic: insufficient collateral"
+        (bool isHealthy, , ) = ExternalUtils.isPositionHealthy(
+            _params.config,
+            _params.priceOracle,
+            msg.sender,
+            _params.userParams.asset,
+            _params.underlyings,
+            assets
         );
+
+        require(isHealthy, "RedeemLogic: insufficient collateral");
     }
 
     function recordRedeem(

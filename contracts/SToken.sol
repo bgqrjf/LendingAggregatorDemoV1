@@ -59,10 +59,11 @@ contract SToken is ISToken, OwnableUpgradeable, ERC20Upgradeable {
     ) internal view override {
         if (_from != address(0)) {
             if (IRouter(owner()).isUsingAsCollateral(underlying, _from)) {
-                require(
-                    IRouter(owner()).isPoisitionHealthy(underlying, _from),
-                    "SToken: insufficient collateral"
+                (bool healthy, , ) = IRouter(owner()).isPoisitionHealthy(
+                    underlying,
+                    _from
                 );
+                require(healthy, "SToken: insufficient collateral");
             }
         }
     }

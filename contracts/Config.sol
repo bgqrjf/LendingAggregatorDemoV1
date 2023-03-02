@@ -69,10 +69,12 @@ contract Config is IConfig, Ownable {
 
             userDebtAndCollateral[_account] = newUserConfig;
 
-            if (
-                !_usingAsCollateral &&
-                !IRouter(router).isPoisitionHealthy(_underlying, _account)
-            ) {
+            (bool isHealthy, , ) = IRouter(router).isPoisitionHealthy(
+                _underlying,
+                _account
+            );
+
+            if (!_usingAsCollateral && !isHealthy) {
                 newUserConfig = oldUserConfig;
                 userDebtAndCollateral[_account] = oldUserConfig;
             }

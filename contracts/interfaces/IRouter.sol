@@ -201,7 +201,11 @@ interface IRouter {
     function isPoisitionHealthy(address _underlying, address _account)
         external
         view
-        returns (bool);
+        returns (
+            bool,
+            uint256,
+            uint256
+        );
 
     function isUsingAsCollateral(address _underlying, address _account)
         external

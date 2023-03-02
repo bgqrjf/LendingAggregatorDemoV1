@@ -262,19 +262,20 @@ library ExternalUtils {
     }
 
     function borrowLimitInternal(
-        IConfig _config,
+        uint256 _userConfig,
+        uint256 _maxLTV,
         IPriceOracle _priceOracle,
         address _account,
         address _borrowAsset,
         address[] memory _underlyings,
         mapping(address => Types.Asset) storage assets
     ) internal view returns (uint256 amount) {
-        uint256 userConfig = _config.userDebtAndCollateral(_account);
+        // uint256 userConfig = _config.userDebtAndCollateral(_account);
         for (uint256 i = 0; i < _underlyings.length; ++i) {
             address underlying = _underlyings[i];
             Types.Asset memory asset = assets[underlying];
 
-            if (userConfig.isUsingAsCollateral(asset.index) && !asset.paused) {
+            if (_userConfig.isUsingAsCollateral(asset.index) && !asset.paused) {
                 uint256 collateralAmount = underlying == _borrowAsset
                     ? asset.sToken.scaledBalanceOf(_account)
                     : _priceOracle.valueOfAsset(
@@ -284,8 +285,8 @@ library ExternalUtils {
                     );
 
                 amount +=
-                    (_config.assetConfigs(underlying).maxLTV *
-                        collateralAmount) /
+                    // (_config.assetConfigs(underlying).maxLTV *
+                    (_maxLTV * collateralAmount) /
                     Utils.MILLION;
             }
         }
@@ -351,9 +352,18 @@ library ExternalUtils {
         address _underlying,
         address[] memory _underlyings,
         mapping(address => Types.Asset) storage assets
-    ) internal view returns (bool) {
+    )
+        internal
+        view
+        returns (
+            bool,
+            uint256,
+            uint256
+        )
+    {
         uint256 maxDebtAllowed = ExternalUtils.borrowLimitInternal(
-            _config,
+            _config.userDebtAndCollateral(_account),
+            _config.assetConfigs(_underlying).liquidateLTV,
             _priceOracle,
             _account,
             _underlying,
@@ -370,6 +380,6 @@ library ExternalUtils {
             assets
         );
 
-        return currentDebts <= maxDebtAllowed;
+        return (currentDebts <= maxDebtAllowed, maxDebtAllowed, currentDebts);
     }
 }

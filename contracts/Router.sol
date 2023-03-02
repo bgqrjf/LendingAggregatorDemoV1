@@ -562,7 +562,11 @@ contract Router is RouterStorage, OwnableUpgradeable {
         public
         view
         override
-        returns (bool)
+        returns (
+            bool,
+            uint256,
+            uint256
+        )
     {
         return
             ExternalUtils.isPositionHealthy(
