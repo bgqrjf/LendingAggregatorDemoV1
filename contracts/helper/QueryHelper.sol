@@ -9,11 +9,25 @@ import "../libraries/internals/Types.sol";
 contract QueryHelper is RateGetter {
     struct MarketInfo {
         address underlying;
-        uint256 totalSupplied;
+        uint256[] supplies;
         uint256 supplyRate;
-        uint256 totalBorrowed;
+        uint256[] borrows;
         uint256 borrowRate;
         uint256 totalMatched;
+    }
+
+    struct UserStatus {
+        uint256 assetPrice;
+        uint256 userBalance;
+        uint256 borrowed;
+        uint256 collateral;
+        uint256 borrowLimit;
+        uint256 liquidateThreashold;
+        bool usingAsCollateral;
+        uint256 supplyRate;
+        uint256 borrowRate;
+        uint256[] supplyRates;
+        uint256[] borrowRates;
     }
 
     struct UserSupplyInfo {
@@ -202,24 +216,65 @@ contract QueryHelper is RateGetter {
         IPriceOracle priceOracle = router.priceOracle();
 
         market.underlying = _underlying;
-        market.totalSupplied = priceOracle.valueOfAsset(
-            _underlying,
-            _quote,
-            router.totalSupplied(_underlying)
+        (market.supplies, , market.totalMatched, , ) = router.getSupplyStatus(
+            _underlying
         );
-        market.supplyRate = getCurrentSupplyRate(_underlying);
-        market.totalBorrowed = priceOracle.valueOfAsset(
-            _underlying,
-            _quote,
-            router.totalBorrowed(_underlying)
-        );
-        market.borrowRate = getCurrentBorrowRate(_underlying);
-        (, , uint256 matchAmount, , ) = router.getSupplyStatus(_underlying);
+        (market.borrows, , , ) = router.getBorrowStatus(_underlying);
+
+        for (uint256 i = 0; i < market.supplies.length; i++) {
+            market.supplies[i] = priceOracle.valueOfAsset(
+                _underlying,
+                _quote,
+                market.supplies[i]
+            );
+
+            market.borrows[i] = priceOracle.valueOfAsset(
+                _underlying,
+                _quote,
+                market.borrows[i]
+            );
+        }
+
         market.totalMatched = priceOracle.valueOfAsset(
             _underlying,
             _quote,
-            matchAmount
+            market.totalMatched
         );
+
+        market.supplyRate = getCurrentSupplyRate(_underlying);
+        market.borrowRate = getCurrentBorrowRate(_underlying);
+    }
+
+    function getUserStatus(address _account, address _asset)
+        public
+        view
+        returns (UserStatus memory userStatus)
+    {
+        userStatus.assetPrice = router.priceOracle().getAssetPrice(_asset);
+        userStatus.userBalance = IERC20(_asset).balanceOf(_account);
+        (userStatus.collateral, userStatus.borrowed, ) = router.userStatus(
+            _account,
+            _asset
+        );
+        userStatus.borrowLimit = router.borrowLimit(_account, _asset);
+        (, userStatus.liquidateThreashold, ) = router.isPoisitionHealthy(
+            _asset,
+            _account
+        );
+        userStatus.usingAsCollateral = router.isUsingAsCollateral(
+            _asset,
+            _account
+        );
+        userStatus.supplyRate = getCurrentSupplyRate(_asset);
+
+        userStatus.supplyRates = new uint256[](2);
+        userStatus.supplyRates[0] = aaveLogic.getCurrentSupplyRate(_asset);
+        userStatus.supplyRates[1] = compoundLogic.getCurrentSupplyRate(_asset);
+
+        userStatus.borrowRate = getCurrentBorrowRate(_asset);
+        userStatus.borrowRates = new uint256[](2);
+        userStatus.borrowRates[0] = aaveLogic.getCurrentBorrowRate(_asset);
+        userStatus.borrowRates[1] = compoundLogic.getCurrentBorrowRate(_asset);
     }
 
     function getUserInfo(address user, address _quote)
