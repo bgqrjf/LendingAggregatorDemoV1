@@ -202,9 +202,9 @@ interface IRouter {
         external
         view
         returns (
-            bool,
-            uint256,
-            uint256
+            bool isHealthy,
+            uint256 borrowAmount,
+            uint256 collateralAmount
         );
 
     function isUsingAsCollateral(address _underlying, address _account)

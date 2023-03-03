@@ -55,7 +55,7 @@ contract Config is IConfig, Ownable {
         Types.Asset memory asset = IRouter(router).getAsset(_underlying);
         uint256 oldUserConfig = userDebtAndCollateral[_account];
 
-        uint256 newUserConfig;
+        uint256 newUserConfig = oldUserConfig;
         if (
             UserAssetBitMap.isUsingAsCollateral(oldUserConfig, asset.index) !=
             _usingAsCollateral
