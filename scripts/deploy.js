@@ -70,10 +70,13 @@ async function main() {
   }
 
   // config
-  let Config = await ethers.getContractFactory("Config");
-  let config = await Config.deploy();
-  await config.deployed();
-  m.log("config:", config.address);
+  let config = await transparentProxy.deployProxy({
+    implementationFactory: "Config",
+    libraries: {},
+    initializeParams: [],
+    proxyAdmin: proxyAdmin,
+  });
+  m.log("config(proxy):", config.address);
 
   // rewards
   let Rewards = await ethers.getContractFactory("Rewards");
