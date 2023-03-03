@@ -100,7 +100,7 @@ contract QueryHelper is RateGetter {
         return (rate, dTokenPrice);
     }
 
-    function getPlatformInfo(address _quote)
+    function getPlatformsInfo(address[] memory _underlyings, address _quote)
         public
         view
         returns (
@@ -112,29 +112,47 @@ contract QueryHelper is RateGetter {
         uint256 totalDeposited;
         uint256 totalBorrowed;
         uint256 totalMatchAmount;
-        uint256 matchAmount;
-        address[] memory _underlyings = router.getUnderlyings();
-        IPriceOracle priceOracle = router.priceOracle();
         for (uint256 i = 0; i < _underlyings.length; ++i) {
-            (, , matchAmount, , ) = router.getSupplyStatus(_underlyings[i]);
-
-            totalDeposited += priceOracle.valueOfAsset(
-                _underlyings[i],
-                _quote,
-                router.totalSupplied(_underlyings[i])
-            );
-            totalBorrowed += priceOracle.valueOfAsset(
-                _underlyings[i],
-                _quote,
-                router.totalBorrowed(_underlyings[i])
-            );
-            totalMatchAmount += priceOracle.valueOfAsset(
-                _underlyings[i],
-                _quote,
-                matchAmount
-            );
+            (
+                uint256 depositedValue,
+                uint256 totalBorrowedValue,
+                uint256 matchAmountValue
+            ) = getPlatformInfo(_underlyings[i], _quote);
+            totalDeposited += depositedValue;
+            totalBorrowed += totalBorrowedValue;
+            totalMatchAmount += matchAmountValue;
         }
         return (totalDeposited, totalBorrowed, totalMatchAmount);
+    }
+
+    function getPlatformInfo(address _underlying, address _quote)
+        public
+        view
+        returns (
+            uint256 depositedValue,
+            uint256 totalBorrowedValue,
+            uint256 matchAmountValue
+        )
+    {
+        uint256 matchAmount;
+        IPriceOracle priceOracle = router.priceOracle();
+        (, , matchAmount, , ) = router.getSupplyStatus(_underlying);
+
+        depositedValue = priceOracle.valueOfAsset(
+            _underlying,
+            _quote,
+            router.totalSupplied(_underlying)
+        );
+        totalBorrowedValue = priceOracle.valueOfAsset(
+            _underlying,
+            _quote,
+            router.totalBorrowed(_underlying)
+        );
+        matchAmountValue = priceOracle.valueOfAsset(
+            _underlying,
+            _quote,
+            matchAmount
+        );
     }
 
     function getCurrentSupplyRates(address _underlying)
