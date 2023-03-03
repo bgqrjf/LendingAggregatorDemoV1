@@ -88,6 +88,7 @@ library LiquidateLogic {
                 protocolsSupplies + totalLending,
                 0,
                 _params.repayParams.userParams.to,
+                false,
                 accFees,
                 assets
             );

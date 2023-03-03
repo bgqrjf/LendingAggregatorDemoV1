@@ -53,6 +53,7 @@ library RedeemLogic {
                 totalBorrowedAmountWithFee,
                 newInterest,
                 msg.sender,
+                true,
                 accFees,
                 assets
             );
@@ -92,6 +93,7 @@ library RedeemLogic {
                 _totalSupplies,
                 _newInterest,
                 _redeemFrom,
+                true,
                 accFees,
                 assets
             );
@@ -118,6 +120,7 @@ library RedeemLogic {
         uint256 _totalSupplies,
         uint256 _newInterest,
         address _redeemFrom,
+        bool notLiquidate,
         mapping(address => uint256) storage accFees,
         mapping(address => Types.Asset) storage assets
     ) internal returns (uint256 underlyingAmount, uint256 fee) {
@@ -139,11 +142,13 @@ library RedeemLogic {
             uint256 sTokenBalance = redeemAsset.sToken.balanceOf(_redeemFrom);
             if (sTokenAmount >= sTokenBalance) {
                 sTokenAmount = sTokenBalance;
+                _params.collateralable = false;
             }
         }
 
         (_params.userParams.amount, fee) = redeemAsset.sToken.burn(
             _redeemFrom,
+            notLiquidate,
             sTokenAmount,
             _totalSupplies,
             accFee

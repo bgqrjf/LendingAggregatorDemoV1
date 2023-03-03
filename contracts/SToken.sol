@@ -40,6 +40,7 @@ contract SToken is ISToken, OwnableUpgradeable, ERC20Upgradeable {
 
     function burn(
         address _from,
+        bool _notLiquidate,
         uint256 _amount,
         uint256 _totalUnderlying,
         uint256 _totalUncollectedFee
@@ -50,6 +51,10 @@ contract SToken is ISToken, OwnableUpgradeable, ERC20Upgradeable {
         amount = (_amount * _totalUnderlying) / totalSupply - fee;
 
         _burn(_from, _amount);
+
+        if (_notLiquidate) {
+            validatePosition(_from);
+        }
     }
 
     function _afterTokenTransfer(
@@ -57,14 +62,18 @@ contract SToken is ISToken, OwnableUpgradeable, ERC20Upgradeable {
         address _to,
         uint256 _amount
     ) internal view override {
-        if (_from != address(0)) {
-            if (IRouter(owner()).isUsingAsCollateral(underlying, _from)) {
-                (bool healthy, , ) = IRouter(owner()).isPoisitionHealthy(
-                    underlying,
-                    _from
-                );
-                require(healthy, "SToken: insufficient collateral");
-            }
+        if (msg.sender != owner()) {
+            validatePosition(_from);
+        }
+    }
+
+    function validatePosition(address _from) internal view {
+        if (IRouter(owner()).isUsingAsCollateral(underlying, _from)) {
+            (bool isHealthy, , ) = IRouter(owner()).isPoisitionHealthy(
+                underlying,
+                _from
+            );
+            require(isHealthy, "SToken: insufficient collateral");
         }
     }
 
