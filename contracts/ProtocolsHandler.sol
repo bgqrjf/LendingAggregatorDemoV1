@@ -200,9 +200,10 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
             uint256 newBorrowWeight = borrowWeight + protocolBorrowAmount;
             if (newBorrowWeight > 0) {
                 borrowRate =
-                    borrowRate *
-                    borrowWeight +
-                    (protocolBorrowRate * protocolBorrowAmount) /
+                    (borrowRate *
+                        borrowWeight +
+                        protocolBorrowRate *
+                        protocolBorrowAmount) /
                     newBorrowWeight;
 
                 borrowWeight = newBorrowWeight;

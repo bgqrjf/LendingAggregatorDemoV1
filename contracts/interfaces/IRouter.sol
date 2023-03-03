@@ -203,7 +203,7 @@ interface IRouter {
         view
         returns (
             bool isHealthy,
-            uint256 borrowAmount,
+            uint256 maxDebtAllowed,
             uint256 collateralAmount
         );
 

@@ -563,9 +563,9 @@ contract Router is RouterStorage, OwnableUpgradeable {
         view
         override
         returns (
-            bool,
-            uint256,
-            uint256
+            bool isHealthy,
+            uint256 maxDebtAllowed,
+            uint256 collateralAmount
         )
     {
         return
