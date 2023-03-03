@@ -20,7 +20,9 @@ contract QueryHelper is RateGetter {
         uint256 assetPrice;
         uint256 userBalance;
         uint256 borrowed;
-        uint256 collateral;
+        uint256 supplied;
+        uint256 totalBorrowed;
+        uint256 tatalCollateral;
         uint256 borrowLimit;
         uint256 liquidateThreashold;
         bool usingAsCollateral;
@@ -251,11 +253,17 @@ contract QueryHelper is RateGetter {
         returns (UserStatus memory userStatus)
     {
         userStatus.assetPrice = router.priceOracle().getAssetPrice(_asset);
-        userStatus.userBalance = IERC20(_asset).balanceOf(_account);
-        (userStatus.collateral, userStatus.borrowed, ) = router.userStatus(
-            _account,
-            _asset
+        userStatus.borrowed = router.getAsset(_asset).dToken.scaledDebtOf(
+            _account
         );
+
+        userStatus.supplied = router.getAsset(_asset).sToken.scaledBalanceOf(
+            _account
+        );
+
+        userStatus.userBalance = IERC20(_asset).balanceOf(_account);
+        (userStatus.tatalCollateral, userStatus.totalBorrowed, ) = router
+            .userStatus(_account, _asset);
         userStatus.borrowLimit = router.borrowLimit(_account, _asset);
         (, userStatus.liquidateThreashold, ) = router.isPoisitionHealthy(
             _asset,
@@ -265,8 +273,8 @@ contract QueryHelper is RateGetter {
             _asset,
             _account
         );
-        userStatus.supplyRate = getCurrentSupplyRate(_asset);
 
+        userStatus.supplyRate = getCurrentSupplyRate(_asset);
         userStatus.supplyRates = new uint256[](2);
         userStatus.supplyRates[0] = aaveLogic.getCurrentSupplyRate(_asset);
         userStatus.supplyRates[1] = compoundLogic.getCurrentSupplyRate(_asset);
