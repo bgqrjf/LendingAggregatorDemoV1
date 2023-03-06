@@ -443,13 +443,14 @@ contract QueryHelper is RateGetter {
             uint256 tokenPrice = router.priceOracle().getAssetPrice(
                 _underlyings[i]
             );
-
-            tokenInfoWithUser[i].underlying = _underlyings[i];
-            tokenInfoWithUser[i].tokenPrice = tokenPrice;
-            tokenInfoWithUser[i].depositAmount = depositAmount;
-            tokenInfoWithUser[i].borrowAmount = borrowAmount;
-            tokenInfoWithUser[i].maxLTV = _conifg.maxLTV;
-            tokenInfoWithUser[i].liquidationThreshold = _conifg.liquidateLTV;
+            tokenInfoWithUser[i] = TokenInfoWithUser(
+                _underlyings[i],
+                tokenPrice,
+                depositAmount,
+                borrowAmount,
+                _conifg.maxLTV,
+                _conifg.liquidateLTV
+            );
         }
     }
 
@@ -461,25 +462,27 @@ contract QueryHelper is RateGetter {
         address[] memory _underlyings = router.getUnderlyings();
         supplyMarket = new SupplyMarket[](_underlyings.length);
         IPriceOracle priceOracle = router.priceOracle();
-
+        uint256 totalSuppliedAmountWithFee;
         for (uint256 i = 0; i < _underlyings.length; ++i) {
             (
-                uint256[] memory supplies,
+                supplyMarket[i].supplies,
                 ,
-                uint256 totalLending,
-                uint256 totalSuppliedAmountWithFee,
+                supplyMarket[i].matchAmount,
+                totalSuppliedAmountWithFee,
 
             ) = router.getSupplyStatus(_underlyings[i]);
 
-            supplyMarket[i].underlying = _underlyings[i];
-            supplyMarket[i].supplyAmount = totalSuppliedAmountWithFee;
-            supplyMarket[i].supplyValue = priceOracle.valueOfAsset(
+            supplyMarket[i] = SupplyMarket(
                 _underlyings[i],
-                _quote,
-                totalSuppliedAmountWithFee
+                totalSuppliedAmountWithFee,
+                priceOracle.valueOfAsset(
+                    _underlyings[i],
+                    _quote,
+                    totalSuppliedAmountWithFee
+                ),
+                supplyMarket[i].matchAmount,
+                supplyMarket[i].supplies
             );
-            supplyMarket[i].matchAmount = totalLending;
-            supplyMarket[i].supplies = supplies;
         }
     }
 
@@ -491,23 +494,27 @@ contract QueryHelper is RateGetter {
         address[] memory _underlyings = router.getUnderlyings();
         borrowMarket = new BorrowMarket[](_underlyings.length);
         IPriceOracle priceOracle = router.priceOracle();
+        uint256 totalBorrowedAmount;
+        uint256 totalLending;
         for (uint256 i = 0; i < _underlyings.length; ++i) {
             (
-                uint256[] memory borrows,
-                uint256 totalBorrowedAmount,
-                uint256 totalLending,
+                borrowMarket[i].borrows,
+                totalBorrowedAmount,
+                totalLending,
 
             ) = router.getBorrowStatus(_underlyings[i]);
 
-            borrowMarket[i].underlying = _underlyings[i];
-            borrowMarket[i].borrowAmount = totalBorrowedAmount;
-            borrowMarket[i].borrowValue = priceOracle.valueOfAsset(
+            borrowMarket[i] = BorrowMarket(
                 _underlyings[i],
-                _quote,
-                totalBorrowedAmount
+                totalBorrowedAmount,
+                priceOracle.valueOfAsset(
+                    _underlyings[i],
+                    _quote,
+                    totalBorrowedAmount
+                ),
+                totalLending,
+                borrowMarket[i].borrows
             );
-            borrowMarket[i].matchAmount = totalLending;
-            borrowMarket[i].borrows = borrows;
         }
     }
 }
