@@ -37,6 +37,8 @@ contract QueryHelper is RateGetter {
         uint256 depositAmount;
         uint256 depositValue;
         uint256 depositApr;
+        uint256[] supplies;
+        uint256 totalMatched;
         uint256 availableBalance;
         uint256 dailyEstProfit;
         bool collateral;
@@ -47,6 +49,8 @@ contract QueryHelper is RateGetter {
         uint256 borrowAmount;
         uint256 borrowValue;
         uint256 borrowApr;
+        uint256[] borrows;
+        uint256 totalMatched;
         uint256 borrowLimit;
         uint256 dailyEstInterest;
     }
@@ -318,11 +322,21 @@ contract QueryHelper is RateGetter {
                 continue;
             }
 
+            (
+                userSupplyInfo[i].supplies,
+                ,
+                userSupplyInfo[i].totalMatched,
+                ,
+
+            ) = router.getSupplyStatus(_underlyings[i]);
+
             userSupplyInfo[i] = UserSupplyInfo(
                 _underlyings[i],
                 depositAmount,
                 priceOracle.valueOfAsset(_underlyings[i], quote, depositAmount),
                 getCurrentSupplyRate(_underlyings[i]),
+                userSupplyInfo[i].supplies,
+                userSupplyInfo[i].totalMatched,
                 IERC20(_underlyings[i]).balanceOf(user),
                 0,
                 router.isUsingAsCollateral(_underlyings[i], user)
@@ -365,14 +379,29 @@ contract QueryHelper is RateGetter {
                 continue;
             }
 
-            userBorrowInfoTemp[i] = UserBorrowInfo(
-                _underlyings[i],
-                borrowAmount,
-                priceOracle.valueOfAsset(_underlyings[i], quote, borrowAmount),
-                getCurrentBorrowRate(_underlyings[i]),
-                router.borrowLimit(user, _underlyings[i]),
-                0
-            );
+            {
+                (
+                    userBorrowInfoTemp[i].borrows,
+                    ,
+                    userBorrowInfoTemp[i].totalMatched,
+
+                ) = router.getBorrowStatus(_underlyings[i]);
+
+                userBorrowInfoTemp[i] = UserBorrowInfo(
+                    _underlyings[i],
+                    borrowAmount,
+                    priceOracle.valueOfAsset(
+                        _underlyings[i],
+                        quote,
+                        borrowAmount
+                    ),
+                    getCurrentBorrowRate(_underlyings[i]),
+                    userBorrowInfoTemp[i].borrows,
+                    userBorrowInfoTemp[i].totalMatched,
+                    router.borrowLimit(user, _underlyings[i]),
+                    0
+                );
+            }
 
             userBorrowInfoTemp[i].dailyEstInterest =
                 (userBorrowInfoTemp[i].borrowValue *
