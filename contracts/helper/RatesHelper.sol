@@ -26,17 +26,17 @@ contract RateGetter is MulticallHelper {
 
         ) = router.getSupplyStatus(_underlying);
 
-        (uint256 protocolsSupplyRate, uint256 protocolsBorrowRate) = router
-            .protocols()
-            .getRates(_underlying);
+        (uint256 protocolsSupplyRate, ) = router.protocols().getRates(
+            _underlying
+        );
 
-        uint256 routerBorrowed = router.totalBorrowed(_underlying);
-        uint256 lendingRate = totalSuppliedAmountWithFee > 0 &&
-            protocolsBorrowRate > protocolsSupplyRate
-            ? protocolsSupplyRate +
-                ((protocolsBorrowRate - protocolsSupplyRate) * routerBorrowed) /
-                totalSuppliedAmountWithFee
-            : protocolsSupplyRate;
+        uint256 lendingRate = getLendingRate(_underlying);
+
+        lendingRate =
+            (lendingRate *
+                (Utils.MILLION -
+                    router.config().assetConfigs(_underlying).feeRate)) /
+            Utils.MILLION;
 
         return
             totalSuppliedAmountWithFee > 0
@@ -44,8 +44,6 @@ contract RateGetter is MulticallHelper {
                     protocolsSupplies +
                     lendingRate *
                     totalLending) / (totalSuppliedAmountWithFee)
-                : routerBorrowed > 0
-                ? lendingRate
                 : protocolsSupplyRate;
     }
 
@@ -61,19 +59,11 @@ contract RateGetter is MulticallHelper {
 
         ) = router.getBorrowStatus(_underlying);
 
-        (uint256 protocolsSupplyRate, uint256 protocolsBorrowRate) = router
-            .protocols()
-            .getRates(_underlying);
+        (, uint256 protocolsBorrowRate) = router.protocols().getRates(
+            _underlying
+        );
 
-        uint256 routerSupplied = router.totalSupplied(_underlying);
-        uint256 lendingRate = routerSupplied > 0 &&
-            protocolsBorrowRate > protocolsSupplyRate
-            ? protocolsSupplyRate +
-                ((protocolsBorrowRate - protocolsSupplyRate) *
-                    totalBorrowedAmount) /
-                routerSupplied
-            : protocolsSupplyRate;
-
+        uint256 lendingRate = getLendingRate(_underlying);
         uint256 protocolsBorrows = Utils.sumOf(borrows);
 
         return
@@ -82,24 +72,28 @@ contract RateGetter is MulticallHelper {
                     protocolsBorrows +
                     lendingRate *
                     totalLending) / (totalBorrowedAmount)
-                : routerSupplied > 0
-                ? lendingRate
                 : protocolsBorrowRate;
     }
 
     function getLendingRate(address _underlying) public view returns (uint256) {
+        (, , , uint256 totalSuppliedAmountWithFee, ) = router.getSupplyStatus(
+            _underlying
+        );
+
         (uint256 protocolsSupplyRate, uint256 protocolsBorrowRate) = router
             .protocols()
             .getRates(_underlying);
 
-        uint256 routerSupplied = router.totalSupplied(_underlying);
-
         return
-            routerSupplied > 0 && protocolsBorrowRate > protocolsSupplyRate
+            totalSuppliedAmountWithFee > 0 &&
+                protocolsBorrowRate > protocolsSupplyRate
                 ? protocolsSupplyRate +
                     ((protocolsBorrowRate - protocolsSupplyRate) *
-                        router.totalBorrowed(_underlying)) /
-                    routerSupplied
+                        Utils.minOf(
+                            router.totalBorrowed(_underlying),
+                            totalSuppliedAmountWithFee
+                        )) /
+                    totalSuppliedAmountWithFee
                 : protocolsSupplyRate;
     }
 }
