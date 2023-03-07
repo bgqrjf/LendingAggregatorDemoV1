@@ -108,8 +108,10 @@ library ExternalUtils {
     ) internal returns (uint256 newIndex) {
         if (_newAmount > 0) {
             newIndex =
-                (((_feeIndex - userFeeIndexes[_account][_underlying]) *
-                    (_dTokenBalance - _newAmount)) + (_feeIndex * _newAmount)) /
+                (userFeeIndexes[_account][_underlying] *
+                    (_dTokenBalance - _newAmount) +
+                    _feeIndex *
+                    _newAmount) /
                 _dTokenBalance;
 
             userFeeIndexes[_account][_underlying] = newIndex;

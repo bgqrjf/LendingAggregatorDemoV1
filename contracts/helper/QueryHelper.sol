@@ -100,7 +100,7 @@ contract QueryHelper is RateGetter {
         ISToken sToken = router.getAsset(_underlying).sToken;
         uint256 rate = sToken.totalSupply() > 0
             ? (sToken.scaledTotalSupply() * 1e18) / sToken.totalSupply()
-            : 0;
+            : 1e18;
         uint256 tokenPrice = router.priceOracle().getAssetPrice(_underlying);
         uint256 sTokenPrice = (rate * tokenPrice) / 1e8;
         return (rate, sTokenPrice);
@@ -114,7 +114,7 @@ contract QueryHelper is RateGetter {
         IDToken dToken = router.getAsset(_underlying).dToken;
         uint256 rate = dToken.totalSupply() > 0
             ? (dToken.totalDebt() * 1e18) / dToken.totalSupply()
-            : 0;
+            : 1e18;
         uint256 tokenPrice = router.priceOracle().getAssetPrice(_underlying);
         uint256 dTokenPrice = (rate * tokenPrice) / 1e8;
         return (rate, dTokenPrice);

@@ -144,14 +144,11 @@ library BorrowLogic {
             accFees
         );
 
-        // to silence stack too deep
-        accFee += accFeeOffsets[_params.userParams.asset];
-
         uint256 dTokenTotalSupply = asset.dToken.totalSupply();
         uint256 feeIndex = ExternalUtils.updateFeeIndex(
             _params.userParams.asset,
             dTokenTotalSupply,
-            accFee,
+            accFee + accFeeOffsets[_params.userParams.asset],
             feeIndexes
         );
 
