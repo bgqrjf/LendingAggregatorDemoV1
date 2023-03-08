@@ -17,6 +17,7 @@ contract QueryHelper is RateGetter {
     }
 
     struct UserStatus {
+        Types.AssetConfig assetConfig;
         uint256 assetPrice;
         uint256 userBalance;
         uint256 borrowed;
@@ -256,6 +257,7 @@ contract QueryHelper is RateGetter {
         view
         returns (UserStatus memory userStatus)
     {
+        userStatus.assetConfig = router.config().assetConfigs(_asset);
         userStatus.assetPrice = router.priceOracle().getAssetPrice(_asset);
         userStatus.borrowed = router.getAsset(_asset).dToken.scaledDebtOf(
             _account
