@@ -62,7 +62,7 @@ async function main() {
     { gasLimit: 5000000 }
   );
   await compoundHandler.deployed();
-  m.log("compoundHandler:", compoundHandler.address);
+  m.log("compoundLogic:", compoundHandler.address);
 
   for (let i = 0; i < cTokens.length; i++) {
     tx = await compoundHandler.updateCTokenList(cTokens[i]);
@@ -72,8 +72,6 @@ async function main() {
   // config
   let config = await transparentProxy.deployProxy({
     implementationFactory: "Config",
-    libraries: {},
-    initializeParams: [],
     proxyAdmin: proxyAdmin,
   });
   m.log("config(proxy):", config.address);

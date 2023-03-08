@@ -4,11 +4,10 @@ pragma solidity ^0.8.14;
 import "./interfaces/IConfig.sol";
 import "./interfaces/IRouter.sol";
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "./libraries/internals/UserAssetBitMap.sol";
 
-// proxy
-contract Config is IConfig, Ownable {
+contract Config is IConfig, OwnableUpgradeable {
     address public router;
 
     // mapping underlying token to assetConfig
@@ -21,6 +20,10 @@ contract Config is IConfig, Ownable {
     modifier onlyRouter() {
         require(msg.sender == router, "Config: Only Router");
         _;
+    }
+
+    function initialize() external initializer {
+        __Ownable_init();
     }
 
     function setRouter(address _router) external override onlyOwner {
