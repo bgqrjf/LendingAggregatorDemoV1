@@ -110,9 +110,10 @@ interface IRouter {
 
     function borrow(Types.UserAssetParams memory, bool _executeNow) external;
 
-    function repay(Types.UserAssetParams memory _params, bool _executeNow)
-        external
-        payable;
+    function repay(
+        Types.UserAssetParams memory _params,
+        bool _executeNow
+    ) external payable;
 
     function recordSupply(
         Types.UserAssetParams memory _params,
@@ -164,14 +165,10 @@ interface IRouter {
 
     function claimRewards(address _account) external;
 
-    function userStatus(address, address)
-        external
-        view
-        returns (
-            uint256,
-            uint256,
-            bool
-        );
+    function userStatus(
+        address,
+        address
+    ) external view returns (uint256, uint256, bool);
 
     function protocols() external view returns (IProtocolsHandler);
 
@@ -179,7 +176,9 @@ interface IRouter {
 
     function getAssets() external view returns (Types.Asset[] memory assets);
 
-    function getSupplyStatus(address _underlying)
+    function getSupplyStatus(
+        address _underlying
+    )
         external
         view
         returns (
@@ -190,7 +189,9 @@ interface IRouter {
             uint256 newInterest
         );
 
-    function getBorrowStatus(address _underlying)
+    function getBorrowStatus(
+        address _underlying
+    )
         external
         view
         returns (
@@ -204,7 +205,10 @@ interface IRouter {
 
     function totalBorrowed(address _underlying) external view returns (uint256);
 
-    function isPoisitionHealthy(address _underlying, address _account)
+    function isPoisitionHealthy(
+        address _underlying,
+        address _account
+    )
         external
         view
         returns (
@@ -213,22 +217,22 @@ interface IRouter {
             uint256 collateralAmount
         );
 
-    function isUsingAsCollateral(address _underlying, address _account)
-        external
-        view
-        returns (bool);
+    function isUsingAsCollateral(
+        address _underlying,
+        address _account
+    ) external view returns (bool);
 
-    function isBorrowing(address _underlying, address _account)
-        external
-        view
-        returns (bool);
+    function isBorrowing(
+        address _underlying,
+        address _account
+    ) external view returns (bool);
 
     // --- admin functions
     function addProtocol(IProtocol _protocol) external;
 
-    function addAsset(Types.NewAssetParams memory _newAsset)
-        external
-        returns (Types.Asset memory asset);
+    function addAsset(
+        Types.NewAssetParams memory _newAsset
+    ) external returns (Types.Asset memory asset);
 
     function updateSToken(address _sToken) external;
 
@@ -236,8 +240,9 @@ interface IRouter {
 
     function updateConfig(IConfig _config) external;
 
-    function updateProtocolsHandler(IProtocolsHandler _protocolsHandler)
-        external;
+    function updateProtocolsHandler(
+        IProtocolsHandler _protocolsHandler
+    ) external;
 
     function updateProtocol(IProtocol _old, IProtocol _new) external;
 
@@ -248,13 +253,12 @@ interface IRouter {
 
     function config() external view returns (IConfig);
 
-    function getAsset(address _underlying)
-        external
-        view
-        returns (Types.Asset memory asset);
+    function getAsset(
+        address _underlying
+    ) external view returns (Types.Asset memory asset);
 
-    function borrowLimit(address _account, address _borrowAsset)
-        external
-        view
-        returns (uint256 amount);
+    function borrowLimit(
+        address _account,
+        address _borrowAsset
+    ) external view returns (uint256 amount);
 }

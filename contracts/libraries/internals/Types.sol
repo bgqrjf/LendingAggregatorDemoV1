@@ -170,7 +170,6 @@ library Types {
         IConfig config;
         IPriceOracle priceOracle;
         uint256 collectedFee;
-        uint256 accFeeOffset;
         uint256 userFeeIndexes;
         Asset asset;
     }
@@ -179,7 +178,6 @@ library Types {
         UserAssetParams userParams;
         IConfig config;
         IRewards rewards;
-        uint256 accFeeOffset;
         uint256 userFeeIndexes;
         Asset asset;
     }

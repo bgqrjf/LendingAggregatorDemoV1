@@ -24,9 +24,9 @@ library BorrowLogic {
         mapping(address => Types.Asset) storage assets,
         mapping(address => uint256) storage totalLendings,
         mapping(address => uint256) storage accFees,
-        mapping(address => uint256) storage accFeeOffsets,
         mapping(address => uint256) storage feeIndexes,
-        mapping(address => mapping(address => uint256)) storage userFeeIndexes
+        mapping(address => mapping(address => uint256)) storage userFeeIndexes,
+        mapping(address => mapping(address => uint256)) storage userFee
     ) external {
         require(_params.actionNotPaused, "BorrowLogic: action paused");
 
@@ -58,9 +58,9 @@ library BorrowLogic {
             ),
             assets,
             accFees,
-            accFeeOffsets,
             feeIndexes,
-            userFeeIndexes
+            userFeeIndexes,
+            userFee
         );
 
         if (address(_params.reservePool) != address(0)) {
@@ -85,17 +85,17 @@ library BorrowLogic {
         Types.RecordBorrowParams memory _params,
         mapping(address => Types.Asset) storage assets,
         mapping(address => uint256) storage accFees,
-        mapping(address => uint256) storage accFeeOffsets,
         mapping(address => uint256) storage feeIndexes,
-        mapping(address => mapping(address => uint256)) storage userFeeIndexes
+        mapping(address => mapping(address => uint256)) storage userFeeIndexes,
+        mapping(address => mapping(address => uint256)) storage userFee
     ) external {
         recordBorrowInternal(
             _params,
             assets,
             accFees,
-            accFeeOffsets,
             feeIndexes,
-            userFeeIndexes
+            userFeeIndexes,
+            userFee
         );
     }
 
@@ -131,9 +131,9 @@ library BorrowLogic {
         Types.RecordBorrowParams memory _params,
         mapping(address => Types.Asset) storage assets,
         mapping(address => uint256) storage accFees,
-        mapping(address => uint256) storage accFeeOffsets,
         mapping(address => uint256) storage feeIndexes,
-        mapping(address => mapping(address => uint256)) storage userFeeIndexes
+        mapping(address => mapping(address => uint256)) storage userFeeIndexes,
+        mapping(address => mapping(address => uint256)) storage userFee
     ) internal {
         Types.Asset memory asset = assets[_params.userParams.asset];
 
@@ -148,30 +148,23 @@ library BorrowLogic {
         uint256 feeIndex = ExternalUtils.updateFeeIndex(
             _params.userParams.asset,
             dTokenTotalSupply,
-            accFee + accFeeOffsets[_params.userParams.asset],
+            _params.newInterest,
             feeIndexes
-        );
-
-        uint256 dTokenAmount = asset.dToken.mint(
-            _params.borrowBy,
-            _params.userParams.amount,
-            _params.totalBorrows
         );
 
         ExternalUtils.updateUserFeeIndex(
             _params.userParams.asset,
             _params.borrowBy,
             asset.dToken.balanceOf(_params.borrowBy),
-            dTokenAmount,
             feeIndex,
-            userFeeIndexes
+            userFeeIndexes,
+            userFee
         );
 
-        ExternalUtils.updateAccFeeOffset(
-            _params.userParams.asset,
-            feeIndex,
-            dTokenAmount,
-            accFeeOffsets
+        uint256 dTokenAmount = asset.dToken.mint(
+            _params.borrowBy,
+            _params.userParams.amount,
+            _params.totalBorrows
         );
 
         _params.rewards.startMiningBorrowReward(

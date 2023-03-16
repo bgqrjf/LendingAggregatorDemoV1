@@ -43,7 +43,7 @@ library SupplyLogic {
                 uint256[] memory supplies,
                 uint256 protocolsSupplies,
                 uint256 totalLending,
-                uint256 totalBorrowedAmountWithFee,
+                uint256 totalSuppliedAmount,
                 uint256 newInterest
             ) = ExternalUtils.getSupplyStatus(
                     _params.userParams.asset,
@@ -54,7 +54,7 @@ library SupplyLogic {
 
             recordSupplyInternal(
                 _params,
-                totalBorrowedAmountWithFee,
+                totalSuppliedAmount,
                 newInterest,
                 accFees
             );
