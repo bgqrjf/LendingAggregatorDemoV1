@@ -32,10 +32,10 @@ contract Config is IConfig, OwnableUpgradeable {
         emit RouterSet(oldRouter, _router);
     }
 
-    function setAssetConfig(address _token, Types.AssetConfig memory _config)
-        external
-        override
-    {
+    function setAssetConfig(
+        address _token,
+        Types.AssetConfig memory _config
+    ) external override {
         require(
             msg.sender == router || msg.sender == owner(),
             "Config: Only Router/Owner"
@@ -78,6 +78,11 @@ contract Config is IConfig, OwnableUpgradeable {
             );
 
             if (!_usingAsCollateral && !isHealthy) {
+                require(
+                    msg.sender == address(router),
+                    "Config: Insufficinet Collateral"
+                );
+
                 newUserConfig = oldUserConfig;
                 userDebtAndCollateral[_account] = oldUserConfig;
             }
@@ -107,12 +112,9 @@ contract Config is IConfig, OwnableUpgradeable {
         emit UserDebtAndCollateralSet(_account, oldUserConfig, newUserConfig);
     }
 
-    function assetConfigs(address _token)
-        public
-        view
-        override
-        returns (Types.AssetConfig memory)
-    {
+    function assetConfigs(
+        address _token
+    ) public view override returns (Types.AssetConfig memory) {
         return _assetConfigs[_token];
     }
 }

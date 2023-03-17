@@ -97,10 +97,10 @@ contract Router is RouterStorage, OwnableUpgradeable {
         );
     }
 
-    function borrow(Types.UserAssetParams memory _params, bool _executeNow)
-        external
-        override
-    {
+    function borrow(
+        Types.UserAssetParams memory _params,
+        bool _executeNow
+    ) external override {
         BorrowLogic.borrow(
             Types.BorrowParams(
                 _params,
@@ -111,7 +111,6 @@ contract Router is RouterStorage, OwnableUpgradeable {
                 rewards,
                 config,
                 priceOracle,
-                collectedFees[_params.asset],
                 underlyings
             ),
             assets,
@@ -123,10 +122,10 @@ contract Router is RouterStorage, OwnableUpgradeable {
         );
     }
 
-    function repay(Types.UserAssetParams memory _params, bool _executeNow)
-        external
-        payable
-    {
+    function repay(
+        Types.UserAssetParams memory _params,
+        bool _executeNow
+    ) external payable {
         RepayLogic.repay(
             Types.RepayParams(
                 _params,
@@ -354,11 +353,9 @@ contract Router is RouterStorage, OwnableUpgradeable {
         );
     }
 
-    function executeBorrow(Types.UserAssetParams memory _params)
-        external
-        override
-        onlyReservePool
-    {
+    function executeBorrow(
+        Types.UserAssetParams memory _params
+    ) external override onlyReservePool {
         IProtocolsHandler protocolsCache = protocols;
         (uint256 totalLending, ) = protocolsCache.simulateLendings(
             _params.asset,
@@ -375,7 +372,6 @@ contract Router is RouterStorage, OwnableUpgradeable {
                 rewards,
                 config,
                 priceOracle,
-                collectedFees[_params.asset],
                 underlyings
             ),
             totalLending,
@@ -383,11 +379,10 @@ contract Router is RouterStorage, OwnableUpgradeable {
         );
     }
 
-    function executeRepay(address _asset, uint256 _amount)
-        external
-        override
-        onlyReservePool
-    {
+    function executeRepay(
+        address _asset,
+        uint256 _amount
+    ) external override onlyReservePool {
         IProtocolsHandler protocolsCache = protocols;
         (uint256 totalLending, ) = protocolsCache.simulateLendings(
             _asset,
@@ -404,12 +399,10 @@ contract Router is RouterStorage, OwnableUpgradeable {
     }
 
     // views
-    function borrowLimit(address _account, address _borrowAsset)
-        external
-        view
-        override
-        returns (uint256 amount)
-    {
+    function borrowLimit(
+        address _account,
+        address _borrowAsset
+    ) external view override returns (uint256 amount) {
         return
             BorrowLogic.borrowLimit(
                 config,
@@ -421,7 +414,10 @@ contract Router is RouterStorage, OwnableUpgradeable {
             );
     }
 
-    function getLiquidationData(address _account, address _repayAsset)
+    function getLiquidationData(
+        address _account,
+        address _repayAsset
+    )
         external
         view
         returns (
@@ -441,7 +437,10 @@ contract Router is RouterStorage, OwnableUpgradeable {
             );
     }
 
-    function userStatus(address _account, address _quote)
+    function userStatus(
+        address _account,
+        address _quote
+    )
         external
         view
         override
@@ -483,7 +482,9 @@ contract Router is RouterStorage, OwnableUpgradeable {
         }
     }
 
-    function getSupplyStatus(address _underlying)
+    function getSupplyStatus(
+        address _underlying
+    )
         external
         view
         override
@@ -504,7 +505,9 @@ contract Router is RouterStorage, OwnableUpgradeable {
             );
     }
 
-    function getBorrowStatus(address _underlying)
+    function getBorrowStatus(
+        address _underlying
+    )
         external
         view
         override
@@ -524,12 +527,9 @@ contract Router is RouterStorage, OwnableUpgradeable {
             );
     }
 
-    function totalSupplied(address _underlying)
-        public
-        view
-        override
-        returns (uint256)
-    {
+    function totalSupplied(
+        address _underlying
+    ) public view override returns (uint256) {
         (, , , uint256 totalSuppliedAmountWithFee, ) = ExternalUtils
             .getSupplyStatus(
                 _underlying,
@@ -543,12 +543,9 @@ contract Router is RouterStorage, OwnableUpgradeable {
         return totalSuppliedAmountWithFee - fee;
     }
 
-    function totalBorrowed(address _underlying)
-        public
-        view
-        override
-        returns (uint256 totalBorrowedAmount)
-    {
+    function totalBorrowed(
+        address _underlying
+    ) public view override returns (uint256 totalBorrowedAmount) {
         (, totalBorrowedAmount, , ) = ExternalUtils.getBorrowStatus(
             _underlying,
             reservePool,
@@ -558,7 +555,10 @@ contract Router is RouterStorage, OwnableUpgradeable {
     }
 
     // validations
-    function isPoisitionHealthy(address _underlying, address _account)
+    function isPoisitionHealthy(
+        address _underlying,
+        address _account
+    )
         public
         view
         override
@@ -579,12 +579,10 @@ contract Router is RouterStorage, OwnableUpgradeable {
             );
     }
 
-    function isUsingAsCollateral(address _underlying, address _account)
-        public
-        view
-        override
-        returns (bool)
-    {
+    function isUsingAsCollateral(
+        address _underlying,
+        address _account
+    ) public view override returns (bool) {
         return
             UserAssetBitMap.isUsingAsCollateral(
                 config.userDebtAndCollateral(_account),
@@ -592,12 +590,10 @@ contract Router is RouterStorage, OwnableUpgradeable {
             );
     }
 
-    function isBorrowing(address _underlying, address _account)
-        public
-        view
-        override
-        returns (bool)
-    {
+    function isBorrowing(
+        address _underlying,
+        address _account
+    ) public view override returns (bool) {
         return
             UserAssetBitMap.isBorrowing(
                 config.userDebtAndCollateral(_account),
@@ -605,21 +601,20 @@ contract Router is RouterStorage, OwnableUpgradeable {
             );
     }
 
-    function actionNotPaused(address _token, Action _action)
-        internal
-        view
-        returns (bool)
-    {
+    function actionNotPaused(
+        address _token,
+        Action _action
+    ) internal view returns (bool) {
         return
             (uint256(blockedActions[_token]) >> uint256(_action)) & 1 == 0 &&
             (uint256(blockedActions[address(0)]) >> uint256(_action)) & 1 == 0;
     }
 
     //  admin functions
-    function setBlockActions(address _asset, uint256 _action)
-        external
-        onlyOwner
-    {
+    function setBlockActions(
+        address _asset,
+        uint256 _action
+    ) external onlyOwner {
         blockedActions[_asset] = _action;
         emit BlockActionsSet(_asset, _action);
     }
@@ -635,21 +630,17 @@ contract Router is RouterStorage, OwnableUpgradeable {
         emit ProtocolAdded(_protocol);
     }
 
-    function updateProtocol(IProtocol _old, IProtocol _new)
-        external
-        override
-        onlyOwner
-    {
+    function updateProtocol(
+        IProtocol _old,
+        IProtocol _new
+    ) external override onlyOwner {
         protocols.updateProtocol(_old, _new);
         emit ProtocolUpdated(_old, _new);
     }
 
-    function addAsset(Types.NewAssetParams memory _newAsset)
-        external
-        override
-        onlyOwner
-        returns (Types.Asset memory asset)
-    {
+    function addAsset(
+        Types.NewAssetParams memory _newAsset
+    ) external override onlyOwner returns (Types.Asset memory asset) {
         uint8 underlyingCount = uint8(underlyings.length);
         require(
             underlyingCount < UserAssetBitMap.MAX_RESERVES_COUNT,
@@ -727,31 +718,28 @@ contract Router is RouterStorage, OwnableUpgradeable {
         emit ConfigUpdated(_config);
     }
 
-    function updateProtocolsHandler(IProtocolsHandler _protocolsHandler)
-        external
-        override
-        onlyOwner
-    {
+    function updateProtocolsHandler(
+        IProtocolsHandler _protocolsHandler
+    ) external override onlyOwner {
         protocols = _protocolsHandler;
         emit ProtocolsHandlerUpdated(_protocolsHandler);
     }
 
-    function updatePriceOracle(IPriceOracle _priceOracle)
-        external
-        override
-        onlyOwner
-    {
+    function updatePriceOracle(
+        IPriceOracle _priceOracle
+    ) external override onlyOwner {
         priceOracle = _priceOracle;
         emit PriceOracleUpdated(_priceOracle);
     }
 
+    function resetCollectedFee(address _underlying) external onlyOwner {
+        collectedFees[_underlying] = 0;
+    }
+
     // --- getters
-    function getAsset(address _underlying)
-        external
-        view
-        override
-        returns (Types.Asset memory asset)
-    {
+    function getAsset(
+        address _underlying
+    ) external view override returns (Types.Asset memory asset) {
         return assets[_underlying];
     }
 }

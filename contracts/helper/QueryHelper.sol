@@ -297,11 +297,13 @@ contract QueryHelper is RateGetter {
         returns (
             uint256 collateralValue,
             uint256 borrowingValue,
-            uint256 borrowLimit
+            uint256 borrowLimit,
+            uint256 liquidateThreashold
         )
     {
         (collateralValue, borrowingValue, ) = router.userStatus(user, _quote);
         borrowLimit = router.borrowLimit(user, _quote);
+        (, liquidateThreashold, ) = router.isPoisitionHealthy(_quote, user);
     }
 
     function getUserSupplied(address user, address quote)

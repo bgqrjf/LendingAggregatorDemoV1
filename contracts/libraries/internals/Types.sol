@@ -155,7 +155,6 @@ library Types {
         IRewards rewards;
         IConfig config;
         IPriceOracle priceOracle;
-        uint256 collectedFee;
         address[] underlyings;
     }
 
