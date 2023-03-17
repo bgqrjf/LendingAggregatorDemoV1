@@ -29,7 +29,9 @@ library LiquidateLogic {
         mapping(address => uint256) storage totalLendings,
         mapping(address => uint256) storage accFees,
         mapping(address => uint256) storage collectedFees,
-        mapping(address => uint256) storage feeIndexes
+        mapping(address => uint256) storage feeIndexes,
+        mapping(address => mapping(address => uint256)) storage userFeeIndexes,
+        mapping(address => mapping(address => uint256)) storage userFee
     ) external {
         // actionNotPaused(_repayParams.asset, Action.liquidate);
         require(_params.actionNotPaused, "LiquidateLogic: action paused");
@@ -44,7 +46,9 @@ library LiquidateLogic {
             totalLendings,
             accFees,
             collectedFees,
-            feeIndexes
+            feeIndexes,
+            userFeeIndexes,
+            userFee
         );
 
         (uint256[] memory supplies, uint256 protocolsSupplies) = _params

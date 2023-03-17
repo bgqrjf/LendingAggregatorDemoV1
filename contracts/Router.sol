@@ -116,9 +116,9 @@ contract Router is RouterStorage, OwnableUpgradeable {
             assets,
             totalLendings,
             accFees,
-            accFeeOffsets,
             feeIndexes,
-            userFeeIndexes
+            userFeeIndexes,
+            userFee
         );
     }
 
@@ -138,14 +138,15 @@ contract Router is RouterStorage, OwnableUpgradeable {
                 config,
                 priceOracle,
                 collectedFees[_params.asset],
-                accFeeOffsets[_params.asset],
                 userFeeIndexes[_params.to][_params.asset],
                 assets[_params.asset]
             ),
             totalLendings,
             accFees,
             collectedFees,
-            feeIndexes
+            feeIndexes,
+            userFeeIndexes,
+            userFee
         );
     }
 
@@ -167,7 +168,6 @@ contract Router is RouterStorage, OwnableUpgradeable {
                     config,
                     priceOracle,
                     collectedFees[_repayParams.asset],
-                    accFeeOffsets[_repayParams.asset],
                     userFeeIndexes[_repayParams.to][_repayParams.asset],
                     assets[_repayParams.asset]
                 ),
@@ -191,7 +191,9 @@ contract Router is RouterStorage, OwnableUpgradeable {
             totalLendings,
             accFees,
             collectedFees,
-            feeIndexes
+            feeIndexes,
+            userFeeIndexes,
+            userFee
         );
     }
 
@@ -290,9 +292,9 @@ contract Router is RouterStorage, OwnableUpgradeable {
             ),
             assets,
             accFees,
-            accFeeOffsets,
             feeIndexes,
-            userFeeIndexes
+            userFeeIndexes,
+            userFee
         );
     }
 

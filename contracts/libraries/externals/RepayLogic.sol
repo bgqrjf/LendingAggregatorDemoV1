@@ -28,14 +28,18 @@ library RepayLogic {
         mapping(address => uint256) storage totalLendings,
         mapping(address => uint256) storage accFees,
         mapping(address => uint256) storage collectedFees,
-        mapping(address => uint256) storage feeIndexes
+        mapping(address => uint256) storage feeIndexes,
+        mapping(address => mapping(address => uint256)) storage userFeeIndexes,
+        mapping(address => mapping(address => uint256)) storage userFee
     ) external {
         repayInternal(
             _params,
             totalLendings,
             accFees,
             collectedFees,
-            feeIndexes
+            feeIndexes,
+            userFeeIndexes,
+            userFee
         );
     }
 
@@ -44,7 +48,9 @@ library RepayLogic {
         mapping(address => uint256) storage totalLendings,
         mapping(address => uint256) storage accFees,
         mapping(address => uint256) storage collectedFees,
-        mapping(address => uint256) storage feeIndexes
+        mapping(address => uint256) storage feeIndexes,
+        mapping(address => mapping(address => uint256)) storage userFeeIndexes,
+        mapping(address => mapping(address => uint256)) storage userFee
     ) internal returns (uint256 amount) {
         require(_params.actionNotPaused, "RepayLogic: action paused");
 
@@ -66,7 +72,6 @@ library RepayLogic {
                 _params.userParams,
                 _params.config,
                 _params.rewards,
-                _params.accFeeOffset,
                 _params.userFeeIndexes,
                 _params.asset
             ),
@@ -74,7 +79,9 @@ library RepayLogic {
             totalBorrowedAmount,
             accFees,
             collectedFees,
-            feeIndexes
+            feeIndexes,
+            userFeeIndexes,
+            userFee
         );
 
         TransferHelper.collect(
@@ -145,30 +152,30 @@ library RepayLogic {
         uint256 totalBorrows,
         mapping(address => uint256) storage accFees,
         mapping(address => uint256) storage collectedFees,
-        mapping(address => uint256) storage feeIndexes
+        mapping(address => uint256) storage feeIndexes,
+        mapping(address => mapping(address => uint256)) storage userFeeIndexes,
+        mapping(address => mapping(address => uint256)) storage userFee
     ) internal returns (uint256 repayAmount, uint256 fee) {
         uint256 dTokenTotalSupply = _params.asset.dToken.totalSupply();
-        uint256 userDebts = _params.asset.dToken.scaledAmount(
-            _params.asset.dToken.balanceOf(_params.userParams.to),
-            totalBorrows
+        uint256 dTokenBlance = _params.asset.dToken.balanceOf(
+            _params.userParams.to
         );
-
-        repayAmount = _params.userParams.amount;
-        if (repayAmount >= userDebts) {
-            repayAmount = userDebts;
-            _params.config.setBorrowing(
-                _params.userParams.to,
-                _params.userParams.asset,
-                false
+        {
+            uint256 userDebts = _params.asset.dToken.scaledAmount(
+                dTokenBlance,
+                totalBorrows
             );
+
+            repayAmount = _params.userParams.amount;
+            if (repayAmount >= userDebts) {
+                repayAmount = userDebts;
+                _params.config.setBorrowing(
+                    _params.userParams.to,
+                    _params.userParams.asset,
+                    false
+                );
+            }
         }
-
-        uint256 dTokenAmount = _params.asset.dToken.burn(
-            _params.userParams.to,
-            repayAmount,
-            totalBorrows
-        );
-
         uint256 accFee = ExternalUtils.updateAccFee(
             _params.userParams.asset,
             newInterest,
@@ -179,15 +186,38 @@ library RepayLogic {
             _params.userParams.asset,
             dTokenTotalSupply,
             // accFee + accFeeOffsets[_params.asset]
-            accFee + _params.accFeeOffset,
+            accFee,
             feeIndexes
         );
 
+        ExternalUtils.updateUserFeeIndex(
+            _params.userParams.asset,
+            _params.userParams.to,
+            dTokenBlance,
+            feeIndex,
+            userFeeIndexes,
+            userFee
+        );
+
         fee =
-            ((feeIndex - _params.userFeeIndexes) * dTokenAmount) /
-            Utils.QUINTILLION;
+            (repayAmount *
+                userFee[_params.userParams.to][_params.userParams.asset]) /
+            userDebts;
 
         collectedFees[_params.userParams.asset] += fee;
+
+        ExternalUtils.updateUserFee(
+            _params.userParams.asset,
+            _params.userParams.to,
+            fee,
+            userFee
+        );
+
+        uint256 dTokenAmount = _params.asset.dToken.burn(
+            _params.userParams.to,
+            repayAmount,
+            totalBorrows
+        );
 
         _params.rewards.stopMiningBorrowReward(
             _params.userParams.asset,

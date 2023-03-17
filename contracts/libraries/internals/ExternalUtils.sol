@@ -21,6 +21,11 @@ library ExternalUtils {
         address indexed asset,
         uint256 newIndex
     );
+    event UserFeeUpdated(
+        address indexed account,
+        address indexed asset,
+        uint256 newUserFee
+    );
 
     event TotalLendingsUpdated(address indexed asset, uint256 newLending);
 
@@ -70,11 +75,15 @@ library ExternalUtils {
     function updateFeeIndex(
         address _underlying,
         uint256 _totalSupply,
-        uint256 _accFee,
+        uint256 _newInterest,
         mapping(address => uint256) storage feeIndexes
     ) internal returns (uint256 newIndex) {
         if (_totalSupply > 0) {
-            newIndex = (_accFee * Utils.QUINTILLION) / _totalSupply;
+            //calculate the new fee globol index
+            newIndex =
+                uint256(feeIndexes[_underlying]) +
+                ((_newInterest * Utils.QUINTILLION) / _totalSupply);
+            // update the feeIndexes
             feeIndexes[_underlying] = newIndex;
             emit FeeIndexUpdated(_underlying, newIndex);
         } else {
@@ -82,44 +91,34 @@ library ExternalUtils {
         }
     }
 
-    function updateAccFeeOffset(
-        address _asset,
-        uint256 _feeIndex,
-        uint256 _newOffset,
-        mapping(address => uint256) storage accFeeOffsets
-    ) internal {
-        if (_newOffset > 0) {
-            uint256 newFeeOffset = accFeeOffsets[_asset] +
-                (_feeIndex * _newOffset).ceilDiv(Utils.QUINTILLION);
-
-            accFeeOffsets[_asset] = newFeeOffset;
-
-            emit AccFeeOffsetUpdated(_asset, newFeeOffset);
-        }
-    }
-
     function updateUserFeeIndex(
         address _underlying,
         address _account,
         uint256 _dTokenBalance,
-        uint256 _newAmount,
         uint256 _feeIndex,
-        mapping(address => mapping(address => uint256)) storage userFeeIndexes
+        mapping(address => mapping(address => uint256)) storage userFeeIndexes,
+        mapping(address => mapping(address => uint256)) storage userFee
     ) internal returns (uint256 newIndex) {
-        if (_newAmount > 0) {
-            newIndex =
-                (userFeeIndexes[_account][_underlying] *
-                    (_dTokenBalance - _newAmount) +
-                    _feeIndex *
-                    _newAmount) /
-                _dTokenBalance;
+        newIndex = _feeIndex;
+        uint256 oldIndex = userFeeIndexes[_account][_underlying];
+        userFee[_account][_underlying] +=
+            ((newIndex - oldIndex) * _dTokenBalance) /
+            Utils.QUINTILLION;
+        // update the user fee index
+        userFeeIndexes[_account][_underlying] = newIndex;
 
-            userFeeIndexes[_account][_underlying] = newIndex;
+        emit UserFeeIndexUpdated(_account, _underlying, newIndex);
+    }
 
-            emit UserFeeIndexUpdated(_account, _underlying, newIndex);
-        } else {
-            newIndex = userFeeIndexes[_account][_underlying];
-        }
+    function updateUserFee(
+        address _underlying,
+        address _account,
+        uint256 _fee,
+        mapping(address => mapping(address => uint256)) storage userFee
+    ) internal returns (uint256 newUserFee) {
+        newUserFee = userFee[_account][_underlying] - _fee;
+        userFee[_account][_underlying] = newUserFee;
+        emit UserFeeUpdated(_account, _underlying, newUserFee);
     }
 
     // views
@@ -354,15 +353,7 @@ library ExternalUtils {
         address _underlying,
         address[] memory _underlyings,
         mapping(address => Types.Asset) storage assets
-    )
-        internal
-        view
-        returns (
-            bool,
-            uint256,
-            uint256
-        )
-    {
+    ) internal view returns (bool, uint256, uint256) {
         uint256 maxDebtAllowed = ExternalUtils.borrowLimitInternal(
             _config.userDebtAndCollateral(_account),
             _config.assetConfigs(_underlying).liquidateLTV,
