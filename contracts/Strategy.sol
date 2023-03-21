@@ -32,8 +32,10 @@ contract Strategy is IStrategy, Ownable {
                 _currentSupplies[i]
             );
 
-            params.minAmounts[i] = minSupply(_protocols[i], _asset, msg.sender);
             uint256 rate = _protocols[i].getCurrentSupplyRate(_asset);
+            if (rate > params.maxRate) {
+                params.bestPoolToAddExtra = i;
+            }
             params.maxRate = uint128(Utils.maxOf(rate, params.maxRate));
         }
 
@@ -66,6 +68,9 @@ contract Strategy is IStrategy, Ownable {
             params.minAmounts[i] = 0;
 
             uint256 rate = _protocols[i].getCurrentSupplyRate(_asset);
+            if (rate > params.maxRate) {
+                params.bestPoolToAddExtra = i;
+            }
             params.maxRate = uint128(Utils.maxOf(rate, params.maxRate));
         }
 
@@ -165,19 +170,6 @@ contract Strategy is IStrategy, Ownable {
         return params.minAmounts;
     }
 
-    function minSupply(
-        IProtocol _protocol,
-        address _underlying,
-        address _account
-    ) public view override returns (uint256 amount) {
-        (uint256 collateral, uint256 borrowed) = _protocol
-            .totalColletralAndBorrow(_account, _underlying);
-        uint256 minCollateral = (borrowed * Utils.MILLION) /
-            maxLTVs[_underlying];
-
-        return minCollateral > collateral ? minCollateral - collateral : 0;
-    }
-
     function maxRedeemAllowed(
         IProtocol _protocol,
         address _underlying,
@@ -221,10 +213,10 @@ contract Strategy is IStrategy, Ownable {
         return maxDebtAllowed < borrowed ? borrowed - maxDebtAllowed : 0;
     }
 
-    function setMaxLTVs(address[] memory _assets, uint256[] memory _maxLTVs)
-        external
-        onlyOwner
-    {
+    function setMaxLTVs(
+        address[] memory _assets,
+        uint256[] memory _maxLTVs
+    ) external onlyOwner {
         require(
             _assets.length == _maxLTVs.length,
             "Strategy: wrong length of _maxLTVs"

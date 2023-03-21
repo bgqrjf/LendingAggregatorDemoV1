@@ -17,10 +17,10 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
 
     receive() external payable {}
 
-    function initialize(address[] memory _protocols, address _strategy)
-        external
-        initializer
-    {
+    function initialize(
+        address[] memory _protocols,
+        address _strategy
+    ) external initializer {
         __Ownable_init();
 
         protocols = new IProtocol[](_protocols.length);
@@ -80,7 +80,9 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         return protocols;
     }
 
-    function totalSupplied(address asset)
+    function totalSupplied(
+        address asset
+    )
         public
         view
         override
@@ -94,7 +96,9 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         }
     }
 
-    function totalBorrowed(address asset)
+    function totalBorrowed(
+        address asset
+    )
         public
         view
         override
@@ -108,12 +112,10 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         }
     }
 
-    function simulateLendings(address _asset, uint256 _totalLending)
-        public
-        view
-        override
-        returns (uint256 totalLending, uint256 newInterest)
-    {
+    function simulateLendings(
+        address _asset,
+        uint256 _totalLending
+    ) public view override returns (uint256 totalLending, uint256 newInterest) {
         IProtocol[] memory protocolsCache = protocols;
         uint256 supplyInterest;
         uint256 borrowInterest;
@@ -154,12 +156,9 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         newInterest = totalLending - _totalLending;
     }
 
-    function getRates(address _underlying)
-        external
-        view
-        override
-        returns (uint256 supplyRate, uint256 borrowRate)
-    {
+    function getRates(
+        address _underlying
+    ) external view override returns (uint256 supplyRate, uint256 borrowRate) {
         IProtocol[] memory protocolsCache = protocols;
 
         uint256 supplyWeight;
@@ -215,11 +214,10 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         }
     }
 
-    function updateSimulates(address _asset, uint256 _totalLending)
-        external
-        override
-        onlyOwner
-    {
+    function updateSimulates(
+        address _asset,
+        uint256 _totalLending
+    ) external override onlyOwner {
         IProtocol[] memory protocolsCache = protocols;
         uint256[] memory supplyAmounts = strategy.getSimulateSupplyStrategy(
             protocolsCache,
@@ -355,10 +353,10 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         return _amount;
     }
 
-    function repay(address _asset, uint256 _amount)
-        internal
-        returns (uint256 amount)
-    {
+    function repay(
+        address _asset,
+        uint256 _amount
+    ) internal returns (uint256 amount) {
         (, uint256 total) = totalBorrowed(_asset);
         amount = Utils.minOf(_amount, total);
         if (amount == 0) {
@@ -392,11 +390,10 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         protocols.push(_protocol);
     }
 
-    function updateProtocol(IProtocol _old, IProtocol _new)
-        external
-        override
-        onlyOwner
-    {
+    function updateProtocol(
+        IProtocol _old,
+        IProtocol _new
+    ) external override onlyOwner {
         IProtocol[] memory protocolsCache = protocols;
         for (uint256 i = 0; i < protocolsCache.length; i++) {
             if (_old == protocolsCache[i]) {
@@ -406,11 +403,14 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         }
     }
 
-    function claimRewards(address _account, uint256[] memory _amounts)
-        external
-        override
-        onlyOwner
-    {
+    // function updateStrategy(IStrategy _newStrategy) external {
+    //     strategy = _newStrategy;
+    // }
+
+    function claimRewards(
+        address _account,
+        uint256[] memory _amounts
+    ) external override onlyOwner {
         for (uint256 i = 0; i < protocols.length; ++i) {
             address token = protocols[i].rewardToken();
             token.safeTransfer(_account, _amounts[i], 0);

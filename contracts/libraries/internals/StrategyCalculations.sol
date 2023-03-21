@@ -23,13 +23,10 @@ library StrategyCalculations {
                 totalAmountToSupply = 0;
                 uint128 targetRate = (_params.maxRate + _params.minRate) / 2;
                 for (uint256 i = 0; i < _protocols.length; ++i) {
-                    amounts[i] = Utils.maxOf(
-                        _params.minAmounts[i],
-                        getAmountToSupply(
-                            _protocols[i],
-                            targetRate,
-                            _params.usageParams[i]
-                        )
+                    amounts[i] = getAmountToSupply(
+                        _protocols[i],
+                        targetRate,
+                        _params.usageParams[i]
                     );
                     totalAmountToSupply += amounts[i];
                 }
@@ -44,7 +41,9 @@ library StrategyCalculations {
             }
 
             if (totalAmountToSupply <= _params.targetAmount) {
-                amounts[0] += _params.targetAmount - totalAmountToSupply;
+                amounts[_params.bestPoolToAddExtra] +=
+                    _params.targetAmount -
+                    totalAmountToSupply;
                 return amounts;
             }
 
