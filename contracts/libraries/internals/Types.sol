@@ -109,6 +109,7 @@ library Types {
         uint256 targetAmount;
         uint128 maxRate;
         uint128 minRate;
+        uint256 bestPoolToAddExtra;
         uint256[] minAmounts;
         uint256[] maxAmounts;
         bytes[] usageParams;

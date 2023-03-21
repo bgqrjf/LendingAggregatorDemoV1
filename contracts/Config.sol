@@ -4,10 +4,12 @@ pragma solidity ^0.8.14;
 import "./interfaces/IConfig.sol";
 import "./interfaces/IRouter.sol";
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+// import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "./libraries/internals/UserAssetBitMap.sol";
 
-contract Config is IConfig, OwnableUpgradeable {
+// contract Config is IConfig, OwnableUpgradeable {
+contract Config is IConfig, Ownable {
     address public router;
 
     // mapping underlying token to assetConfig
@@ -22,9 +24,9 @@ contract Config is IConfig, OwnableUpgradeable {
         _;
     }
 
-    function initialize() external initializer {
-        __Ownable_init();
-    }
+    // function initialize() external initializer {
+    //     __Ownable_init();
+    // }
 
     function setRouter(address _router) external override onlyOwner {
         address oldRouter = router;
@@ -32,10 +34,10 @@ contract Config is IConfig, OwnableUpgradeable {
         emit RouterSet(oldRouter, _router);
     }
 
-    function setAssetConfig(address _token, Types.AssetConfig memory _config)
-        external
-        override
-    {
+    function setAssetConfig(
+        address _token,
+        Types.AssetConfig memory _config
+    ) external override {
         require(
             msg.sender == router || msg.sender == owner(),
             "Config: Only Router/Owner"
@@ -107,12 +109,9 @@ contract Config is IConfig, OwnableUpgradeable {
         emit UserDebtAndCollateralSet(_account, oldUserConfig, newUserConfig);
     }
 
-    function assetConfigs(address _token)
-        public
-        view
-        override
-        returns (Types.AssetConfig memory)
-    {
+    function assetConfigs(
+        address _token
+    ) public view override returns (Types.AssetConfig memory) {
         return _assetConfigs[_token];
     }
 }
