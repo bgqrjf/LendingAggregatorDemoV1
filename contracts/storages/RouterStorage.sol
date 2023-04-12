@@ -18,12 +18,6 @@ abstract contract RouterStorage is IRouter {
     mapping(address => Types.Asset) public assets;
     mapping(address => uint256) public totalLendings;
 
-    mapping(address => uint256) public accFees;
-    mapping(address => uint256) public collectedFees;
-    mapping(address => uint256) public feeIndexes;
-    mapping(address => mapping(address => uint256)) public userFeeIndexes;
-    mapping(address => mapping(address => uint256)) public userFee;
-
     // address0 => block all
     // tokenAddress => block token
     mapping(address => uint256) public blockedActions;

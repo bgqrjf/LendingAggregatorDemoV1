@@ -18,8 +18,10 @@ interface IConfig {
 
     function setRouter(address _router) external;
 
-    function setAssetConfig(address _token, Types.AssetConfig memory _config)
-        external;
+    function setAssetConfig(
+        address _token,
+        Types.AssetConfig memory _config
+    ) external;
 
     function setUsingAsCollateral(
         address _account,
@@ -34,13 +36,11 @@ interface IConfig {
     ) external;
 
     // external state-getters
-    function assetConfigs(address)
-        external
-        view
-        returns (Types.AssetConfig memory);
+    function assetConfigs(
+        address
+    ) external view returns (Types.AssetConfig memory);
 
-    function userDebtAndCollateral(address asset)
-        external
-        view
-        returns (uint256 config);
+    function userDebtAndCollateral(
+        address asset
+    ) external view returns (uint256 config);
 }

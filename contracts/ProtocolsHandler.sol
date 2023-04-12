@@ -184,7 +184,7 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
                     newSupplyWeight;
                 supplyWeight = newSupplyWeight;
             } else {
-                supplyRate = Utils.maxOf(supplyRate, protocolSupplyRate);
+                supplyRate = Math.max(supplyRate, protocolSupplyRate);
             }
 
             uint256 protocolBorrowRate = protocolsCache[i].getCurrentBorrowRate(
@@ -208,7 +208,7 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
                 borrowWeight = newBorrowWeight;
             } else {
                 borrowRate = borrowRate > 0
-                    ? Utils.minOf(borrowRate, protocolBorrowRate)
+                    ? Math.min(borrowRate, protocolBorrowRate)
                     : protocolBorrowRate;
             }
         }
@@ -312,7 +312,7 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         uint256 _totalSupplied,
         address _to
     ) internal returns (uint256 amount) {
-        amount = Utils.minOf(_amount, _totalSupplied);
+        amount = Math.min(_amount, _totalSupplied);
 
         if (amount > 0) {
             redeemAndSupply(_asset, supplies, _totalSupplied - amount);
@@ -358,7 +358,7 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         uint256 _amount
     ) internal returns (uint256 amount) {
         (, uint256 total) = totalBorrowed(_asset);
-        amount = Utils.minOf(_amount, total);
+        amount = Math.min(_amount, total);
         if (amount == 0) {
             return amount;
         }

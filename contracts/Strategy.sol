@@ -36,7 +36,7 @@ contract Strategy is IStrategy, Ownable {
             if (rate > params.maxRate) {
                 params.bestPoolToAddExtra = i;
             }
-            params.maxRate = uint128(Utils.maxOf(rate, params.maxRate));
+            params.maxRate = uint128(Math.max(rate, params.maxRate));
         }
 
         params.targetAmount = _amount;
@@ -71,7 +71,7 @@ contract Strategy is IStrategy, Ownable {
             if (rate > params.maxRate) {
                 params.bestPoolToAddExtra = i;
             }
-            params.maxRate = uint128(Utils.maxOf(rate, params.maxRate));
+            params.maxRate = uint128(Math.max(rate, params.maxRate));
         }
 
         params.targetAmount = _amount;
@@ -100,7 +100,7 @@ contract Strategy is IStrategy, Ownable {
             maxBorrowAmount += params.maxAmounts[i];
 
             uint256 rate = _protocols[i].getCurrentBorrowRate(_asset);
-            params.minRate = uint128(Utils.minOf(rate, params.minRate));
+            params.minRate = uint128(Math.min(rate, params.minRate));
         }
 
         require(maxBorrowAmount >= _amount, "Strategy: insufficient balance");
@@ -123,7 +123,7 @@ contract Strategy is IStrategy, Ownable {
             params.usageParams[i] = _protocols[i].getUsageParams(_asset, 0);
             params.maxAmounts[i] = Utils.MAX_UINT;
             uint256 rate = _protocols[i].getCurrentBorrowRate(_asset);
-            params.minRate = uint128(Utils.minOf(rate, params.minRate));
+            params.minRate = uint128(Math.min(rate, params.minRate));
         }
 
         params.targetAmount = _amount;
@@ -145,7 +145,7 @@ contract Strategy is IStrategy, Ownable {
         for (uint256 i = 0; i < _protocols.length; ++i) {
             params.usageParams[i] = _protocols[i].getUsageParams(_asset, 0);
 
-            params.minAmounts[i] = Utils.minOf(
+            params.minAmounts[i] = Math.min(
                 _amount - minRepayAmount,
                 minRepay(_protocols[i], _asset, msg.sender)
             );
@@ -154,7 +154,7 @@ contract Strategy is IStrategy, Ownable {
             params.maxAmounts[i] = _protocols[i].debtOf(_asset, msg.sender);
 
             uint256 rate = _protocols[i].getCurrentBorrowRate(_asset);
-            params.maxRate = uint128(Utils.maxOf(rate, params.maxRate));
+            params.maxRate = uint128(Math.max(rate, params.maxRate));
         }
 
         if (_amount > minRepayAmount) {
@@ -181,7 +181,7 @@ contract Strategy is IStrategy, Ownable {
             maxLTVs[_underlying];
         return
             minCollateralNeeded < collateral
-                ? Utils.minOf(
+                ? Math.min(
                     collateral - minCollateralNeeded,
                     _protocol.supplyOf(_underlying, _account)
                 )

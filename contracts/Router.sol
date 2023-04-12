@@ -67,8 +67,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
                 config,
                 assets[_params.asset]
             ),
-            totalLendings,
-            accFees
+            totalLendings
         );
     }
 
@@ -87,12 +86,10 @@ contract Router is RouterStorage, OwnableUpgradeable {
                 reservePool,
                 rewards,
                 config,
-                priceOracle,
-                collectedFees[_params.asset],
-                underlyings
+                priceOracle
             ),
+            underlyings,
             totalLendings,
-            accFees,
             assets
         );
     }
@@ -110,15 +107,11 @@ contract Router is RouterStorage, OwnableUpgradeable {
                 reservePool,
                 rewards,
                 config,
-                priceOracle,
-                underlyings
+                priceOracle
             ),
+            underlyings,
             assets,
-            totalLendings,
-            accFees,
-            feeIndexes,
-            userFeeIndexes,
-            userFee
+            totalLendings
         );
     }
 
@@ -137,16 +130,9 @@ contract Router is RouterStorage, OwnableUpgradeable {
                 rewards,
                 config,
                 priceOracle,
-                collectedFees[_params.asset],
-                userFeeIndexes[_params.to][_params.asset],
                 assets[_params.asset]
             ),
-            totalLendings,
-            accFees,
-            collectedFees,
-            feeIndexes,
-            userFeeIndexes,
-            userFee
+            totalLendings
         );
     }
 
@@ -157,43 +143,19 @@ contract Router is RouterStorage, OwnableUpgradeable {
     ) external payable {
         LiquidateLogic.liquidate(
             Types.LiquidateParams(
-                Types.RepayParams(
-                    _repayParams,
-                    true,
-                    actionNotPaused(_repayParams.asset, Action.repay),
-                    feeCollector,
-                    protocols,
-                    reservePool,
-                    rewards,
-                    config,
-                    priceOracle,
-                    collectedFees[_repayParams.asset],
-                    userFeeIndexes[_repayParams.to][_repayParams.asset],
-                    assets[_repayParams.asset]
-                ),
-                Types.RedeemParams(
-                    _redeemParams,
-                    true,
-                    true,
-                    actionNotPaused(_redeemParams.asset, Action.redeem),
-                    protocols,
-                    reservePool,
-                    rewards,
-                    config,
-                    priceOracle,
-                    collectedFees[_redeemParams.asset],
-                    underlyings
-                ),
-                actionNotPaused(_repayParams.asset, Action.liquidate),
-                underlyings
+                _repayParams,
+                _redeemParams,
+                feeCollector,
+                protocols,
+                reservePool,
+                rewards,
+                config,
+                priceOracle,
+                actionNotPaused(_repayParams.asset, Action.liquidate)
             ),
+            underlyings,
             assets,
-            totalLendings,
-            accFees,
-            collectedFees,
-            feeIndexes,
-            userFeeIndexes,
-            userFee
+            totalLendings
         );
     }
 
@@ -212,31 +174,23 @@ contract Router is RouterStorage, OwnableUpgradeable {
     }
 
     function sync(address _asset) external override {
-        ExternalUtils.sync(_asset, protocols, config, totalLendings, accFees);
+        ExternalUtils.sync(_asset, protocols, totalLendings);
     }
 
     // reservePool callbacks
     function recordSupply(
         Types.UserAssetParams memory _params,
-        uint256 _totalSupplies,
-        uint256 _newInterest,
-        bool _collateralable
+        uint256 totalUnderlying,
+        uint256 newInterest
     ) external override onlyReservePool {
         SupplyLogic.recordSupply(
-            Types.SupplyParams(
+            Types.RecordSupplyParams(
                 _params,
-                _collateralable,
-                false, // not used in libirary
-                false, // not used in library
-                protocols,
-                reservePool,
-                rewards,
-                config,
-                assets[_params.asset]
-            ),
-            _totalSupplies,
-            _newInterest,
-            accFees
+                assets[_params.asset].sToken,
+                assets[_params.asset].dToken,
+                totalUnderlying,
+                newInterest
+            )
         );
     }
 
@@ -246,31 +200,18 @@ contract Router is RouterStorage, OwnableUpgradeable {
         uint256 _newInterest,
         address _redeemFrom,
         bool _collateralable
-    )
-        external
-        override
-        onlyReservePool
-        returns (uint256 underlyingAmount, uint256 fee)
-    {
+    ) external override onlyReservePool returns (uint256 underlyingAmount) {
         return
             RedeemLogic.recordRedeem(
-                Types.RedeemParams(
+                Types.RecordRedeemParams(
                     _params,
+                    _totalSupplies,
+                    _newInterest,
+                    _redeemFrom,
+                    true,
                     _collateralable,
-                    false, // not used in libirary
-                    false, // not used in library
-                    protocols,
-                    reservePool,
-                    rewards,
-                    config,
-                    priceOracle,
-                    collectedFees[_params.asset],
-                    underlyings
+                    rewards
                 ),
-                _totalSupplies,
-                _newInterest,
-                _redeemFrom,
-                accFees,
                 assets
             );
     }
@@ -287,72 +228,23 @@ contract Router is RouterStorage, OwnableUpgradeable {
                 _newInterest,
                 _totalBorrows,
                 _borrowBy,
-                config,
                 rewards
             ),
-            assets,
-            accFees,
-            feeIndexes,
-            userFeeIndexes,
-            userFee
+            assets
         );
     }
 
     function executeSupply(
-        address _asset,
-        uint256 _amount,
-        uint256 _totalLending,
-        uint256[] memory _supplies,
-        uint256 _protocolsSupplies
+        Types.ExecuteSupplyParams memory params
     ) external payable override onlyReservePool {
-        SupplyLogic.executeSupply(
-            Types.SupplyParams(
-                Types.UserAssetParams(
-                    _asset,
-                    _amount,
-                    address(0) // not used in library
-                ),
-                false, // not used in library
-                false, // not used in library
-                true, // not used in library
-                protocols,
-                reservePool,
-                rewards,
-                config,
-                assets[_asset]
-            ),
-            _totalLending,
-            _supplies,
-            _protocolsSupplies,
-            totalLendings
-        );
+        SupplyLogic.executeSupply(params, protocols, totalLendings);
     }
 
     function executeRedeem(
-        Types.UserAssetParams memory _params,
-        uint256[] memory _supplies,
-        uint256 _protocolsSupplies,
-        uint256 _totalLending
+        Types.ExecuteRedeemParams memory _params
     ) external override onlyReservePool {
-        RedeemLogic.executeRedeem(
-            Types.RedeemParams(
-                _params,
-                false,
-                true,
-                true,
-                protocols,
-                reservePool,
-                rewards,
-                config,
-                priceOracle,
-                collectedFees[_params.asset],
-                underlyings
-            ),
-            _supplies,
-            _protocolsSupplies,
-            _totalLending,
-            totalLendings
-        );
+        _params.protocols = protocols;
+        RedeemLogic.executeRedeem(_params, totalLendings);
     }
 
     function executeBorrow(
@@ -365,17 +257,8 @@ contract Router is RouterStorage, OwnableUpgradeable {
         );
 
         BorrowLogic.executeBorrow(
-            Types.BorrowParams(
-                _params,
-                true, // not used in library
-                true, // not used in library
-                protocolsCache,
-                reservePool,
-                rewards,
-                config,
-                priceOracle,
-                underlyings
-            ),
+            _params,
+            protocols,
             totalLending,
             totalLendings
         );
@@ -531,23 +414,30 @@ contract Router is RouterStorage, OwnableUpgradeable {
 
     function totalSupplied(
         address _underlying
-    ) public view override returns (uint256) {
-        (, , , uint256 totalSuppliedAmountWithFee, ) = ExternalUtils
-            .getSupplyStatus(
+    ) external view override returns (uint256) {
+        (
+            ,
+            ,
+            ,
+            uint256 totalSuppliedAmountWithFee,
+            uint newInterest
+        ) = ExternalUtils.getSupplyStatus(
                 _underlying,
                 reservePool,
                 protocols,
                 totalLendings
             );
 
-        uint256 fee = accFees[_underlying] - collectedFees[_underlying];
+        IDToken dToken = assets[_underlying].dToken;
+        (uint newAccFee, ) = dToken.calculateFee(newInterest);
+        uint fee = newAccFee - dToken.collectedFee();
 
         return totalSuppliedAmountWithFee - fee;
     }
 
     function totalBorrowed(
         address _underlying
-    ) public view override returns (uint256 totalBorrowedAmount) {
+    ) external view override returns (uint256 totalBorrowedAmount) {
         (, totalBorrowedAmount, , ) = ExternalUtils.getBorrowStatus(
             _underlying,
             reservePool,
@@ -732,10 +622,6 @@ contract Router is RouterStorage, OwnableUpgradeable {
     ) external override onlyOwner {
         priceOracle = _priceOracle;
         emit PriceOracleUpdated(_priceOracle);
-    }
-
-    function resetCollectedFee(address _underlying) external onlyOwner {
-        collectedFees[_underlying] = 0;
     }
 
     // --- getters

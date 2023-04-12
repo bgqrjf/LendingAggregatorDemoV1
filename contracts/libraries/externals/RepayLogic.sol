@@ -25,32 +25,14 @@ library RepayLogic {
 
     function repay(
         Types.RepayParams memory _params,
-        mapping(address => uint256) storage totalLendings,
-        mapping(address => uint256) storage accFees,
-        mapping(address => uint256) storage collectedFees,
-        mapping(address => uint256) storage feeIndexes,
-        mapping(address => mapping(address => uint256)) storage userFeeIndexes,
-        mapping(address => mapping(address => uint256)) storage userFee
+        mapping(address => uint256) storage totalLendings
     ) external {
-        repayInternal(
-            _params,
-            totalLendings,
-            accFees,
-            collectedFees,
-            feeIndexes,
-            userFeeIndexes,
-            userFee
-        );
+        repayInternal(_params, totalLendings);
     }
 
     function repayInternal(
         Types.RepayParams memory _params,
-        mapping(address => uint256) storage totalLendings,
-        mapping(address => uint256) storage accFees,
-        mapping(address => uint256) storage collectedFees,
-        mapping(address => uint256) storage feeIndexes,
-        mapping(address => mapping(address => uint256)) storage userFeeIndexes,
-        mapping(address => mapping(address => uint256)) storage userFee
+        mapping(address => uint256) storage totalLendings
     ) internal returns (uint256 amount) {
         require(_params.actionNotPaused, "RepayLogic: action paused");
 
@@ -66,32 +48,30 @@ library RepayLogic {
                 totalLendings
             );
 
-        uint256 fee;
-        (amount, fee) = recordRepay(
+        uint256 newFee;
+        (amount, newFee) = recordRepay(
             Types.RecordRepayParams(
                 _params.userParams,
-                _params.config,
                 _params.rewards,
-                _params.userFeeIndexes,
-                _params.asset
-            ),
-            newInterest,
-            totalBorrowedAmount,
-            accFees,
-            collectedFees,
-            feeIndexes,
-            userFeeIndexes,
-            userFee
+                _params.asset,
+                newInterest,
+                totalBorrowedAmount
+            )
         );
 
         TransferHelper.collect(
             _params.userParams.asset,
             msg.sender,
             _params.feeCollector,
-            fee,
+            newFee,
             0
         );
-        emit FeeCollected(_params.userParams.asset, _params.feeCollector, fee);
+
+        emit FeeCollected(
+            _params.userParams.asset,
+            _params.feeCollector,
+            newFee
+        );
 
         if (
             _params.userParams.asset == TransferHelper.ETH &&
@@ -100,19 +80,20 @@ library RepayLogic {
             _refundETH(_params.userParams.amount - amount);
         }
 
+        uint executeAmount = amount - newFee;
         if (address(_params.reservePool) != address(0)) {
             TransferHelper.collect(
                 _params.userParams.asset,
                 msg.sender,
                 address(_params.reservePool),
-                amount - fee,
+                executeAmount,
                 0
             );
 
             _params.reservePool.repay(
                 Types.UserAssetParams(
                     _params.userParams.asset,
-                    amount - fee,
+                    executeAmount,
                     _params.userParams.to
                 ),
                 totalBorrowedAmount,
@@ -123,113 +104,49 @@ library RepayLogic {
                 _params.userParams.asset,
                 msg.sender,
                 address(_params.protocols),
-                amount - fee,
+                executeAmount,
                 0
             );
 
             executeRepayInternal(
                 _params.protocols,
                 _params.userParams.asset,
-                amount - fee,
+                executeAmount,
                 totalLending,
                 totalLendings
             );
         }
 
-        totalLending = totalLendings[_params.userParams.asset];
-
-        ExternalUtils.updateTotalLendings(
-            _params.protocols,
-            _params.userParams.asset,
-            totalLending > fee ? totalLending - fee : 0,
-            totalLendings
-        );
+        if (_params.asset.dToken.balanceOf(msg.sender) == 0) {
+            _params.config.setBorrowing(
+                msg.sender,
+                _params.userParams.asset,
+                false
+            );
+        }
     }
 
     function recordRepay(
-        Types.RecordRepayParams memory _params,
-        uint256 newInterest,
-        uint256 totalBorrows,
-        mapping(address => uint256) storage accFees,
-        mapping(address => uint256) storage collectedFees,
-        mapping(address => uint256) storage feeIndexes,
-        mapping(address => mapping(address => uint256)) storage userFeeIndexes,
-        mapping(address => mapping(address => uint256)) storage userFee
-    ) internal returns (uint256 repayAmount, uint256 fee) {
-        uint256 dTokenTotalSupply = _params.asset.dToken.totalSupply();
-        uint256 dTokenBlance = _params.asset.dToken.balanceOf(
-            _params.userParams.to
-        );
-        {
-            uint256 userDebts = _params.asset.dToken.scaledAmount(
-                dTokenBlance,
-                totalBorrows
-            );
-
-            repayAmount = _params.userParams.amount;
-            if (repayAmount >= userDebts) {
-                repayAmount = userDebts;
-                _params.config.setBorrowing(
-                    _params.userParams.to,
-                    _params.userParams.asset,
-                    false
-                );
-            }
-        }
-        uint256 accFee = ExternalUtils.updateAccFee(
-            _params.userParams.asset,
-            newInterest,
-            _params.config,
-            accFees
-        );
-        uint256 feeIndex = ExternalUtils.updateFeeIndex(
-            _params.userParams.asset,
-            dTokenTotalSupply,
-            // accFee + accFeeOffsets[_params.asset]
-            accFee,
-            feeIndexes
-        );
-
-        ExternalUtils.updateUserFeeIndex(
-            _params.userParams.asset,
+        Types.RecordRepayParams memory _params
+    ) internal returns (uint256 repaidAmount, uint256 newFee) {
+        (repaidAmount, newFee) = _params.asset.dToken.burn(
             _params.userParams.to,
-            dTokenBlance,
-            feeIndex,
-            userFeeIndexes,
-            userFee
+            _params.userParams.amount,
+            _params.totalBorrows,
+            _params.newInterest
         );
 
-        fee =
-            (repayAmount *
-                userFee[_params.userParams.to][_params.userParams.asset]) /
-            userDebts;
-
-        collectedFees[_params.userParams.asset] += fee;
-
-        ExternalUtils.updateUserFee(
-            _params.userParams.asset,
-            _params.userParams.to,
-            fee,
-            userFee
-        );
-
-        uint256 dTokenAmount = _params.asset.dToken.burn(
-            _params.userParams.to,
-            repayAmount,
-            totalBorrows
-        );
-
-        _params.rewards.stopMiningBorrowReward(
-            _params.userParams.asset,
-            _params.userParams.to,
-            dTokenAmount,
-            dTokenTotalSupply
-        );
+        // _params.rewards.stopMiningBorrowReward(
+        //     _params.userParams.asset,
+        //     _params.userParams.to,
+        //     dTokenAmount,
+        //     dTokenTotalSupply
+        // );
 
         emit Repaid(
             _params.userParams.to,
             _params.userParams.asset,
-            repayAmount
+            repaidAmount
         );
     }
 

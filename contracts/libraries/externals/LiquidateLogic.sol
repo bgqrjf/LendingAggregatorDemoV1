@@ -25,90 +25,120 @@ library LiquidateLogic {
     // _redeemParams.amount is the minAmount redeem which is used as slippage validation
     function liquidate(
         Types.LiquidateParams memory _params,
+        address[] storage underlyings,
         mapping(address => Types.Asset) storage assets,
-        mapping(address => uint256) storage totalLendings,
-        mapping(address => uint256) storage accFees,
-        mapping(address => uint256) storage collectedFees,
-        mapping(address => uint256) storage feeIndexes,
-        mapping(address => mapping(address => uint256)) storage userFeeIndexes,
-        mapping(address => mapping(address => uint256)) storage userFee
+        mapping(address => uint256) storage totalLendings
     ) external {
         // actionNotPaused(_repayParams.asset, Action.liquidate);
         require(_params.actionNotPaused, "LiquidateLogic: action paused");
 
-        _params.repayParams.userParams.amount = validateLiquidatation(
+        // repay
+        _params.repayParams.amount = validateLiquidatation(
             _params,
+            underlyings,
             assets
         );
 
-        _params.repayParams.userParams.amount = RepayLogic.repayInternal(
-            _params.repayParams,
-            totalLendings,
-            accFees,
-            collectedFees,
-            feeIndexes,
-            userFeeIndexes,
-            userFee
+        _params.repayParams.amount = RepayLogic.repayInternal(
+            Types.RepayParams(
+                _params.repayParams,
+                true,
+                true,
+                _params.feeCollector,
+                _params.protocols,
+                _params.reservePool,
+                _params.rewards,
+                _params.config,
+                _params.priceOracle,
+                assets[_params.repayParams.asset]
+            ),
+            totalLendings
         );
 
-        (uint256[] memory supplies, uint256 protocolsSupplies) = _params
-            .redeemParams
-            .protocols
-            .totalSupplied(_params.redeemParams.userParams.asset);
+        if (
+            assets[_params.repayParams.asset].dToken.balanceOf(msg.sender) == 0
+        ) {
+            _params.config.setBorrowing(
+                msg.sender,
+                _params.repayParams.asset,
+                false
+            );
+        }
 
-        (uint256 totalLending, ) = _params
-            .redeemParams
-            .protocols
-            .simulateLendings(
-                _params.redeemParams.userParams.asset,
-                totalLendings[_params.redeemParams.userParams.asset]
+        // redeem
+        (
+            uint256[] memory supplies,
+            uint256 protocolsSupplies,
+            uint256 totalLending,
+            uint256 totalsupplies,
+            uint256 newInterest
+        ) = ExternalUtils.getSupplyStatus(
+                _params.redeemParams.asset,
+                _params.reservePool,
+                _params.protocols,
+                totalLendings
             );
 
         // preprocessing data
         {
-            uint256 assetValue = _params.repayParams.priceOracle.valueOfAsset(
-                _params.repayParams.userParams.asset,
-                _params.redeemParams.userParams.asset,
-                _params.repayParams.userParams.amount
+            uint256 assetValue = _params.priceOracle.valueOfAsset(
+                _params.repayParams.asset,
+                _params.redeemParams.asset,
+                _params.repayParams.amount
             );
 
             uint256 redeemAmount = (assetValue *
                 _params
-                    .redeemParams
                     .config
-                    .assetConfigs(_params.redeemParams.userParams.asset)
+                    .assetConfigs(_params.redeemParams.asset)
                     .liquidateRewardRatio) / Utils.MILLION;
 
             require(
-                redeemAmount >= _params.redeemParams.userParams.amount,
+                redeemAmount >= _params.redeemParams.amount,
                 "LiquidateLogic: insufficient redeem amount"
             );
-            _params.redeemParams.userParams.amount = redeemAmount;
+
+            _params.redeemParams.amount = redeemAmount;
         }
-        (_params.redeemParams.userParams.amount, ) = RedeemLogic
-            .recordRedeemInternal(
+
+        _params.redeemParams.amount = RedeemLogic.recordRedeemInternal(
+            Types.RecordRedeemParams(
                 _params.redeemParams,
-                protocolsSupplies + totalLending,
-                0,
-                _params.repayParams.userParams.to,
+                totalsupplies,
+                newInterest,
+                _params.repayParams.to,
                 false,
-                accFees,
-                assets
-            );
+                true,
+                _params.rewards
+            ),
+            assets
+        );
 
         RedeemLogic.executeRedeemInternal(
-            _params.redeemParams,
-            supplies,
-            protocolsSupplies,
-            totalLending,
+            Types.ExecuteRedeemParams(
+                _params.redeemParams,
+                _params.protocols,
+                supplies,
+                protocolsSupplies,
+                totalLending
+            ),
             totalLendings
         );
 
-        emit Liquidated(
-            msg.sender,
-            _params.repayParams.userParams,
-            _params.redeemParams.userParams
-        );
+        Types.Asset memory redeemAsset = assets[_params.redeemParams.asset];
+
+        if (
+            !redeemAsset.collateralable ||
+            redeemAsset.sToken.balanceOf(msg.sender) == 0
+        ) {
+            _params.config.setUsingAsCollateral(
+                msg.sender,
+                _params.redeemParams.asset,
+                false
+            );
+        }
+
+        emit Liquidated(msg.sender, _params.repayParams, _params.redeemParams);
     }
 
     function getLiquidationData(
@@ -140,24 +170,21 @@ library LiquidateLogic {
 
     function validateLiquidatation(
         Types.LiquidateParams memory _params,
+        address[] storage underlyings,
         mapping(address => Types.Asset) storage assets
     ) internal view returns (uint256) {
-        uint256 userConfig = _params.repayParams.config.userDebtAndCollateral(
-            _params.repayParams.userParams.to
+        uint256 userConfig = _params.config.userDebtAndCollateral(
+            _params.repayParams.to
         );
-        Types.Asset memory repayAsset = assets[
-            _params.repayParams.userParams.asset
-        ];
-        Types.Asset memory redeemAsset = assets[
-            _params.redeemParams.userParams.asset
-        ];
+        Types.Asset memory repayAsset = assets[_params.repayParams.asset];
+        Types.Asset memory redeemAsset = assets[_params.redeemParams.asset];
 
         uint256 debtsValue = ExternalUtils.getUserDebts(
-            _params.repayParams.userParams.to,
+            _params.repayParams.to,
             userConfig,
-            _params.underlyings,
-            _params.repayParams.userParams.asset,
-            _params.repayParams.priceOracle,
+            underlyings,
+            _params.repayParams.asset,
+            _params.priceOracle,
             assets
         );
 
@@ -166,16 +193,16 @@ library LiquidateLogic {
             uint256 maxLiquidationAmount,
             bool blackListed
         ) = getLiquidationDataInternal(
-                _params.repayParams.userParams.to,
-                _params.repayParams.userParams.asset,
-                _params.underlyings,
-                _params.repayParams.config,
-                _params.repayParams.priceOracle,
+                _params.repayParams.to,
+                _params.repayParams.asset,
+                underlyings,
+                _params.config,
+                _params.priceOracle,
                 assets
             );
 
         require(
-            assets[_params.redeemParams.userParams.asset].paused == blackListed,
+            assets[_params.redeemParams.asset].paused == blackListed,
             "LiquidateLogic: Paused token not liquidated"
         );
 
@@ -195,8 +222,8 @@ library LiquidateLogic {
         );
 
         return
-            _params.repayParams.userParams.amount < maxLiquidationAmount
-                ? _params.repayParams.userParams.amount
+            _params.repayParams.amount < maxLiquidationAmount
+                ? _params.repayParams.amount
                 : maxLiquidationAmount;
     }
 

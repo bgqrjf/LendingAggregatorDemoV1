@@ -19,8 +19,7 @@ library SupplyLogic {
 
     function supply(
         Types.SupplyParams memory _params,
-        mapping(address => uint256) storage totalLendings,
-        mapping(address => uint256) storage accFees
+        mapping(address => uint256) storage totalLendings
     ) external {
         require(_params.actionNotPaused, "SupplyLogic: action paused");
 
@@ -43,8 +42,8 @@ library SupplyLogic {
                 uint256[] memory supplies,
                 uint256 protocolsSupplies,
                 uint256 totalLending,
-                uint256 totalSuppliedAmount,
-                uint256 newInterest
+                uint256 newInterest,
+                uint256 totalSuppliedAmountWithFee
             ) = ExternalUtils.getSupplyStatus(
                     _params.userParams.asset,
                     _params.reservePool,
@@ -53,10 +52,13 @@ library SupplyLogic {
                 );
 
             recordSupplyInternal(
-                _params,
-                totalSuppliedAmount,
-                newInterest,
-                accFees
+                Types.RecordSupplyParams(
+                    _params.userParams,
+                    _params.asset.sToken,
+                    _params.asset.dToken,
+                    totalSuppliedAmountWithFee,
+                    newInterest
+                )
             );
 
             TransferHelper.collect(
@@ -68,10 +70,14 @@ library SupplyLogic {
             );
 
             executeSupplyInternal(
-                _params,
-                totalLending,
-                supplies,
-                protocolsSupplies,
+                Types.ExecuteSupplyParams(
+                    _params.userParams.asset,
+                    _params.userParams.amount,
+                    totalLending,
+                    supplies,
+                    protocolsSupplies
+                ),
+                _params.protocols,
                 totalLendings
             );
         }
@@ -85,56 +91,37 @@ library SupplyLogic {
         }
     }
 
-    function recordSupply(
-        Types.SupplyParams memory _params,
-        uint256 _totalSupplies,
-        uint256 _newInterest,
-        mapping(address => uint256) storage accFees
-    ) external {
-        recordSupplyInternal(_params, _totalSupplies, _newInterest, accFees);
+    function recordSupply(Types.RecordSupplyParams memory _params) external {
+        recordSupplyInternal(_params);
     }
 
     function executeSupply(
-        Types.SupplyParams memory _params,
-        uint256 _totalLending,
-        uint256[] memory _supplies,
-        uint256 _protocolsSupplies,
+        Types.ExecuteSupplyParams memory _params,
+        IProtocolsHandler _protocols,
         mapping(address => uint256) storage totalLendings
     ) external {
-        executeSupplyInternal(
-            _params,
-            _totalLending,
-            _supplies,
-            _protocolsSupplies,
-            totalLendings
-        );
+        executeSupplyInternal(_params, _protocols, totalLendings);
     }
 
     function recordSupplyInternal(
-        Types.SupplyParams memory _params,
-        uint256 _totalSupplies,
-        uint256 _newInterest,
-        mapping(address => uint256) storage accFees
+        Types.RecordSupplyParams memory _params
     ) internal {
-        ExternalUtils.updateAccFee(
-            _params.userParams.asset,
-            _newInterest,
-            _params.config,
-            accFees
+        uint256 uncollectedFee = _params.dToken.updateNewFee(
+            _params.newInterest
         );
 
-        uint256 sTokenAmount = _params.asset.sToken.mint(
+        _params.sToken.mint(
             _params.userParams.to,
             _params.userParams.amount,
-            _totalSupplies
+            _params.totalUnderlying - uncollectedFee
         );
 
-        _params.rewards.startMiningSupplyReward(
-            _params.userParams.asset,
-            _params.userParams.to,
-            sTokenAmount,
-            _params.asset.sToken.totalSupply()
-        );
+        // _params.rewards.startMiningSupplyReward(
+        //     _params.userParams.asset,
+        //     _params.userParams.to,
+        //     sTokenAmount,
+        //     _params.asset.sToken.totalSupply()
+        // );
 
         emit Supplied(
             _params.userParams.to,
@@ -144,24 +131,22 @@ library SupplyLogic {
     }
 
     function executeSupplyInternal(
-        Types.SupplyParams memory _params,
-        uint256 _totalLending,
-        uint256[] memory _supplies,
-        uint256 _protocolsSupplies,
+        Types.ExecuteSupplyParams memory _params,
+        IProtocolsHandler _protocols,
         mapping(address => uint256) storage totalLendings
     ) internal {
-        (uint256 repayed, ) = _params.protocols.repayAndSupply(
-            _params.userParams.asset,
-            _params.userParams.amount,
-            _supplies,
-            _protocolsSupplies
+        (uint256 repayed, ) = _protocols.repayAndSupply(
+            _params.asset,
+            _params.amount,
+            _params.supplies,
+            _params.protocolsSupplies
         );
 
         if (repayed > 0) {
             ExternalUtils.updateTotalLendings(
-                _params.protocols,
-                _params.userParams.asset,
-                _totalLending + repayed,
+                _protocols,
+                _params.asset,
+                _params.totalLending + repayed,
                 totalLendings
             );
         }

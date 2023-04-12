@@ -117,9 +117,8 @@ interface IRouter {
 
     function recordSupply(
         Types.UserAssetParams memory _params,
-        uint256 totalSupplies,
-        uint256 newInterest,
-        bool _collateralable
+        uint256 totalUnderlying,
+        uint256 newInterest
     ) external;
 
     function recordRedeem(
@@ -128,7 +127,7 @@ interface IRouter {
         uint256 newInterest,
         address _redeemFrom,
         bool _collateralable
-    ) external returns (uint256 underlyingAmount, uint256 fee);
+    ) external returns (uint256 underlyingAmount);
 
     function recordBorrow(
         Types.UserAssetParams memory _params,
@@ -138,19 +137,10 @@ interface IRouter {
     ) external;
 
     function executeSupply(
-        address _asset,
-        uint256 _amount,
-        uint256 _totalLending,
-        uint256[] memory _supplies,
-        uint256 _protocolsSupplies
+        Types.ExecuteSupplyParams memory _params
     ) external payable;
 
-    function executeRedeem(
-        Types.UserAssetParams memory _params,
-        uint256[] memory _supplies,
-        uint256 _protocolsSupplies,
-        uint256 _totalLending
-    ) external;
+    function executeRedeem(Types.ExecuteRedeemParams memory _params) external;
 
     function executeBorrow(Types.UserAssetParams memory _params) external;
 

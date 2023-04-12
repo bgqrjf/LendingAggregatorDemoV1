@@ -72,11 +72,10 @@ library TransferHelper {
         IERC20(_token).safeApprove(_spender, _amount);
     }
 
-    function balanceOf(address _token, address _account)
-        internal
-        view
-        returns (uint256 balance)
-    {
+    function balanceOf(
+        address _token,
+        address _account
+    ) internal view returns (uint256 balance) {
         return
             _token == ETH
                 ? _account.balance

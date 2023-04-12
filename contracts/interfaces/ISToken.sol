@@ -21,23 +21,22 @@ interface ISToken is IERC20Upgradeable {
         address _account,
         bool _notLiquidate,
         uint256 _amount,
-        uint256 _totalUnderlying,
-        uint256 _totalUncollectedFee
-    ) external returns (uint256 amount, uint256 fee);
+        uint256 _totalUnderlying
+    ) external returns (uint256 amount);
 
     function scaledBalanceOf(address _account) external view returns (uint256);
 
-    function scaledAmount(uint256 _amount, uint256 scaledAmount)
-        external
-        view
-        returns (uint256);
+    function scaledAmount(
+        uint256 _amount,
+        uint256 _totalSupplied
+    ) external view returns (uint256);
 
     function scaledTotalSupply() external view returns (uint256);
 
-    function unscaledAmount(uint256 _amount, uint256 _totalSupplied)
-        external
-        view
-        returns (uint256);
+    function unscaledAmount(
+        uint256 _amount,
+        uint256 _totalSupplied
+    ) external view returns (uint256);
 
     // external state-getters
     function underlying() external view returns (address);

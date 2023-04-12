@@ -18,14 +18,6 @@ library Utils {
     uint256 constant MAX_UINT =
         0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
 
-    function minOf(uint256 a, uint256 b) internal pure returns (uint256) {
-        return a < b ? a : b;
-    }
-
-    function maxOf(uint256 a, uint256 b) internal pure returns (uint256) {
-        return a > b ? a : b;
-    }
-
     function sumOf(uint256[] memory a) internal pure returns (uint256 sum) {
         uint256 i;
         while (i < a.length) {
@@ -56,10 +48,10 @@ library Utils {
         return returnData;
     }
 
-    function delegateCall(address _contract, bytes memory _encodedData)
-        internal
-        returns (bytes memory)
-    {
+    function delegateCall(
+        address _contract,
+        bytes memory _encodedData
+    ) internal returns (bytes memory) {
         (bool success, bytes memory returnData) = _contract.delegatecall(
             _encodedData
         );

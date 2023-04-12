@@ -13,34 +13,19 @@ library ExternalUtils {
     using Math for uint256;
     using UserAssetBitMap for uint256;
 
-    event AccFeeUpdated(address indexed asset, uint256 newAccFee);
-    event AccFeeOffsetUpdated(address indexed asset, uint256 newIndex);
-    event FeeIndexUpdated(address indexed asset, uint256 newIndex);
-    event UserFeeIndexUpdated(
-        address indexed account,
-        address indexed asset,
-        uint256 newIndex
-    );
-    event UserFeeUpdated(
-        address indexed account,
-        address indexed asset,
-        uint256 newUserFee
-    );
-
     event TotalLendingsUpdated(address indexed asset, uint256 newLending);
 
     function sync(
         address _asset,
         IProtocolsHandler _protocols,
-        IConfig _config,
-        mapping(address => uint256) storage totalLendings,
-        mapping(address => uint256) storage accFees
+        mapping(address => uint256) storage totalLendings
     ) internal {
-        (uint256 totalLending, uint256 newInterest) = _protocols
-            .simulateLendings(_asset, totalLendings[_asset]);
+        (uint256 totalLending, ) = _protocols.simulateLendings(
+            _asset,
+            totalLendings[_asset]
+        );
 
         updateTotalLendings(_protocols, _asset, totalLending, totalLendings);
-        updateAccFee(_asset, newInterest, _config, accFees);
     }
 
     function updateTotalLendings(
@@ -52,73 +37,6 @@ library ExternalUtils {
         _protocol.updateSimulates(_asset, _new);
         totalLendings[_asset] = _new;
         emit TotalLendingsUpdated(_asset, _new);
-    }
-
-    function updateAccFee(
-        address _asset,
-        uint256 _newInterest,
-        IConfig config,
-        mapping(address => uint256) storage accFees
-    ) internal returns (uint256 accFee) {
-        if (_newInterest > 0) {
-            accFee = accFees[_asset];
-
-            accFee +=
-                (_newInterest * config.assetConfigs(_asset).feeRate) /
-                Utils.MILLION;
-
-            accFees[_asset] = accFee;
-            emit AccFeeUpdated(_asset, accFee);
-        }
-    }
-
-    function updateFeeIndex(
-        address _underlying,
-        uint256 _totalSupply,
-        uint256 _newInterest,
-        mapping(address => uint256) storage feeIndexes
-    ) internal returns (uint256 newIndex) {
-        if (_totalSupply > 0) {
-            //calculate the new fee globol index
-            newIndex =
-                uint256(feeIndexes[_underlying]) +
-                ((_newInterest * Utils.QUINTILLION) / _totalSupply);
-            // update the feeIndexes
-            feeIndexes[_underlying] = newIndex;
-            emit FeeIndexUpdated(_underlying, newIndex);
-        } else {
-            newIndex = feeIndexes[_underlying];
-        }
-    }
-
-    function updateUserFeeIndex(
-        address _underlying,
-        address _account,
-        uint256 _dTokenBalance,
-        uint256 _feeIndex,
-        mapping(address => mapping(address => uint256)) storage userFeeIndexes,
-        mapping(address => mapping(address => uint256)) storage userFee
-    ) internal returns (uint256 newIndex) {
-        newIndex = _feeIndex;
-        uint256 oldIndex = userFeeIndexes[_account][_underlying];
-        userFee[_account][_underlying] +=
-            ((newIndex - oldIndex) * _dTokenBalance) /
-            Utils.QUINTILLION;
-        // update the user fee index
-        userFeeIndexes[_account][_underlying] = newIndex;
-
-        emit UserFeeIndexUpdated(_account, _underlying, newIndex);
-    }
-
-    function updateUserFee(
-        address _underlying,
-        address _account,
-        uint256 _fee,
-        mapping(address => mapping(address => uint256)) storage userFee
-    ) internal returns (uint256 newUserFee) {
-        newUserFee = userFee[_account][_underlying] - _fee;
-        userFee[_account][_underlying] = newUserFee;
-        emit UserFeeUpdated(_account, _underlying, newUserFee);
     }
 
     // views
@@ -134,8 +52,8 @@ library ExternalUtils {
             uint256[] memory supplies,
             uint256 protocolsSupplies,
             uint256 totalLending,
-            uint256 totalSuppliedAmount,
-            uint256 newInterest
+            uint256 newInterest,
+            uint256 totalSuppliedAmountWithFee
         )
     {
         (supplies, protocolsSupplies) = protocols.totalSupplied(_underlying);
@@ -149,7 +67,10 @@ library ExternalUtils {
             redeemedAmount = reservePool.redeemedAmounts(_underlying);
         }
 
-        totalSuppliedAmount = protocolsSupplies + totalLending - redeemedAmount;
+        totalSuppliedAmountWithFee =
+            protocolsSupplies +
+            totalLending -
+            redeemedAmount;
     }
 
     function getBorrowStatus(
@@ -195,7 +116,6 @@ library ExternalUtils {
         );
     }
 
-    // deprecating
     function calculateAmountByRatio(
         address _underlying,
         uint256 _amount,
@@ -351,7 +271,7 @@ library ExternalUtils {
         IPriceOracle _priceOracle,
         address _account,
         address _underlying,
-        address[] memory _underlyings,
+        address[] storage _underlyings,
         mapping(address => Types.Asset) storage assets
     ) internal view returns (bool, uint256, uint256) {
         uint256 maxDebtAllowed = ExternalUtils.borrowLimitInternal(

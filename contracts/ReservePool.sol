@@ -5,6 +5,7 @@ import "./interfaces/IReservePool.sol";
 
 import "./libraries/internals/TransferHelper.sol";
 import "./libraries/internals/Utils.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 contract ReservePool is IReservePool, OwnableUpgradeable {
@@ -54,7 +55,7 @@ contract ReservePool is IReservePool, OwnableUpgradeable {
         );
 
         if (_executeNow) {
-            uint256 pendingRepayAmount = Utils.minOf(
+            uint256 pendingRepayAmount = Math.min(
                 pendingRepayAmounts[_params.asset],
                 newReserve
             );
@@ -89,7 +90,7 @@ contract ReservePool is IReservePool, OwnableUpgradeable {
 
         uint256 canceledAmount;
         if (pendingSupply.amount > 0) {
-            canceledAmount = Utils.minOf(_params.amount, pendingSupply.amount);
+            canceledAmount = Math.min(_params.amount, pendingSupply.amount);
 
             pendingSupplies[_params.asset][_redeemFrom].amount =
                 pendingSupply.amount -
@@ -104,15 +105,18 @@ contract ReservePool is IReservePool, OwnableUpgradeable {
             );
         }
 
+        uint256 totalSuppliedAmountWithFee;
+        uint256 newInterest;
+        Types.ExecuteRedeemParams memory executeParams;
         (
-            uint256[] memory supplies,
-            uint256 protocolsSupplies,
-            uint256 totalLending,
-            uint256 totalSuppliedAmountWithFee,
-            uint256 newInterest
+            executeParams.supplies,
+            executeParams.protocolsSupplies,
+            executeParams.totalLending,
+            totalSuppliedAmountWithFee,
+            newInterest
         ) = IRouter(owner()).getSupplyStatus(_params.asset);
 
-        (_params.amount, ) = IRouter(owner()).recordRedeem(
+        _params.amount = IRouter(owner()).recordRedeem(
             Types.UserAssetParams(_params.asset, _params.amount, _params.to),
             totalSuppliedAmountWithFee,
             newInterest,
@@ -121,19 +125,14 @@ contract ReservePool is IReservePool, OwnableUpgradeable {
         );
 
         if (_executeNow) {
-            canceledAmount = Utils.minOf(
+            canceledAmount = Math.min(
                 canceledAmount,
                 _params.asset.balanceOf(address(this))
             );
 
             _params.asset.safeTransfer(_params.to, canceledAmount, 0);
-
-            IRouter(owner()).executeRedeem(
-                _params,
-                supplies,
-                protocolsSupplies,
-                totalLending
-            );
+            executeParams.userParams = _params;
+            IRouter(owner()).executeRedeem(executeParams);
         } else {
             require(
                 _params.amount + canceledAmount <=
@@ -153,11 +152,10 @@ contract ReservePool is IReservePool, OwnableUpgradeable {
         reserves[_params.asset] = _params.asset.balanceOf(address(this));
     }
 
-    function borrow(Types.UserAssetParams memory _params, bool _executeNow)
-        external
-        override
-        onlyOwner
-    {
+    function borrow(
+        Types.UserAssetParams memory _params,
+        bool _executeNow
+    ) external override onlyOwner {
         if (_executeNow) {
             IRouter(owner()).executeBorrow(_params);
         } else {
@@ -183,7 +181,7 @@ contract ReservePool is IReservePool, OwnableUpgradeable {
 
         pendingRepayAmounts[_params.asset] += _params.amount;
         if (_executeNow) {
-            uint256 pendingRepayAmount = Utils.minOf(
+            uint256 pendingRepayAmount = Math.min(
                 pendingRepayAmounts[_params.asset],
                 newReserve
             );
@@ -212,12 +210,12 @@ contract ReservePool is IReservePool, OwnableUpgradeable {
         reserves[_params.asset] = _params.asset.balanceOf(address(this));
     }
 
-    function executeRepayAndSupply(address _asset, uint256 _recordLoops)
-        external
-        override
-    {
+    function executeRepayAndSupply(
+        address _asset,
+        uint256 _recordLoops
+    ) external override {
         uint256 reserve = reserves[_asset];
-        uint256 pendingRepayAmount = Utils.minOf(
+        uint256 pendingRepayAmount = Math.min(
             pendingRepayAmounts[_asset],
             reserve
         );
@@ -319,7 +317,7 @@ contract ReservePool is IReservePool, OwnableUpgradeable {
             : 0;
 
         // supply
-        totalAmountToSupply = Utils.minOf(
+        totalAmountToSupply = Math.min(
             totalAmountToSupply,
             _pendingSupplyAmount
         );
@@ -332,11 +330,13 @@ contract ReservePool is IReservePool, OwnableUpgradeable {
         );
 
         router.executeSupply(
-            _asset,
-            totalAmountToSupply,
-            totalLending,
-            supplies,
-            protocolsSupplies
+            Types.ExecuteSupplyParams(
+                _asset,
+                totalAmountToSupply,
+                totalLending,
+                supplies,
+                protocolsSupplies
+            )
         );
     }
 
@@ -372,12 +372,7 @@ contract ReservePool is IReservePool, OwnableUpgradeable {
             _account
         );
 
-        IRouter(owner()).recordSupply(
-            _params,
-            _totalSupplies,
-            _newInterest,
-            pendingSupply.collateralable
-        );
+        IRouter(owner()).recordSupply(_params, _totalSupplies, _newInterest);
 
         (nextAccount, totalRecordedAmount) = _recordSupply(
             _asset,
@@ -401,11 +396,9 @@ contract ReservePool is IReservePool, OwnableUpgradeable {
         executeSupplyThresholds[_asset] = _executeSupplyThreshold;
     }
 
-    function setMaxPendingRatio(uint256 _maxPendingRatio)
-        external
-        override
-        onlyOwner
-    {
+    function setMaxPendingRatio(
+        uint256 _maxPendingRatio
+    ) external override onlyOwner {
         maxPendingRatio = _maxPendingRatio;
     }
 }

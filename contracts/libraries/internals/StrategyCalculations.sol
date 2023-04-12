@@ -54,7 +54,7 @@ library StrategyCalculations {
                     totalAmountToSupply > _params.targetAmount;
                 ++i
             ) {
-                uint256 amount = Utils.minOf(
+                uint256 amount = Math.min(
                     totalAmountToSupply - _params.targetAmount,
                     amounts[i] - _params.minAmounts[i]
                 );
@@ -76,7 +76,7 @@ library StrategyCalculations {
                     totalAmountToSupply > _params.targetAmount;
                 ++i
             ) {
-                amounts[i] -= Utils.minOf(
+                amounts[i] -= Math.min(
                     (amounts[i] * amountToReduce).ceilDiv(totalAmountToSupply),
                     totalAmountToSupply - _params.targetAmount
                 );
@@ -103,7 +103,7 @@ library StrategyCalculations {
                     : (_params.maxRate + _params.minRate) / 2;
 
                 for (uint256 i = 0; i < _protocols.length; ++i) {
-                    uint256 amount = Utils.minOf(
+                    uint256 amount = Math.min(
                         getAmountToBorrow(
                             _protocols[i],
                             targetRate,
@@ -112,7 +112,7 @@ library StrategyCalculations {
                         _params.maxAmounts[i]
                     );
                     amounts[i] = totalAmountToBorrow < _params.targetAmount
-                        ? Utils.minOf(
+                        ? Math.min(
                             amount,
                             _params.targetAmount - totalAmountToBorrow
                         )
@@ -133,7 +133,7 @@ library StrategyCalculations {
                 uint256 amountLeft = _params.targetAmount - totalAmountToBorrow;
                 for (uint256 i = 0; i < amounts.length && amountLeft > 0; ++i) {
                     if (amounts[i] < _params.maxAmounts[i]) {
-                        uint256 amountDelta = Utils.minOf(
+                        uint256 amountDelta = Math.min(
                             amountLeft,
                             _params.maxAmounts[i] - amounts[i]
                         );
@@ -165,16 +165,16 @@ library StrategyCalculations {
                         _params.usageParams[i]
                     );
 
-                    amounts[i] = Utils.maxOf(_params.minAmounts[i], amount);
+                    amounts[i] = Math.max(_params.minAmounts[i], amount);
 
                     if (totalAmountToRepay < _params.targetAmount) {
-                        amounts[i] = Utils.minOf(
+                        amounts[i] = Math.min(
                             amounts[i],
                             _params.targetAmount - totalAmountToRepay
                         );
                     }
 
-                    amounts[i] = Utils.minOf(_params.maxAmounts[i], amounts[i]);
+                    amounts[i] = Math.min(_params.maxAmounts[i], amounts[i]);
                     totalAmountToRepay += amount;
                     totalAmount += amounts[i];
                 }
@@ -192,7 +192,7 @@ library StrategyCalculations {
                 uint256 amountLeft = _params.targetAmount - totalAmount;
                 for (uint256 i = 0; i < amounts.length && amountLeft > 0; ++i) {
                     if (amounts[i] < _params.maxAmounts[i]) {
-                        uint256 amountDelta = Utils.minOf(
+                        uint256 amountDelta = Math.min(
                             amountLeft,
                             _params.maxAmounts[i] - amounts[i]
                         );

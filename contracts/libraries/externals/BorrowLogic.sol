@@ -21,12 +21,9 @@ library BorrowLogic {
 
     function borrow(
         Types.BorrowParams memory _params,
+        address[] storage underlyings,
         mapping(address => Types.Asset) storage assets,
-        mapping(address => uint256) storage totalLendings,
-        mapping(address => uint256) storage accFees,
-        mapping(address => uint256) storage feeIndexes,
-        mapping(address => mapping(address => uint256)) storage userFeeIndexes,
-        mapping(address => mapping(address => uint256)) storage userFee
+        mapping(address => uint256) storage totalLendings
     ) external {
         require(_params.actionNotPaused, "BorrowLogic: action paused");
 
@@ -53,20 +50,28 @@ library BorrowLogic {
                 newInterest,
                 totalBorrowedAmount,
                 msg.sender,
-                _params.config,
                 _params.rewards
             ),
-            assets,
-            accFees,
-            feeIndexes,
-            userFeeIndexes,
-            userFee
+            assets
         );
 
         if (address(_params.reservePool) != address(0)) {
             _params.reservePool.borrow(_params.userParams, _params.executeNow);
         } else {
-            executeBorrowInternal(_params, totalLending, totalLendings);
+            executeBorrowInternal(
+                _params.userParams,
+                _params.protocols,
+                totalLending,
+                totalLendings
+            );
+        }
+
+        if (assets[_params.userParams.asset].dToken.balanceOf(msg.sender) > 0) {
+            _params.config.setBorrowing(
+                msg.sender,
+                _params.userParams.asset,
+                true
+            );
         }
 
         (bool isHealthy, , ) = ExternalUtils.isPositionHealthy(
@@ -74,37 +79,38 @@ library BorrowLogic {
             _params.priceOracle,
             msg.sender,
             _params.userParams.asset,
-            _params.underlyings,
+            underlyings,
             assets
         );
 
         require(isHealthy, "BorrowLogic: Insufficient collateral");
+
+        emit Borrowed(
+            msg.sender,
+            _params.userParams.asset,
+            _params.userParams.amount
+        );
     }
 
     function recordBorrow(
         Types.RecordBorrowParams memory _params,
-        mapping(address => Types.Asset) storage assets,
-        mapping(address => uint256) storage accFees,
-        mapping(address => uint256) storage feeIndexes,
-        mapping(address => mapping(address => uint256)) storage userFeeIndexes,
-        mapping(address => mapping(address => uint256)) storage userFee
+        mapping(address => Types.Asset) storage assets
     ) external {
-        recordBorrowInternal(
-            _params,
-            assets,
-            accFees,
-            feeIndexes,
-            userFeeIndexes,
-            userFee
-        );
+        recordBorrowInternal(_params, assets);
     }
 
     function executeBorrow(
-        Types.BorrowParams memory _params,
+        Types.UserAssetParams memory _params,
+        IProtocolsHandler _protocols,
         uint256 _totalLending,
         mapping(address => uint256) storage totalLendings
     ) external {
-        executeBorrowInternal(_params, _totalLending, totalLendings);
+        executeBorrowInternal(
+            _params,
+            _protocols,
+            _totalLending,
+            totalLendings
+        );
     }
 
     function borrowLimit(
@@ -129,85 +135,43 @@ library BorrowLogic {
 
     function recordBorrowInternal(
         Types.RecordBorrowParams memory _params,
-        mapping(address => Types.Asset) storage assets,
-        mapping(address => uint256) storage accFees,
-        mapping(address => uint256) storage feeIndexes,
-        mapping(address => mapping(address => uint256)) storage userFeeIndexes,
-        mapping(address => mapping(address => uint256)) storage userFee
+        mapping(address => Types.Asset) storage assets
     ) internal {
-        Types.Asset memory asset = assets[_params.userParams.asset];
-
-        uint256 accFee = ExternalUtils.updateAccFee(
-            _params.userParams.asset,
-            _params.newInterest,
-            _params.config,
-            accFees
-        );
-
-        uint256 dTokenTotalSupply = asset.dToken.totalSupply();
-        uint256 feeIndex = ExternalUtils.updateFeeIndex(
-            _params.userParams.asset,
-            dTokenTotalSupply,
-            _params.newInterest,
-            feeIndexes
-        );
-
-        ExternalUtils.updateUserFeeIndex(
-            _params.userParams.asset,
-            _params.borrowBy,
-            asset.dToken.balanceOf(_params.borrowBy),
-            feeIndex,
-            userFeeIndexes,
-            userFee
-        );
-
-        uint256 dTokenAmount = asset.dToken.mint(
+        assets[_params.userParams.asset].dToken.mint(
             _params.borrowBy,
             _params.userParams.amount,
-            _params.totalBorrows
+            _params.totalBorrows,
+            _params.newInterest
         );
 
-        _params.rewards.startMiningBorrowReward(
-            _params.userParams.asset,
-            _params.borrowBy,
-            dTokenAmount,
-            dTokenTotalSupply
-        );
-
-        _params.config.setBorrowing(
-            _params.borrowBy,
-            _params.userParams.asset,
-            true
-        );
-
-        emit Borrowed(
-            _params.borrowBy,
-            _params.userParams.asset,
-            _params.userParams.amount
-        );
+        // _params.rewards.startMiningBorrowReward(
+        //     _params.userParams.asset,
+        //     _params.borrowBy,
+        //     dTokenAmount,
+        //     dTokenTotalSupply
+        // );
     }
 
     function executeBorrowInternal(
-        Types.BorrowParams memory _params,
+        Types.UserAssetParams memory _params,
+        IProtocolsHandler _protocols,
         uint256 _totalLending,
         mapping(address => uint256) storage totalLendings
     ) internal {
-        IProtocolsHandler protocolsCache = _params.protocols;
+        (uint256[] memory supplies, uint256 protocolsSupplies) = _protocols
+            .totalSupplied(_params.asset);
 
-        (uint256[] memory supplies, uint256 protocolsSupplies) = protocolsCache
-            .totalSupplied(_params.userParams.asset);
-
-        (uint256 redeemed, ) = protocolsCache.redeemAndBorrow(
-            _params.userParams.asset,
-            _params.userParams.amount,
+        (uint256 redeemed, ) = _protocols.redeemAndBorrow(
+            _params.asset,
+            _params.amount,
             supplies,
             protocolsSupplies,
-            _params.userParams.to
+            _params.to
         );
 
         ExternalUtils.updateTotalLendings(
-            protocolsCache,
-            _params.userParams.asset,
+            _protocols,
+            _params.asset,
             _totalLending + redeemed,
             totalLendings
         );

@@ -21,8 +21,8 @@ library RedeemLogic {
 
     function redeem(
         Types.RedeemParams memory _params,
+        address[] storage underlyings,
         mapping(address => uint256) storage totalLendings,
-        mapping(address => uint256) storage accFees,
         mapping(address => Types.Asset) storage assets
     ) external {
         require(_params.actionNotPaused, "RedeemLogic: action paused");
@@ -39,7 +39,7 @@ library RedeemLogic {
                 uint256[] memory supplies,
                 uint256 protocolsSupplies,
                 uint256 totalLending,
-                uint256 totalBorrowedAmountWithFee,
+                uint256 totalsupplies,
                 uint256 newInterest
             ) = ExternalUtils.getSupplyStatus(
                     _params.userParams.asset,
@@ -48,31 +48,51 @@ library RedeemLogic {
                     totalLendings
                 );
 
-            (_params.userParams.amount, ) = recordRedeemInternal(
-                _params,
-                totalBorrowedAmountWithFee,
-                newInterest,
-                msg.sender,
-                true,
-                accFees,
+            _params.userParams.amount = recordRedeemInternal(
+                Types.RecordRedeemParams(
+                    _params.userParams,
+                    totalsupplies,
+                    newInterest,
+                    msg.sender,
+                    true,
+                    _params.collateralable,
+                    _params.rewards
+                ),
                 assets
             );
 
             executeRedeemInternal(
-                _params,
-                supplies,
-                protocolsSupplies,
-                totalLending,
+                Types.ExecuteRedeemParams(
+                    _params.userParams,
+                    _params.protocols,
+                    supplies,
+                    protocolsSupplies,
+                    totalLending
+                ),
                 totalLendings
             );
         }
+
+        bool useAsCollateral = _params.collateralable;
+        if (useAsCollateral) {
+            Types.Asset memory asset = assets[_params.userParams.asset];
+            useAsCollateral =
+                asset.collateralable &&
+                asset.sToken.balanceOf(msg.sender) != 0;
+        }
+
+        _params.config.setUsingAsCollateral(
+            msg.sender,
+            _params.userParams.asset,
+            useAsCollateral
+        );
 
         (bool isHealthy, , ) = ExternalUtils.isPositionHealthy(
             _params.config,
             _params.priceOracle,
             msg.sender,
             _params.userParams.asset,
-            _params.underlyings,
+            underlyings,
             assets
         );
 
@@ -80,103 +100,50 @@ library RedeemLogic {
     }
 
     function recordRedeem(
-        Types.RedeemParams memory _params,
-        uint256 _totalSupplies,
-        uint256 _newInterest,
-        address _redeemFrom,
-        mapping(address => uint256) storage accFees,
+        Types.RecordRedeemParams memory _params,
         mapping(address => Types.Asset) storage assets
-    ) external returns (uint256 underlyingAmount, uint256 fee) {
-        return
-            recordRedeemInternal(
-                _params,
-                _totalSupplies,
-                _newInterest,
-                _redeemFrom,
-                true,
-                accFees,
-                assets
-            );
+    ) external returns (uint256 underlyingAmount) {
+        return recordRedeemInternal(_params, assets);
     }
 
     function executeRedeem(
-        Types.RedeemParams memory _params,
-        uint256[] memory _supplies,
-        uint256 _protocolsSupplies,
-        uint256 _totalLending,
+        Types.ExecuteRedeemParams memory _params,
         mapping(address => uint256) storage totalLendings
     ) external {
-        executeRedeemInternal(
-            _params,
-            _supplies,
-            _protocolsSupplies,
-            _totalLending,
-            totalLendings
-        );
+        executeRedeemInternal(_params, totalLendings);
     }
 
     function recordRedeemInternal(
-        Types.RedeemParams memory _params,
-        uint256 _totalSupplies,
-        uint256 _newInterest,
-        address _redeemFrom,
-        bool notLiquidate,
-        mapping(address => uint256) storage accFees,
+        Types.RecordRedeemParams memory _params,
         mapping(address => Types.Asset) storage assets
-    ) internal returns (uint256 underlyingAmount, uint256 fee) {
-        uint256 accFee = ExternalUtils.updateAccFee(
-            _params.userParams.asset,
-            _newInterest,
-            _params.config,
-            accFees
-        ) - _params.collectedFee;
+    ) internal returns (uint256 burntAmount) {
+        Types.Asset memory asset = assets[_params.userParams.asset];
 
-        Types.Asset memory redeemAsset = assets[_params.userParams.asset];
-        uint256 sTokenAmount = redeemAsset.sToken.unscaledAmount(
+        uint256 uncollectedFee = asset.dToken.updateNewFee(_params.newInterest);
+
+        burntAmount = asset.sToken.burn(
+            _params.redeemFrom,
+            _params.notLiquidate,
             _params.userParams.amount,
-            _totalSupplies
+            _params.totalUnderlying - uncollectedFee
         );
 
-        // to prevent stack too deep
-        {
-            uint256 sTokenBalance = redeemAsset.sToken.balanceOf(_redeemFrom);
-            if (sTokenAmount >= sTokenBalance) {
-                sTokenAmount = sTokenBalance;
-                _params.collateralable = false;
-            }
-        }
+        // _params.rewards.stopMiningSupplyReward(
+        //     _params.userParams.asset,
+        //     _params.redeemFrom,
+        //     sTokenAmount,
+        //     redeemAsset.sToken.totalSupply() + sTokenAmount
+        // );
 
-        (_params.userParams.amount, fee) = redeemAsset.sToken.burn(
-            _redeemFrom,
-            notLiquidate,
-            sTokenAmount,
-            _totalSupplies,
-            accFee
-        );
-
-        underlyingAmount = _params.userParams.amount;
-
-        _params.rewards.stopMiningSupplyReward(
+        emit Redeemed(
+            _params.redeemFrom,
             _params.userParams.asset,
-            _redeemFrom,
-            sTokenAmount,
-            redeemAsset.sToken.totalSupply() + sTokenAmount
+            burntAmount
         );
-
-        _params.config.setUsingAsCollateral(
-            _redeemFrom,
-            _params.userParams.asset,
-            redeemAsset.collateralable && _params.collateralable
-        );
-
-        emit Redeemed(_redeemFrom, _params.userParams.asset, underlyingAmount);
     }
 
     function executeRedeemInternal(
-        Types.RedeemParams memory _params,
-        uint256[] memory _supplies,
-        uint256 _protocolsSupplies,
-        uint256 _totalLending,
+        Types.ExecuteRedeemParams memory _params,
         mapping(address => uint256) storage totalLendings
     ) internal {
         IProtocolsHandler protocolsCache = _params.protocols;
@@ -184,21 +151,20 @@ library RedeemLogic {
         (, uint256 borrowed) = protocolsCache.redeemAndBorrow(
             _params.userParams.asset,
             _params.userParams.amount,
-            _supplies,
-            _protocolsSupplies,
+            _params.supplies,
+            _params.protocolsSupplies,
             _params.userParams.to
         );
 
         uint256 totalLendingDelta = borrowed;
         if (totalLendingDelta > 0) {
-            //  uncollectedFee may cause underflow
-            _totalLending = _totalLending > totalLendingDelta
-                ? _totalLending - totalLendingDelta
+            _params.totalLending = _params.totalLending > totalLendingDelta
+                ? _params.totalLending - totalLendingDelta
                 : 0;
             ExternalUtils.updateTotalLendings(
                 protocolsCache,
                 _params.userParams.asset,
-                _totalLending,
+                _params.totalLending,
                 totalLendings
             );
         }

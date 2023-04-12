@@ -11,12 +11,121 @@ import "../../interfaces/IRewards.sol";
 import "../../interfaces/IConfig.sol";
 
 library Types {
+    struct SupplyParams {
+        UserAssetParams userParams;
+        bool collateralable;
+        bool executeNow;
+        bool actionNotPaused;
+        IProtocolsHandler protocols;
+        IReservePool reservePool;
+        IRewards rewards;
+        IConfig config;
+        Asset asset;
+    }
+
+    struct RecordSupplyParams {
+        UserAssetParams userParams;
+        ISToken sToken;
+        IDToken dToken;
+        uint256 totalUnderlying;
+        uint256 newInterest;
+    }
+
+    struct ExecuteSupplyParams {
+        address asset;
+        uint256 amount;
+        uint256 totalLending;
+        uint256[] supplies;
+        uint256 protocolsSupplies;
+    }
+
+    struct RedeemParams {
+        UserAssetParams userParams;
+        bool collateralable;
+        bool executeNow;
+        bool actionNotPaused;
+        IProtocolsHandler protocols;
+        IReservePool reservePool;
+        IRewards rewards;
+        IConfig config;
+        IPriceOracle priceOracle;
+    }
+
+    struct RecordRedeemParams {
+        UserAssetParams userParams;
+        uint256 totalUnderlying;
+        uint256 newInterest;
+        address redeemFrom;
+        bool notLiquidate;
+        bool collateralable;
+        IRewards rewards;
+    }
+
+    struct ExecuteRedeemParams {
+        UserAssetParams userParams;
+        IProtocolsHandler protocols;
+        uint256[] supplies;
+        uint256 protocolsSupplies;
+        uint256 totalLending;
+    }
+
+    struct BorrowParams {
+        UserAssetParams userParams;
+        bool executeNow;
+        bool actionNotPaused;
+        IProtocolsHandler protocols;
+        IReservePool reservePool;
+        IRewards rewards;
+        IConfig config;
+        IPriceOracle priceOracle;
+    }
+
+    struct RecordBorrowParams {
+        UserAssetParams userParams;
+        uint256 newInterest;
+        uint256 totalBorrows;
+        address borrowBy;
+        IRewards rewards;
+    }
+
+    struct RepayParams {
+        UserAssetParams userParams;
+        bool executeNow;
+        bool actionNotPaused;
+        address feeCollector;
+        IProtocolsHandler protocols;
+        IReservePool reservePool;
+        IRewards rewards;
+        IConfig config;
+        IPriceOracle priceOracle;
+        Asset asset;
+    }
+
+    struct RecordRepayParams {
+        UserAssetParams userParams;
+        IRewards rewards;
+        Asset asset;
+        uint256 newInterest;
+        uint256 totalBorrows;
+    }
+
+    struct LiquidateParams {
+        UserAssetParams repayParams;
+        UserAssetParams redeemParams;
+        address feeCollector;
+        IProtocolsHandler protocols;
+        IReservePool reservePool;
+        IRewards rewards;
+        IConfig config;
+        IPriceOracle priceOracle;
+        bool actionNotPaused;
+    }
+
     struct AssetConfig {
         uint256 maxLTV;
         uint256 liquidateLTV;
         uint256 maxLiquidateRatio;
         uint256 liquidateRewardRatio;
-        uint256 feeRate;
     }
 
     struct Asset {
@@ -119,83 +228,6 @@ library Types {
         address asset;
         uint256 amount;
         address to;
-    }
-
-    struct SupplyParams {
-        UserAssetParams userParams;
-        bool collateralable;
-        bool executeNow;
-        bool actionNotPaused;
-        IProtocolsHandler protocols;
-        IReservePool reservePool;
-        IRewards rewards;
-        IConfig config;
-        Asset asset;
-    }
-
-    struct RedeemParams {
-        UserAssetParams userParams;
-        bool collateralable;
-        bool executeNow;
-        bool actionNotPaused;
-        IProtocolsHandler protocols;
-        IReservePool reservePool;
-        IRewards rewards;
-        IConfig config;
-        IPriceOracle priceOracle;
-        uint256 collectedFee;
-        address[] underlyings;
-    }
-
-    struct BorrowParams {
-        UserAssetParams userParams;
-        bool executeNow;
-        bool actionNotPaused;
-        IProtocolsHandler protocols;
-        IReservePool reservePool;
-        IRewards rewards;
-        IConfig config;
-        IPriceOracle priceOracle;
-        address[] underlyings;
-    }
-
-    struct RepayParams {
-        UserAssetParams userParams;
-        bool executeNow;
-        bool actionNotPaused;
-        address feeCollector;
-        IProtocolsHandler protocols;
-        IReservePool reservePool;
-        IRewards rewards;
-        IConfig config;
-        IPriceOracle priceOracle;
-        uint256 collectedFee;
-        uint256 userFeeIndexes;
-        Asset asset;
-    }
-
-    struct RecordRepayParams {
-        UserAssetParams userParams;
-        IConfig config;
-        IRewards rewards;
-        uint256 userFeeIndexes;
-        Asset asset;
-    }
-
-    struct RecordBorrowParams {
-        UserAssetParams userParams;
-        uint256 newInterest;
-        uint256 totalBorrows;
-        address borrowBy;
-        IConfig config;
-        IRewards rewards;
-    }
-
-    struct LiquidateParams {
-        RepayParams repayParams;
-        RedeemParams redeemParams;
-        bool actionNotPaused;
-        address[] underlyings;
     }
 
     struct ClaimRewardsParams {
