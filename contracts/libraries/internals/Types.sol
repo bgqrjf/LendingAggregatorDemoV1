@@ -144,6 +144,7 @@ library Types {
         string sTokenSymbol;
         string dTokenName;
         string dTokenSymbol;
+        uint256 feeRate;
         AssetConfig config;
         uint256 maxReserve;
         uint256 executeSupplyThreshold;

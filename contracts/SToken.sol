@@ -30,10 +30,7 @@ contract SToken is ISToken, OwnableUpgradeable, ERC20Upgradeable {
         uint256 _amountOfUnderlying,
         uint256 _totalUnderlying
     ) external override onlyOwner returns (uint256 amount) {
-        uint256 totalSupply = totalSupply();
-        amount = totalSupply > 0
-            ? (_amountOfUnderlying * totalSupply) / _totalUnderlying
-            : _amountOfUnderlying;
+        amount = unscaledAmount(_amountOfUnderlying, _totalUnderlying);
         _mint(_account, amount);
     }
 
@@ -48,14 +45,12 @@ contract SToken is ISToken, OwnableUpgradeable, ERC20Upgradeable {
             scaledAmount(balanceOf(_from), _totalUnderlying)
         );
         uint256 amount = unscaledAmount(amountOfUnderlying, _totalUnderlying);
+        amountOfUnderlying = scaledAmount(amount, _totalUnderlying);
 
         _burn(_from, amount);
-
         if (_notLiquidate) {
             _validatePosition(_from);
         }
-
-        return scaledAmount(amount, _totalUnderlying);
     }
 
     function scaledAmount(
@@ -63,7 +58,10 @@ contract SToken is ISToken, OwnableUpgradeable, ERC20Upgradeable {
         uint256 _totalSupplied
     ) public view override returns (uint256) {
         uint totalSupply = totalSupply();
-        return totalSupply > 0 ? (_amount * _totalSupplied) / totalSupply : 0;
+        return
+            totalSupply > 0
+                ? (_amount * _totalSupplied) / totalSupply
+                : _amount;
     }
 
     function unscaledAmount(
@@ -74,7 +72,7 @@ contract SToken is ISToken, OwnableUpgradeable, ERC20Upgradeable {
         return
             _totalSupplied > 0
                 ? (_amount * totalSupply).ceilDiv(_totalSupplied)
-                : 0;
+                : _amount;
     }
 
     function scaledBalanceOf(

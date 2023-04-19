@@ -16,26 +16,28 @@ contract DToken is IDToken, OwnableUpgradeable {
     string public name;
     string public symbol;
     uint8 public decimals = 18;
-    uint256 public totalSupply;
+    uint256 public override totalSupply;
     address public override underlying;
-    uint256 public feeRate;
-    uint256 public accFee;
+    uint256 public override feeRate;
+    uint256 public override accFee;
     uint256 public override collectedFee;
-    uint256 public feeIndex;
+    uint256 public override feeIndex;
 
-    mapping(address => uint256) public balanceOf;
-    mapping(address => uint256) public feeIndexOf;
+    mapping(address => uint256) public override balanceOf;
+    mapping(address => uint256) public override feeIndexOf;
 
     function initialize(
         address _underlying,
         string memory _name,
-        string memory _symbol
+        string memory _symbol,
+        uint _feeRate
     ) external initializer {
         __Ownable_init();
 
         underlying = _underlying;
         name = _name;
         symbol = _symbol;
+        feeRate = _feeRate;
     }
 
     function mint(
@@ -105,7 +107,7 @@ contract DToken is IDToken, OwnableUpgradeable {
         return
             _totalBorrowed > 0
                 ? (_amount * totalSupply).ceilDiv(_totalBorrowed)
-                : 0;
+                : _amount;
     }
 
     function totalDebt() public view override returns (uint256 amount) {
@@ -117,7 +119,9 @@ contract DToken is IDToken, OwnableUpgradeable {
     ) public view override returns (uint newAccFee, uint256 newFeeIndex) {
         uint newFee = (_newInterest * feeRate) / Utils.MILLION;
         newAccFee = accFee + newFee;
-        newFeeIndex = feeIndex + (newFee * Utils.QUINTILLION) / totalSupply;
+        newFeeIndex = totalSupply > 0
+            ? feeIndex + (newFee * Utils.QUINTILLION) / totalSupply
+            : 0;
     }
 
     function _mint(
@@ -126,14 +130,18 @@ contract DToken is IDToken, OwnableUpgradeable {
         uint256 _newInterest
     ) internal {
         require(_account != address(0), "ERC20: mint to the zero address");
-        totalSupply += _amount;
-        balanceOf[_account] += _amount;
 
         _updateNewFee(_newInterest);
-        feeIndexOf[_account] =
-            (feeIndexOf[_account] * balanceOf[_account] + feeIndex * _amount) /
-            (balanceOf[_account] + _amount);
-        // emit UpdateUserFeeIndexOf
+        uint256 userFeeIndex = (feeIndexOf[_account] *
+            balanceOf[_account] +
+            feeIndex *
+            _amount) / (balanceOf[_account] + _amount);
+
+        feeIndexOf[_account] = userFeeIndex;
+        emit UserFeeIndexUpdated(_account, userFeeIndex);
+
+        totalSupply += _amount;
+        balanceOf[_account] += _amount;
 
         emit Transfer(address(0), _account, _amount);
     }
@@ -144,15 +152,17 @@ contract DToken is IDToken, OwnableUpgradeable {
         uint256 _newInterest
     ) internal returns (uint256 newCollectedFee) {
         require(_account != address(0), "ERC20: burn from the zero address");
+        _updateNewFee(_newInterest);
+
         balanceOf[_account] -= _amount;
         totalSupply -= _amount;
         emit Transfer(_account, address(0), _amount);
 
-        _updateNewFee(_newInterest);
         newCollectedFee =
             ((feeIndex - feeIndexOf[_account]) * _amount) /
             Utils.QUINTILLION;
         collectedFee += newCollectedFee;
+        emit CollectedFeeUpdated(collectedFee);
     }
 
     function _updateNewFee(uint256 _newInterest) internal {

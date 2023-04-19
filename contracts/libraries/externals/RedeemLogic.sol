@@ -156,17 +156,11 @@ library RedeemLogic {
             _params.userParams.to
         );
 
-        uint256 totalLendingDelta = borrowed;
-        if (totalLendingDelta > 0) {
-            _params.totalLending = _params.totalLending > totalLendingDelta
-                ? _params.totalLending - totalLendingDelta
-                : 0;
-            ExternalUtils.updateTotalLendings(
-                protocolsCache,
-                _params.userParams.asset,
-                _params.totalLending,
-                totalLendings
-            );
-        }
+        ExternalUtils.updateTotalLendings(
+            protocolsCache,
+            _params.userParams.asset,
+            _params.totalLending - borrowed,
+            totalLendings
+        );
     }
 }

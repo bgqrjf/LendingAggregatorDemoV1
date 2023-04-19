@@ -347,7 +347,11 @@ contract ReservePool is IReservePool, OwnableUpgradeable {
         lentAmounts[_asset] = lentAmount > _amount ? lentAmount - _amount : 0;
         pendingRepayAmounts[_asset] -= _amount;
 
-        _asset.safeTransfer(address(router.protocols()), _amount, 0);
+        if (_asset != TransferHelper.ETH) {
+            IERC20(_asset).approve(address(router), _amount);
+        } else {
+            TransferHelper.transferETH(address(router), _amount, 0);
+        }
         router.executeRepay(_asset, _amount);
     }
 

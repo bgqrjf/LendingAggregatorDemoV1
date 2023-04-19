@@ -93,11 +93,9 @@ contract QueryHelper is RateGetter {
         compoundLogic = IProtocol(_compoundLogic);
     }
 
-    function getSTokenConvertRate(address _underlying)
-        public
-        view
-        returns (uint256, uint256)
-    {
+    function getSTokenConvertRate(
+        address _underlying
+    ) public view returns (uint256, uint256) {
         ISToken sToken = router.getAsset(_underlying).sToken;
         uint256 rate = sToken.totalSupply() > 0
             ? (sToken.scaledTotalSupply() * 1e18) / sToken.totalSupply()
@@ -107,11 +105,9 @@ contract QueryHelper is RateGetter {
         return (rate, sTokenPrice);
     }
 
-    function getDTokenConvertRate(address _underlying)
-        public
-        view
-        returns (uint256, uint256)
-    {
+    function getDTokenConvertRate(
+        address _underlying
+    ) public view returns (uint256, uint256) {
         IDToken dToken = router.getAsset(_underlying).dToken;
         uint256 rate = dToken.totalSupply() > 0
             ? (dToken.totalDebt() * 1e18) / dToken.totalSupply()
@@ -121,15 +117,10 @@ contract QueryHelper is RateGetter {
         return (rate, dTokenPrice);
     }
 
-    function getPlatformsInfo(address[] memory _underlyings, address _quote)
-        public
-        view
-        returns (
-            uint256,
-            uint256,
-            uint256
-        )
-    {
+    function getPlatformsInfo(
+        address[] memory _underlyings,
+        address _quote
+    ) public view returns (uint256, uint256, uint256) {
         uint256 totalDeposited;
         uint256 totalBorrowed;
         uint256 totalMatchAmount;
@@ -146,7 +137,10 @@ contract QueryHelper is RateGetter {
         return (totalDeposited, totalBorrowed, totalMatchAmount);
     }
 
-    function getPlatformInfo(address _underlying, address _quote)
+    function getPlatformInfo(
+        address _underlying,
+        address _quote
+    )
         public
         view
         returns (
@@ -176,7 +170,9 @@ contract QueryHelper is RateGetter {
         );
     }
 
-    function getCurrentSupplyRates(address _underlying)
+    function getCurrentSupplyRates(
+        address _underlying
+    )
         public
         view
         returns (
@@ -190,7 +186,9 @@ contract QueryHelper is RateGetter {
         compSupplyRate = compoundLogic.getCurrentSupplyRate(_underlying);
     }
 
-    function getCurrentBorrowRates(address _underlying)
+    function getCurrentBorrowRates(
+        address _underlying
+    )
         public
         view
         returns (
@@ -204,22 +202,20 @@ contract QueryHelper is RateGetter {
         compBorrowRate = compoundLogic.getCurrentBorrowRate(_underlying);
     }
 
-    function getMarketsInfo(address[] memory _underlyings, address _quote)
-        public
-        view
-        returns (MarketInfo[] memory markets)
-    {
+    function getMarketsInfo(
+        address[] memory _underlyings,
+        address _quote
+    ) public view returns (MarketInfo[] memory markets) {
         markets = new MarketInfo[](_underlyings.length);
         for (uint256 i = 0; i < _underlyings.length; ++i) {
             markets[i] = getMarketInfo(_underlyings[i], _quote);
         }
     }
 
-    function getMarketInfo(address _underlying, address _quote)
-        public
-        view
-        returns (MarketInfo memory market)
-    {
+    function getMarketInfo(
+        address _underlying,
+        address _quote
+    ) public view returns (MarketInfo memory market) {
         IPriceOracle priceOracle = router.priceOracle();
 
         market.underlying = _underlying;
@@ -252,11 +248,10 @@ contract QueryHelper is RateGetter {
         market.borrowRate = getCurrentBorrowRate(_underlying);
     }
 
-    function getUserStatus(address _account, address _asset)
-        public
-        view
-        returns (UserStatus memory userStatus)
-    {
+    function getUserStatus(
+        address _account,
+        address _asset
+    ) public view returns (UserStatus memory userStatus) {
         userStatus.assetConfig = router.config().assetConfigs(_asset);
         userStatus.assetPrice = router.priceOracle().getAssetPrice(_asset);
         userStatus.borrowed = router.getAsset(_asset).dToken.scaledDebtOf(
@@ -291,7 +286,10 @@ contract QueryHelper is RateGetter {
         userStatus.borrowRates[1] = compoundLogic.getCurrentBorrowRate(_asset);
     }
 
-    function getUserInfo(address user, address _quote)
+    function getUserInfo(
+        address user,
+        address _quote
+    )
         public
         view
         returns (
@@ -306,11 +304,10 @@ contract QueryHelper is RateGetter {
         (, liquidateThreashold, ) = router.isPoisitionHealthy(_quote, user);
     }
 
-    function getUserSupplied(address user, address quote)
-        public
-        view
-        returns (UserSupplyInfo[] memory userSupplyInfos)
-    {
+    function getUserSupplied(
+        address user,
+        address quote
+    ) public view returns (UserSupplyInfo[] memory userSupplyInfos) {
         address[] memory _underlyings = router.getUnderlyings();
         UserSupplyInfo[] memory userSupplyInfo = new UserSupplyInfo[](
             _underlyings.length
@@ -364,11 +361,10 @@ contract QueryHelper is RateGetter {
         }
     }
 
-    function getUserBorrowed(address user, address quote)
-        public
-        view
-        returns (UserBorrowInfo[] memory userBorrowInfos)
-    {
+    function getUserBorrowed(
+        address user,
+        address quote
+    ) public view returns (UserBorrowInfo[] memory userBorrowInfos) {
         address[] memory _underlyings = router.getUnderlyings();
         UserBorrowInfo[] memory userBorrowInfoTemp = new UserBorrowInfo[](
             _underlyings.length
@@ -429,11 +425,9 @@ contract QueryHelper is RateGetter {
         }
     }
 
-    function getTokenInfoWithUser(address user)
-        public
-        view
-        returns (TokenInfoWithUser[] memory tokenInfoWithUser)
-    {
+    function getTokenInfoWithUser(
+        address user
+    ) public view returns (TokenInfoWithUser[] memory tokenInfoWithUser) {
         address[] memory _underlyings = router.getUnderlyings();
         tokenInfoWithUser = new TokenInfoWithUser[](_underlyings.length);
         Types.Asset[] memory _assets = router.getAssets();
@@ -458,11 +452,9 @@ contract QueryHelper is RateGetter {
         }
     }
 
-    function getSupplyMarkets(address _quote)
-        public
-        view
-        returns (SupplyMarket[] memory supplyMarket)
-    {
+    function getSupplyMarkets(
+        address _quote
+    ) public view returns (SupplyMarket[] memory supplyMarket) {
         address[] memory _underlyings = router.getUnderlyings();
         supplyMarket = new SupplyMarket[](_underlyings.length);
         IPriceOracle priceOracle = router.priceOracle();
@@ -490,11 +482,9 @@ contract QueryHelper is RateGetter {
         }
     }
 
-    function getBorrowMarkets(address _quote)
-        public
-        view
-        returns (BorrowMarket[] memory borrowMarket)
-    {
+    function getBorrowMarkets(
+        address _quote
+    ) public view returns (BorrowMarket[] memory borrowMarket) {
         address[] memory _underlyings = router.getUnderlyings();
         borrowMarket = new BorrowMarket[](_underlyings.length);
         IPriceOracle priceOracle = router.priceOracle();

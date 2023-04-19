@@ -13,11 +13,9 @@ contract RateGetter is MulticallHelper {
         router = IRouter(_router);
     }
 
-    function getCurrentSupplyRate(address _underlying)
-        public
-        view
-        returns (uint256)
-    {
+    function getCurrentSupplyRate(
+        address _underlying
+    ) public view returns (uint256) {
         (
             ,
             uint256 protocolsSupplies,
@@ -47,11 +45,9 @@ contract RateGetter is MulticallHelper {
                 : protocolsSupplyRate;
     }
 
-    function getCurrentBorrowRate(address _underlying)
-        public
-        view
-        returns (uint256)
-    {
+    function getCurrentBorrowRate(
+        address _underlying
+    ) public view returns (uint256) {
         (
             uint256[] memory borrows,
             uint256 totalBorrowedAmount,

@@ -2,6 +2,7 @@
 pragma solidity ^0.8.14;
 
 import "./storages/RouterStorage.sol";
+import "./MultiImplementationBeaconProxy.sol";
 
 import "./libraries/externals/SupplyLogic.sol";
 import "./libraries/externals/RedeemLogic.sol";
@@ -15,7 +16,6 @@ import "./libraries/internals/Utils.sol";
 
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts/proxy/Clones.sol";
 
 contract Router is RouterStorage, OwnableUpgradeable {
     using Math for uint256;
@@ -275,7 +275,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
         );
 
         RepayLogic.executeRepay(
-            protocols,
+            protocolsCache,
             _asset,
             _amount,
             totalLending,
@@ -544,20 +544,33 @@ contract Router is RouterStorage, OwnableUpgradeable {
             underlyingCount,
             _newAsset.collateralable,
             false,
-            ISToken(Clones.clone(sTokenImplement)),
-            IDToken(Clones.clone(dTokenImplement))
-        );
-
-        asset.sToken.initialize(
-            _newAsset.underlying,
-            _newAsset.sTokenName,
-            _newAsset.sTokenSymbol
-        );
-
-        asset.dToken.initialize(
-            _newAsset.underlying,
-            _newAsset.dTokenName,
-            _newAsset.dTokenSymbol
+            ISToken(
+                address(
+                    new MultiImplementationBeaconProxy(
+                        keySToken,
+                        abi.encodeWithSelector(
+                            ISToken.initialize.selector,
+                            _newAsset.underlying,
+                            _newAsset.sTokenName,
+                            _newAsset.sTokenSymbol
+                        )
+                    )
+                )
+            ),
+            IDToken(
+                address(
+                    new MultiImplementationBeaconProxy(
+                        keyDToken,
+                        abi.encodeWithSelector(
+                            IDToken.initialize.selector,
+                            _newAsset.underlying,
+                            _newAsset.dTokenName,
+                            _newAsset.dTokenSymbol,
+                            _newAsset.feeRate
+                        )
+                    )
+                )
+            )
         );
 
         assets[_newAsset.underlying] = asset;
@@ -629,5 +642,17 @@ contract Router is RouterStorage, OwnableUpgradeable {
         address _underlying
     ) external view override returns (Types.Asset memory asset) {
         return assets[_underlying];
+    }
+
+    function implementations(
+        bytes32 implementationKey
+    ) external view override returns (address) {
+        if (implementationKey == keyDToken) {
+            return dTokenImplement;
+        } else if (implementationKey == keySToken) {
+            return sTokenImplement;
+        } else {
+            revert("Router: implementationKey not exists");
+        }
     }
 }

@@ -4,11 +4,14 @@ pragma solidity ^0.8.14;
 interface IDToken {
     event Transfer(address indexed from, address indexed to, uint256 amount);
     event AccFeeUpdated(uint256 newAccFee, uint256 newIndex);
+    event UserFeeIndexUpdated(address account, uint256 newIndex);
+    event CollectedFeeUpdated(uint collectedFee);
 
     function initialize(
         address _underlying,
         string memory _name,
-        string memory _symbol
+        string memory _symbol,
+        uint256 feeRate
     ) external;
 
     function mint(
@@ -41,13 +44,21 @@ interface IDToken {
     ) external view returns (uint256);
 
     // external state-getters
+    function underlying() external view returns (address);
+
+    function feeRate() external view returns (uint256);
+
+    function accFee() external view returns (uint256);
+
     function collectedFee() external view returns (uint256);
 
-    function underlying() external view returns (address);
+    function feeIndex() external view returns (uint256);
 
     function totalSupply() external view returns (uint256);
 
     function totalDebt() external view returns (uint256);
 
     function balanceOf(address account) external view returns (uint256);
+
+    function feeIndexOf(address account) external view returns (uint256);
 }

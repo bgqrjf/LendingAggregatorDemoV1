@@ -116,8 +116,12 @@ describe("Reserve pool tests", function () {
     await priceOracle.setAssetPrice(ETHAddress, 200000000000); // set price to 2000.00
 
     // config
-    let Config = await ethers.getContractFactory("Config");
-    let config = await Config.deploy();
+    let config = await transparentProxy.deployProxy({
+      implementationFactory: "Config",
+      proxyAdmin: proxyAdmin,
+    });
+
+    await config.transferOwnership(deployer.address);
 
     // rewards
     let Rewards = await ethers.getContractFactory("Rewards");
@@ -209,8 +213,8 @@ describe("Reserve pool tests", function () {
         liquidateLTV: 750000,
         maxLiquidateRatio: 500000,
         liquidateRewardRatio: 1080000,
-        feeRate: 10000,
       },
+      feeRate: 10000,
       maxReserve: ethers.utils.parseUnits("10", "ether"),
       executeSupplyThreshold: ethers.utils.parseUnits("1", "ether"),
     });
@@ -228,8 +232,8 @@ describe("Reserve pool tests", function () {
         liquidateLTV: 750000,
         maxLiquidateRatio: 500000,
         liquidateRewardRatio: 1080000,
-        feeRate: 10000,
       },
+      feeRate: 10000,
       maxReserve: 100000000,
       executeSupplyThreshold: 1000000,
     });
@@ -247,8 +251,8 @@ describe("Reserve pool tests", function () {
         liquidateLTV: 750000,
         maxLiquidateRatio: 500000,
         liquidateRewardRatio: 1080000,
-        feeRate: 10000,
       },
+      feeRate: 10000,
       maxReserve: ethers.utils.parseUnits("1", "ether"),
       executeSupplyThreshold: ethers.utils.parseUnits("0.1", "ether"),
     });
@@ -945,9 +949,9 @@ describe("Reserve pool tests", function () {
       await expect(bobPendingSupply.amount).to.equal(supplyAmount);
       await expect(reserve).to.equal(0);
       await expect(balance).to.equal(0);
-      await expect(sTokenBalance).to.equal(21571301644);
-      await expect(underlyingBalance).to.equal(21571302110);
-      await expect(totalSupplies).to.equal(21571302110);
+      await expect(sTokenBalance).to.equal(21571302181);
+      await expect(underlyingBalance).to.equal(21571302647);
+      await expect(totalSupplies).to.equal(21571302647);
     });
 
     it("should not emit events when redeem from reserve", async () => {
@@ -1216,7 +1220,7 @@ describe("Reserve pool tests", function () {
       await borrow(deployer, router, token0, borrowAmount.mul(10), true);
 
       await supply(alice, router, token0, borrowAmount.mul(2), true);
-      await borrow(alice, router, token0, borrowAmount, true);
+      let dToken0 = await borrow(alice, router, token0, borrowAmount, true);
 
       await token0.mint(deployer.address, borrowAmount.mul(2));
       await token0.approve(router.address, borrowAmount.mul(2));
@@ -1236,12 +1240,10 @@ describe("Reserve pool tests", function () {
       let pendingRepayAmount = await reservePool.pendingRepayAmounts(
         token0.address
       );
-      let fee = await router.collectedFees(token0.address);
+      let fee = await dToken0.collectedFee();
       let reserve = await reservePool.reserves(token0.address);
       let balance = await token0.balanceOf(reservePool.address);
 
-      let assetToken0 = await router.assets(token0.address);
-      let dToken0 = await ethers.getContractAt("IDToken", assetToken0.dToken);
       let dTokenBalance = await dToken0.balanceOf(alice.address);
       let underlyingBalance = await dToken0.scaledDebtOf(alice.address);
       let totalBorrowed = await router.totalBorrowed(token0.address);

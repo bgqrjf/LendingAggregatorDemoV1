@@ -52,8 +52,8 @@ library ExternalUtils {
             uint256[] memory supplies,
             uint256 protocolsSupplies,
             uint256 totalLending,
-            uint256 newInterest,
-            uint256 totalSuppliedAmountWithFee
+            uint256 totalSuppliedAmountWithFee,
+            uint256 newInterest
         )
     {
         (supplies, protocolsSupplies) = protocols.totalSupplied(_underlying);

@@ -38,12 +38,20 @@ library SupplyLogic {
                 _params.executeNow
             );
         } else {
+            TransferHelper.collect(
+                _params.userParams.asset,
+                msg.sender,
+                address(_params.protocols),
+                _params.userParams.amount,
+                0 // gasLimit
+            );
+
             (
                 uint256[] memory supplies,
                 uint256 protocolsSupplies,
                 uint256 totalLending,
-                uint256 newInterest,
-                uint256 totalSuppliedAmountWithFee
+                uint256 totalSuppliedAmountWithFee,
+                uint256 newInterest
             ) = ExternalUtils.getSupplyStatus(
                     _params.userParams.asset,
                     _params.reservePool,
@@ -59,14 +67,6 @@ library SupplyLogic {
                     totalSuppliedAmountWithFee,
                     newInterest
                 )
-            );
-
-            TransferHelper.collect(
-                _params.userParams.asset,
-                msg.sender,
-                address(_params.protocols),
-                _params.userParams.amount,
-                0 // gasLimit
             );
 
             executeSupplyInternal(
@@ -142,13 +142,11 @@ library SupplyLogic {
             _params.protocolsSupplies
         );
 
-        if (repayed > 0) {
-            ExternalUtils.updateTotalLendings(
-                _protocols,
-                _params.asset,
-                _params.totalLending + repayed,
-                totalLendings
-            );
-        }
+        ExternalUtils.updateTotalLendings(
+            _protocols,
+            _params.asset,
+            _params.totalLending + repayed,
+            totalLendings
+        );
     }
 }

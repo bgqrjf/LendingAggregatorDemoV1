@@ -59,19 +59,16 @@ library RepayLogic {
             )
         );
 
-        TransferHelper.collect(
-            _params.userParams.asset,
-            msg.sender,
-            _params.feeCollector,
-            newFee,
-            0
-        );
-
-        emit FeeCollected(
-            _params.userParams.asset,
-            _params.feeCollector,
-            newFee
-        );
+        if (newFee > 0) {
+            TransferHelper.collect(
+                _params.userParams.asset,
+                msg.sender,
+                address(_params.feeCollector),
+                newFee,
+                0
+            );
+            totalLending -= newFee;
+        }
 
         if (
             _params.userParams.asset == TransferHelper.ETH &&
@@ -80,38 +77,36 @@ library RepayLogic {
             _refundETH(_params.userParams.amount - amount);
         }
 
-        uint executeAmount = amount - newFee;
         if (address(_params.reservePool) != address(0)) {
             TransferHelper.collect(
                 _params.userParams.asset,
                 msg.sender,
                 address(_params.reservePool),
-                executeAmount,
+                amount - newFee,
                 0
+            );
+
+            ExternalUtils.updateTotalLendings(
+                _params.protocols,
+                _params.userParams.asset,
+                totalLending,
+                totalLendings
             );
 
             _params.reservePool.repay(
                 Types.UserAssetParams(
                     _params.userParams.asset,
-                    executeAmount,
+                    amount - newFee,
                     _params.userParams.to
                 ),
-                totalBorrowedAmount,
+                totalBorrowedAmount - newFee,
                 _params.executeNow
             );
         } else {
-            TransferHelper.collect(
-                _params.userParams.asset,
-                msg.sender,
-                address(_params.protocols),
-                executeAmount,
-                0
-            );
-
             executeRepayInternal(
                 _params.protocols,
                 _params.userParams.asset,
-                executeAmount,
+                amount - newFee,
                 totalLending,
                 totalLendings
             );
@@ -173,6 +168,14 @@ library RepayLogic {
         uint256 _totalLending,
         mapping(address => uint256) storage totalLendings
     ) internal {
+        TransferHelper.collect(
+            _asset,
+            msg.sender,
+            address(protocols),
+            _amount,
+            0
+        );
+
         (uint256[] memory supplies, uint256 protocolsSupplies) = protocols
             .totalSupplied(_asset);
 
@@ -186,7 +189,7 @@ library RepayLogic {
         ExternalUtils.updateTotalLendings(
             protocols,
             _asset,
-            _totalLending > supplied ? _totalLending - supplied : 0,
+            _totalLending - supplied,
             totalLendings
         );
     }

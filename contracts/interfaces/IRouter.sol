@@ -7,10 +7,11 @@ import "./IProtocolsHandler.sol";
 import "./IReservePool.sol";
 import "./IRewards.sol";
 import "./IStrategy.sol";
+import "./IMultiImplementationBeacon.sol";
 
 import "../libraries/internals/Types.sol";
 
-interface IRouter {
+interface IRouter is IMultiImplementationBeacon {
     enum Action {
         supply,
         redeem,
@@ -48,12 +49,6 @@ interface IRouter {
         address indexed liquidator,
         Types.UserAssetParams repayParams,
         Types.UserAssetParams redeemParams
-    );
-
-    event FeeCollected(
-        address indexed asset,
-        address indexed collector,
-        uint256 amount
     );
 
     event TotalLendingsUpdated(address indexed asset, uint256 newLending);

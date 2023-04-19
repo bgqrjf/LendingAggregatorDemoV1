@@ -27,8 +27,10 @@ interface IReservePool {
         bool _executeNow
     ) external;
 
-    function borrow(Types.UserAssetParams memory _params, bool _executeNow)
-        external;
+    function borrow(
+        Types.UserAssetParams memory _params,
+        bool _executeNow
+    ) external;
 
     function repay(
         Types.UserAssetParams memory _params,
@@ -36,17 +38,18 @@ interface IReservePool {
         bool _executeNow
     ) external;
 
-    function executeRepayAndSupply(address _asset, uint256 _recordLoops)
-        external;
+    function executeRepayAndSupply(
+        address _asset,
+        uint256 _recordLoops
+    ) external;
 
     function redeemedAmounts(address _asset) external view returns (uint256);
 
     function lentAmounts(address _asset) external view returns (uint256);
 
-    function pendingRepayAmounts(address _asset)
-        external
-        view
-        returns (uint256);
+    function pendingRepayAmounts(
+        address _asset
+    ) external view returns (uint256);
 
     function setConfig(
         address _asset,
