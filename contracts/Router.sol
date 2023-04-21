@@ -12,7 +12,6 @@ import "./libraries/externals/LiquidateLogic.sol";
 import "./libraries/externals/RewardLogic.sol";
 
 import "./libraries/internals/TransferHelper.sol";
-import "./libraries/internals/Utils.sol";
 
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";

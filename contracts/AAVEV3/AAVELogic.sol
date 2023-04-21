@@ -27,6 +27,26 @@ contract AAVELogic is IProtocol {
     uint256 public immutable RAY = 1e27;
     uint256 public immutable BASE = 1e21;
 
+    struct UsageParams {
+        uint256 totalSupplied; // not balance
+        uint256 totalBorrowed;
+        uint256 totalBorrowedStable;
+        uint256 totalBorrowedVariable;
+        uint256 unbacked;
+        uint256 slopeV1;
+        uint256 slopeV2;
+        uint256 slopeS1;
+        uint256 slopeS2;
+        uint256 baseS; // actual base * 10^6
+        uint256 baseV;
+        uint256 optimalLTV;
+        uint256 reserveFactor;
+        uint256 stableToTotalDebtRatio;
+        uint256 optimalStableToTotalDebtRatio;
+        uint256 maxExcessStableToTotalDebtRatio;
+        uint256 maxExcessUsageRatio;
+    }
+
     receive() external payable {}
 
     constructor(
@@ -45,10 +65,10 @@ contract AAVELogic is IProtocol {
         );
     }
 
-    function updateSupplyShare(address _underlying, uint256 _amount)
-        external
-        override
-    {
+    function updateSupplyShare(
+        address _underlying,
+        uint256 _amount
+    ) external override {
         AAVELogicStorage.SimulateData memory data = AAVELogicStorage
             .SimulateData(
                 _amount,
@@ -60,10 +80,10 @@ contract AAVELogic is IProtocol {
         emit SupplyShareUpdated(_underlying, _amount, abi.encode(data));
     }
 
-    function updateBorrowShare(address _underlying, uint256 _amount)
-        external
-        override
-    {
+    function updateBorrowShare(
+        address _underlying,
+        uint256 _amount
+    ) external override {
         AAVELogicStorage.SimulateData memory data = AAVELogicStorage
             .SimulateData(
                 _amount,
@@ -77,12 +97,9 @@ contract AAVELogic is IProtocol {
         emit BorrowShareUpdated(_underlying, _amount, abi.encode(data));
     }
 
-    function lastSupplyInterest(address _underlying)
-        external
-        view
-        override
-        returns (uint256)
-    {
+    function lastSupplyInterest(
+        address _underlying
+    ) external view override returns (uint256) {
         AAVELogicStorage.SimulateData memory data = LOGIC_STORAGE
             .getLastSimulatedSupply(_underlying);
 
@@ -96,12 +113,9 @@ contract AAVELogic is IProtocol {
         return (deltaIndex * data.amount) / data.index;
     }
 
-    function lastBorrowInterest(address _underlying)
-        external
-        view
-        override
-        returns (uint256)
-    {
+    function lastBorrowInterest(
+        address _underlying
+    ) external view override returns (uint256) {
         AAVELogicStorage.SimulateData memory data = LOGIC_STORAGE
             .getLastSimulatedBorrow(_underlying);
         if (data.index == 0) {
@@ -178,12 +192,10 @@ contract AAVELogic is IProtocol {
 
     function claimRewards(address _account) external override {}
 
-    function supplyOf(address _underlying, address _account)
-        external
-        view
-        override
-        returns (uint256)
-    {
+    function supplyOf(
+        address _underlying,
+        address _account
+    ) external view override returns (uint256) {
         _underlying = replaceNative(_underlying);
         AAVEDataTypes.ReserveData memory reserve = LOGIC_STORAGE
             .pool()
@@ -191,12 +203,10 @@ contract AAVELogic is IProtocol {
         return IERC20(reserve.aTokenAddress).balanceOf(_account);
     }
 
-    function debtOf(address _underlying, address _account)
-        external
-        view
-        override
-        returns (uint256)
-    {
+    function debtOf(
+        address _underlying,
+        address _account
+    ) external view override returns (uint256) {
         _underlying = replaceNative(_underlying);
         AAVEDataTypes.ReserveData memory reserve = LOGIC_STORAGE
             .pool()
@@ -204,7 +214,10 @@ contract AAVELogic is IProtocol {
         return IERC20(reserve.variableDebtTokenAddress).balanceOf(_account);
     }
 
-    function totalColletralAndBorrow(address _account, address _quote)
+    function totalColletralAndBorrow(
+        address _account,
+        address _quote
+    )
         external
         view
         override
@@ -226,22 +239,17 @@ contract AAVELogic is IProtocol {
         (, , , uint256 decimals, , ) = AAVEReserveConfigurationGetter.getParams(
             configuration
         );
-        uint256 unit = 10**(decimals);
+        uint256 unit = 10 ** (decimals);
 
         collateralValue = (collateralValue * unit) / priceQuote;
         borrowedValue = (borrowedValue * unit) / priceQuote;
     }
 
-    function supplyToTargetSupplyRate(uint256 _targetRate, bytes memory _params)
-        external
-        pure
-        override
-        returns (int256)
-    {
-        Types.AAVEUsageParams memory params = abi.decode(
-            _params,
-            (Types.AAVEUsageParams)
-        );
+    function supplyToTargetSupplyRate(
+        uint256 _targetRate,
+        bytes memory _params
+    ) external pure override returns (int256) {
+        UsageParams memory params = abi.decode(_params, (UsageParams));
 
         _targetRate = (_targetRate * Utils.MILLION).ceilDiv(
             params.reserveFactor
@@ -308,16 +316,11 @@ contract AAVELogic is IProtocol {
         return int256(supplyAmount) - int256(params.totalSupplied);
     }
 
-    function borrowToTargetBorrowRate(uint256 _targetRate, bytes memory _params)
-        external
-        pure
-        override
-        returns (int256)
-    {
-        Types.AAVEUsageParams memory params = abi.decode(
-            _params,
-            (Types.AAVEUsageParams)
-        );
+    function borrowToTargetBorrowRate(
+        uint256 _targetRate,
+        bytes memory _params
+    ) external pure override returns (int256) {
+        UsageParams memory params = abi.decode(_params, (UsageParams));
 
         if (_targetRate < params.baseV) {
             _targetRate = params.baseV;
@@ -365,28 +368,22 @@ contract AAVELogic is IProtocol {
         return LOGIC_STORAGE.wrappedNative();
     }
 
-    function lastSimulatedSupply(address _asset)
-        external
-        view
-        returns (AAVELogicStorage.SimulateData memory)
-    {
+    function lastSimulatedSupply(
+        address _asset
+    ) external view returns (AAVELogicStorage.SimulateData memory) {
         return LOGIC_STORAGE.getLastSimulatedSupply(_asset);
     }
 
-    function lastSimulatedBorrow(address _asset)
-        external
-        view
-        returns (AAVELogicStorage.SimulateData memory)
-    {
+    function lastSimulatedBorrow(
+        address _asset
+    ) external view returns (AAVELogicStorage.SimulateData memory) {
         return LOGIC_STORAGE.getLastSimulatedBorrow(_asset);
     }
 
-    function getUsageParams(address _underlying, uint256 _suppliesToRedeem)
-        external
-        view
-        override
-        returns (bytes memory)
-    {
+    function getUsageParams(
+        address _underlying,
+        uint256 _suppliesToRedeem
+    ) external view override returns (bytes memory) {
         AAVEDataTypes.ReserveData memory reserve = LOGIC_STORAGE
             .pool()
             .getReserveData(replaceNative(_underlying));
@@ -394,7 +391,7 @@ contract AAVELogic is IProtocol {
             reserve.interestRateStrategyAddress
         );
 
-        Types.AAVEUsageParams memory params = Types.AAVEUsageParams(
+        UsageParams memory params = UsageParams(
             IERC20(reserve.aTokenAddress).totalSupply() - _suppliesToRedeem,
             0,
             IERC20(reserve.stableDebtTokenAddress).totalSupply(),
@@ -440,12 +437,9 @@ contract AAVELogic is IProtocol {
         return abi.encode(params);
     }
 
-    function getCurrentSupplyRate(address _underlying)
-        external
-        view
-        override
-        returns (uint256)
-    {
+    function getCurrentSupplyRate(
+        address _underlying
+    ) external view override returns (uint256) {
         return
             LOGIC_STORAGE
                 .pool()
@@ -453,12 +447,9 @@ contract AAVELogic is IProtocol {
                 .currentLiquidityRate / BASE;
     }
 
-    function getCurrentBorrowRate(address _underlying)
-        external
-        view
-        override
-        returns (uint256)
-    {
+    function getCurrentBorrowRate(
+        address _underlying
+    ) external view override returns (uint256) {
         return
             LOGIC_STORAGE
                 .pool()
@@ -466,11 +457,9 @@ contract AAVELogic is IProtocol {
                 .currentVariableBorrowRate / BASE;
     }
 
-    function replaceNative(address _underlying)
-        internal
-        view
-        returns (address)
-    {
+    function replaceNative(
+        address _underlying
+    ) internal view returns (address) {
         if (_underlying == TransferHelper.ETH) {
             return LOGIC_STORAGE.wrappedNative();
         } else {

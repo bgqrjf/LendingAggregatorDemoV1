@@ -17,6 +17,16 @@ contract CompoundLogic is IProtocol {
     uint256 public immutable BASE = 1e12;
     uint256 public immutable BLOCK_PER_YEAR = 2102400;
 
+    struct UsageParams {
+        uint256 totalSupplied; // not balance
+        uint256 totalBorrowed;
+        uint256 slope1;
+        uint256 slope2;
+        uint256 base;
+        uint256 optimalLTV;
+        uint256 reserveFactor;
+    }
+
     constructor(
         address _protocolsHandler,
         address _comptroller,
@@ -37,10 +47,10 @@ contract CompoundLogic is IProtocol {
 
     receive() external payable {}
 
-    function updateSupplyShare(address _underlying, uint256 _amount)
-        external
-        override
-    {
+    function updateSupplyShare(
+        address _underlying,
+        uint256 _amount
+    ) external override {
         CTokenInterface cToken = CTokenInterface(
             LOGIC_STORAGE.cTokens(_underlying)
         );
@@ -53,10 +63,10 @@ contract CompoundLogic is IProtocol {
         emit SupplyShareUpdated(_underlying, _amount, abi.encode(data));
     }
 
-    function updateBorrowShare(address _underlying, uint256 _amount)
-        external
-        override
-    {
+    function updateBorrowShare(
+        address _underlying,
+        uint256 _amount
+    ) external override {
         CTokenInterface cToken = CTokenInterface(
             LOGIC_STORAGE.cTokens(_underlying)
         );
@@ -71,12 +81,9 @@ contract CompoundLogic is IProtocol {
         emit BorrowShareUpdated(_underlying, _amount, abi.encode(data));
     }
 
-    function lastSupplyInterest(address _underlying)
-        external
-        view
-        override
-        returns (uint256)
-    {
+    function lastSupplyInterest(
+        address _underlying
+    ) external view override returns (uint256) {
         CTokenInterface cToken = CTokenInterface(
             LOGIC_STORAGE.cTokens(_underlying)
         );
@@ -91,12 +98,9 @@ contract CompoundLogic is IProtocol {
         return (deltaIndex * data.amount) / data.index;
     }
 
-    function lastBorrowInterest(address _underlying)
-        external
-        view
-        override
-        returns (uint256)
-    {
+    function lastBorrowInterest(
+        address _underlying
+    ) external view override returns (uint256) {
         CTokenInterface cToken = CTokenInterface(
             LOGIC_STORAGE.cTokens(_underlying)
         );
@@ -164,12 +168,10 @@ contract CompoundLogic is IProtocol {
 
     // return underlying Token
     // return data for caller
-    function supplyOf(address _underlying, address _account)
-        external
-        view
-        override
-        returns (uint256)
-    {
+    function supplyOf(
+        address _underlying,
+        address _account
+    ) external view override returns (uint256) {
         CTokenInterface cToken = CTokenInterface(
             LOGIC_STORAGE.cTokens(_underlying)
         );
@@ -199,12 +201,10 @@ contract CompoundLogic is IProtocol {
                 : 0;
     }
 
-    function debtOf(address _underlying, address _account)
-        external
-        view
-        override
-        returns (uint256)
-    {
+    function debtOf(
+        address _underlying,
+        address _account
+    ) external view override returns (uint256) {
         CTokenInterface cToken = CTokenInterface(
             LOGIC_STORAGE.cTokens(_underlying)
         );
@@ -214,11 +214,10 @@ contract CompoundLogic is IProtocol {
             cToken.borrowIndex();
     }
 
-    function totalColletralAndBorrow(address _account, address _quote)
-        external
-        view
-        returns (uint256 collateralValue, uint256 borrowValue)
-    {
+    function totalColletralAndBorrow(
+        address _account,
+        address _quote
+    ) external view returns (uint256 collateralValue, uint256 borrowValue) {
         // For each asset the account is in
         CTokenInterface[] memory userCTokens = LOGIC_STORAGE
             .comptroller()
@@ -255,16 +254,11 @@ contract CompoundLogic is IProtocol {
         borrowValue = borrowValue / oraclePriceQuote;
     }
 
-    function supplyToTargetSupplyRate(uint256 _targetRate, bytes memory _params)
-        external
-        pure
-        override
-        returns (int256)
-    {
-        Types.CompoundUsageParams memory params = abi.decode(
-            _params,
-            (Types.CompoundUsageParams)
-        );
+    function supplyToTargetSupplyRate(
+        uint256 _targetRate,
+        bytes memory _params
+    ) external pure override returns (int256) {
+        UsageParams memory params = abi.decode(_params, (UsageParams));
 
         _targetRate = (_targetRate * Utils.MILLION) / params.reserveFactor;
 
@@ -299,15 +293,11 @@ contract CompoundLogic is IProtocol {
         return int256(supplyAmount) - int256(params.totalSupplied);
     }
 
-    function borrowToTargetBorrowRate(uint256 _targetRate, bytes memory _params)
-        external
-        pure
-        returns (int256)
-    {
-        Types.CompoundUsageParams memory params = abi.decode(
-            _params,
-            (Types.CompoundUsageParams)
-        );
+    function borrowToTargetBorrowRate(
+        uint256 _targetRate,
+        bytes memory _params
+    ) external pure returns (int256) {
+        UsageParams memory params = abi.decode(_params, (UsageParams));
 
         if (_targetRate < params.base) {
             _targetRate = params.base;
@@ -332,28 +322,22 @@ contract CompoundLogic is IProtocol {
         return int256(borrowAmount) - int256(params.totalBorrowed);
     }
 
-    function lastSimulatedSupply(address _asset)
-        external
-        view
-        returns (CompoundLogicStorage.SimulateData memory)
-    {
+    function lastSimulatedSupply(
+        address _asset
+    ) external view returns (CompoundLogicStorage.SimulateData memory) {
         return LOGIC_STORAGE.getLastSimulatedSupply(_asset);
     }
 
-    function lastSimulatedBorrow(address _asset)
-        external
-        view
-        returns (CompoundLogicStorage.SimulateData memory)
-    {
+    function lastSimulatedBorrow(
+        address _asset
+    ) external view returns (CompoundLogicStorage.SimulateData memory) {
         return LOGIC_STORAGE.getLastSimulatedBorrow(_asset);
     }
 
-    function getUsageParams(address _underlying, uint256 _suppliesToRedeem)
-        external
-        view
-        override
-        returns (bytes memory)
-    {
+    function getUsageParams(
+        address _underlying,
+        uint256 _suppliesToRedeem
+    ) external view override returns (bytes memory) {
         CTokenInterface cToken = CTokenInterface(
             LOGIC_STORAGE.cTokens(_underlying)
         );
@@ -366,7 +350,7 @@ contract CompoundLogic is IProtocol {
 
         InterestRateModel interestRateModel = cToken.interestRateModel();
 
-        Types.CompoundUsageParams memory params = Types.CompoundUsageParams(
+        UsageParams memory params = UsageParams(
             totalCash + totalBorrows - totalReserves - _suppliesToRedeem,
             totalBorrows,
             (interestRateModel.multiplierPerBlock() * BLOCK_PER_YEAR) / BASE,
@@ -399,7 +383,10 @@ contract CompoundLogic is IProtocol {
                 : getBorrowReward(cToken, _account);
     }
 
-    function accrueInterest(address _underlying, CTokenInterface _cToken)
+    function accrueInterest(
+        address _underlying,
+        CTokenInterface _cToken
+    )
         internal
         view
         returns (
@@ -435,23 +422,17 @@ contract CompoundLogic is IProtocol {
         }
     }
 
-    function getCurrentSupplyRate(address _underlying)
-        external
-        view
-        override
-        returns (uint256)
-    {
+    function getCurrentSupplyRate(
+        address _underlying
+    ) external view override returns (uint256) {
         return
             (CTokenInterface(LOGIC_STORAGE.cTokens(_underlying))
                 .supplyRatePerBlock() * BLOCK_PER_YEAR) / BASE;
     }
 
-    function getCurrentBorrowRate(address _underlying)
-        external
-        view
-        override
-        returns (uint256)
-    {
+    function getCurrentBorrowRate(
+        address _underlying
+    ) external view override returns (uint256) {
         return
             (CTokenInterface(LOGIC_STORAGE.cTokens(_underlying))
                 .borrowRatePerBlock() * BLOCK_PER_YEAR) / BASE;
@@ -463,11 +444,10 @@ contract CompoundLogic is IProtocol {
         LOGIC_STORAGE.comptroller().enterMarkets(underlyings);
     }
 
-    function getSupplyReward(CTokenInterface _cToken, address _account)
-        internal
-        view
-        returns (uint256 rewards)
-    {
+    function getSupplyReward(
+        CTokenInterface _cToken,
+        address _account
+    ) internal view returns (uint256 rewards) {
         (uint256 supplyIndex, uint256 blockNumber) = LOGIC_STORAGE
             .comptroller()
             .compSupplyState(address(_cToken));
@@ -494,11 +474,10 @@ contract CompoundLogic is IProtocol {
         rewards = (supplierTokens * deltaIndex) / 1e36;
     }
 
-    function getBorrowReward(CTokenInterface _cToken, address _account)
-        internal
-        view
-        returns (uint256 rewards)
-    {
+    function getBorrowReward(
+        CTokenInterface _cToken,
+        address _account
+    ) internal view returns (uint256 rewards) {
         (uint256 borrowIndex, uint256 blockNumber) = LOGIC_STORAGE
             .comptroller()
             .compBorrowState(address(_cToken));
@@ -527,11 +506,10 @@ contract CompoundLogic is IProtocol {
         rewards = (borrowAmount * deltaIndex) / 1e36;
     }
 
-    function getSupplyIndex(address _underlying, CTokenInterface cToken)
-        public
-        view
-        returns (uint256 supplyIndex)
-    {
+    function getSupplyIndex(
+        address _underlying,
+        CTokenInterface cToken
+    ) public view returns (uint256 supplyIndex) {
         uint256 supplyTokens = cToken.totalSupply();
 
         (

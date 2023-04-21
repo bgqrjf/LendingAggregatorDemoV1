@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.8.0;
 
-import "./Types.sol";
 import "./Utils.sol";
 
 import "@openzeppelin/contracts/utils/math/Math.sol";
@@ -12,8 +11,18 @@ library StrategyCalculations {
     using Math for uint256;
     uint256 constant PRECISION = 1;
 
+    struct StrategyParams {
+        uint256 targetAmount;
+        uint128 maxRate;
+        uint128 minRate;
+        uint256 bestPoolToAddExtra;
+        uint256[] minAmounts;
+        uint256[] maxAmounts;
+        bytes[] usageParams;
+    }
+
     function calculateAmountsToSupply(
-        Types.StrategyParams memory _params,
+        StrategyParams memory _params,
         IProtocol[] memory _protocols
     ) internal pure returns (uint256[] memory amounts) {
         amounts = new uint256[](_protocols.length);
@@ -86,7 +95,7 @@ library StrategyCalculations {
     }
 
     function calculateAmountsToBorrow(
-        Types.StrategyParams memory _params,
+        StrategyParams memory _params,
         IProtocol[] memory _protocols
     ) internal pure returns (uint256[] memory amounts) {
         amounts = new uint256[](_protocols.length);
@@ -146,7 +155,7 @@ library StrategyCalculations {
     }
 
     function calculateAmountsToRepay(
-        Types.StrategyParams memory _params,
+        StrategyParams memory _params,
         IProtocol[] memory _protocols
     ) internal pure returns (uint256[] memory amounts) {
         amounts = new uint256[](_protocols.length);

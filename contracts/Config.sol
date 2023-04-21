@@ -6,7 +6,6 @@ import "./interfaces/IRouter.sol";
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "./libraries/internals/UserAssetBitMap.sol";
-import "./libraries/internals/Utils.sol";
 
 contract Config is IConfig, OwnableUpgradeable {
     address public router;

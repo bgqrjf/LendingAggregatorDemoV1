@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.14;
 
-import "./interfaces/IDToken.sol";
+import "./storages/DTokenStorage.sol";
 import "./interfaces/IRouter.sol";
 
 import "@openzeppelin/contracts/utils/math/Math.sol";
@@ -10,21 +10,8 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "./libraries/internals/Utils.sol";
 
 // DebtToken
-contract DToken is IDToken, OwnableUpgradeable {
+contract DToken is DTokenSotrage, OwnableUpgradeable {
     using Math for uint256;
-
-    string public name;
-    string public symbol;
-    uint8 public decimals = 18;
-    uint256 public override totalSupply;
-    address public override underlying;
-    uint256 public override feeRate;
-    uint256 public override accFee;
-    uint256 public override collectedFee;
-    uint256 public override feeIndex;
-
-    mapping(address => uint256) public override balanceOf;
-    mapping(address => uint256) public override feeIndexOf;
 
     function initialize(
         address _underlying,

@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "./libraries/internals/StrategyCalculations.sol";
 
 contract Strategy is IStrategy, Ownable {
-    using StrategyCalculations for Types.StrategyParams;
+    using StrategyCalculations for StrategyCalculations.StrategyParams;
 
     mapping(address => uint256) public maxLTVs;
 
@@ -22,7 +22,7 @@ contract Strategy is IStrategy, Ownable {
         override
         returns (uint256[] memory supplyAmounts, uint256[] memory redeemAmounts)
     {
-        Types.StrategyParams memory params;
+        StrategyCalculations.StrategyParams memory params;
         params.usageParams = new bytes[](_protocols.length);
         params.minAmounts = new uint256[](_protocols.length);
 
@@ -59,7 +59,7 @@ contract Strategy is IStrategy, Ownable {
         address _asset,
         uint256 _amount
     ) external view override returns (uint256[] memory amounts) {
-        Types.StrategyParams memory params;
+        StrategyCalculations.StrategyParams memory params;
         params.usageParams = new bytes[](_protocols.length);
         params.minAmounts = new uint256[](_protocols.length);
 
@@ -78,12 +78,21 @@ contract Strategy is IStrategy, Ownable {
         amounts = params.calculateAmountsToSupply(_protocols);
     }
 
+    function getRedeemStrategy(
+        IProtocol[] memory,
+        address,
+        uint256[] memory,
+        uint256
+    ) external pure override returns (uint256[] memory, uint256[] memory) {
+        revert("not implemented, auto rebalance");
+    }
+
     function getBorrowStrategy(
         IProtocol[] memory _protocols,
         address _asset,
         uint256 _amount
     ) external view override returns (uint256[] memory amounts) {
-        Types.StrategyParams memory params;
+        StrategyCalculations.StrategyParams memory params;
         params.usageParams = new bytes[](_protocols.length);
         params.maxAmounts = new uint256[](_protocols.length);
         uint256 maxBorrowAmount;
@@ -115,7 +124,7 @@ contract Strategy is IStrategy, Ownable {
         address _asset,
         uint256 _amount
     ) external view override returns (uint256[] memory amounts) {
-        Types.StrategyParams memory params;
+        StrategyCalculations.StrategyParams memory params;
         params.usageParams = new bytes[](_protocols.length);
         params.maxAmounts = new uint256[](_protocols.length);
 
@@ -135,7 +144,7 @@ contract Strategy is IStrategy, Ownable {
         address _asset,
         uint256 _amount
     ) external view override returns (uint256[] memory amounts) {
-        Types.StrategyParams memory params;
+        StrategyCalculations.StrategyParams memory params;
         params.usageParams = new bytes[](_protocols.length);
 
         params.minAmounts = new uint256[](_protocols.length);
@@ -174,7 +183,7 @@ contract Strategy is IStrategy, Ownable {
         IProtocol _protocol,
         address _underlying,
         address _account
-    ) public view override returns (uint256 amount) {
+    ) public view returns (uint256 amount) {
         (uint256 collateral, uint256 borrowed) = _protocol
             .totalColletralAndBorrow(_account, _underlying);
         uint256 minCollateralNeeded = (borrowed * Utils.MILLION) /
@@ -192,7 +201,7 @@ contract Strategy is IStrategy, Ownable {
         IProtocol _protocol,
         address _underlying,
         address _account
-    ) public view override returns (uint256 amount) {
+    ) public view returns (uint256 amount) {
         (uint256 collateral, uint256 borrowed) = _protocol
             .totalColletralAndBorrow(_account, _underlying);
 
@@ -205,7 +214,7 @@ contract Strategy is IStrategy, Ownable {
         IProtocol _protocol,
         address _underlying,
         address _account
-    ) public view override returns (uint256 amount) {
+    ) public view returns (uint256 amount) {
         (uint256 collateral, uint256 borrowed) = _protocol
             .totalColletralAndBorrow(_account, _underlying);
         uint256 maxDebtAllowed = (collateral * maxLTVs[_underlying]) /
