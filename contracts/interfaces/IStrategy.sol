@@ -53,4 +53,15 @@ interface IStrategy {
         address _asset,
         uint256 _amount
     ) external view returns (uint256[] memory amounts);
+
+    function getRebalanceStrategy(
+        IProtocol[] memory _protocols,
+        address _asset
+    )
+        external
+        view
+        returns (
+            uint256[] memory redeemAmounts,
+            uint256[] memory supplyAmounts
+        );
 }

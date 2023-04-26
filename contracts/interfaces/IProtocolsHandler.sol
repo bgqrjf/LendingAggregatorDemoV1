@@ -12,6 +12,7 @@ interface IProtocolsHandler {
     event Redeemed(address indexed asset, uint256 amount);
     event Borrowed(address indexed asset, uint256 amount);
     event Repaid(address indexed asset, uint256 amount);
+    event AutoRebalanceToggled(bool);
 
     function rebalanceAllProtocols(address _asset) external;
 
@@ -30,33 +31,30 @@ interface IProtocolsHandler {
         address _to
     ) external returns (uint256 redeemAmount, uint256 borrowAmount);
 
-    function totalSupplied(address asset)
-        external
-        view
-        returns (uint256[] memory amounts, uint256 totalAmount);
+    function totalSupplied(
+        address asset
+    ) external view returns (uint256[] memory amounts, uint256 totalAmount);
 
-    function totalBorrowed(address asset)
-        external
-        view
-        returns (uint256[] memory amounts, uint256 totalAmount);
+    function totalBorrowed(
+        address asset
+    ) external view returns (uint256[] memory amounts, uint256 totalAmount);
 
-    function getRates(address _underlying)
-        external
-        view
-        returns (uint256, uint256);
+    function getRates(
+        address _underlying
+    ) external view returns (uint256, uint256);
 
-    function simulateLendings(address _asset, uint256 _totalLending)
-        external
-        view
-        returns (uint256 totalLending, uint256 newInterest);
+    function simulateLendings(
+        address _asset,
+        uint256 _totalLending
+    ) external view returns (uint256 totalLending, uint256 newInterest);
 
     function updateSimulates(address _asset, uint256 _totalLending) external;
-
-    function claimRewards(address _account, uint256[] memory _amounts) external;
 
     function addProtocol(IProtocol _protocol) external;
 
     function updateProtocol(IProtocol _old, IProtocol _new) external;
 
     function getProtocols() external view returns (IProtocol[] memory);
+
+    function toggleAutoRebalance() external;
 }

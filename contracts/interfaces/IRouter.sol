@@ -230,6 +230,8 @@ interface IRouter is IMultiImplementationBeacon {
 
     function updatePriceOracle(IPriceOracle _priceOracle) external;
 
+    function toggleAutoRebalance() external;
+
     // --- getters
     function priceOracle() external view returns (IPriceOracle);
 

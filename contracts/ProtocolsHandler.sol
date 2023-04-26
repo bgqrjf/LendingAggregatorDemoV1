@@ -14,12 +14,14 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
 
     IStrategy public strategy;
     IProtocol[] public protocols;
+    bool public autoRebalance;
 
     receive() external payable {}
 
     function initialize(
         address[] memory _protocols,
-        address _strategy
+        address _strategy,
+        bool _autoRebalance
     ) external initializer {
         __Ownable_init();
 
@@ -28,13 +30,42 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
             protocols[i] = IProtocol(_protocols[i]);
         }
         strategy = IStrategy(_strategy);
+        autoRebalance = _autoRebalance;
     }
 
-    function rebalanceAllProtocols(address _asset) external override {
-        (uint256[] memory supplies, uint256 totalSupplies) = totalSupplied(
-            _asset
-        );
-        supply(_asset, 0, supplies, totalSupplies);
+    function rebalanceAllProtocols(address _asset) public override {
+        IProtocol[] memory protocolsCache = protocols;
+
+        (
+            uint256[] memory redeemAmounts,
+            uint256[] memory supplyAmounts
+        ) = strategy.getRebalanceStrategy(protocolsCache, _asset);
+
+        for (uint256 i = 0; i < protocolsCache.length; ++i) {
+            if (redeemAmounts[i] > 0) {
+                Utils.delegateCall(
+                    address(protocolsCache[i]),
+                    abi.encodeWithSelector(
+                        protocolsCache[i].redeem.selector,
+                        _asset,
+                        redeemAmounts[i]
+                    )
+                );
+            }
+        }
+
+        for (uint256 i = 0; i < protocolsCache.length; ++i) {
+            if (supplyAmounts[i] > 0) {
+                Utils.delegateCall(
+                    address(protocolsCache[i]),
+                    abi.encodeWithSelector(
+                        protocolsCache[i].supply.selector,
+                        _asset,
+                        supplyAmounts[i]
+                    )
+                );
+            }
+        }
     }
 
     function repayAndSupply(
@@ -53,6 +84,10 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         if (repayAmount < _amount) {
             supplyAmount = _amount - repayAmount;
             supply(_asset, supplyAmount, supplies, _totalSupplied);
+        }
+
+        if (autoRebalance) {
+            rebalanceAllProtocols(_asset);
         }
     }
 
@@ -73,6 +108,10 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         if (redeemAmount < _amount) {
             borrowAmount = _amount - redeemAmount;
             borrow(_asset, borrowAmount, _to);
+        }
+
+        if (autoRebalance) {
+            rebalanceAllProtocols(_asset);
         }
     }
 
@@ -252,21 +291,51 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         }
     }
 
-    function redeemAndSupply(
+    function supply(
         address _asset,
+        uint256 _amount,
         uint256[] memory supplies,
-        uint256 _totalSuppliedTarget
+        uint256
     ) internal {
         IProtocol[] memory protocolsCache = protocols;
-        (
-            uint256[] memory supplyAmounts,
-            uint256[] memory redeemAmounts
-        ) = strategy.getSupplyStrategy(
-                protocolsCache,
-                _asset,
-                supplies,
-                _totalSuppliedTarget
-            );
+        (uint256[] memory supplyAmounts, ) = strategy.getSupplyStrategy(
+            protocolsCache,
+            _asset,
+            supplies,
+            _amount
+        );
+
+        for (uint256 i = 0; i < protocolsCache.length; ++i) {
+            if (supplyAmounts[i] > 0) {
+                Utils.delegateCall(
+                    address(protocolsCache[i]),
+                    abi.encodeWithSelector(
+                        protocolsCache[i].supply.selector,
+                        _asset,
+                        supplyAmounts[i]
+                    )
+                );
+            }
+        }
+        emit Supplied(_asset, _amount);
+    }
+
+    function redeem(
+        address _asset,
+        uint256 _amount,
+        uint256[] memory supplies,
+        uint256 _totalSupplied,
+        address _to
+    ) internal returns (uint256 amount) {
+        amount = Math.min(_amount, _totalSupplied);
+
+        IProtocol[] memory protocolsCache = protocols;
+        (, uint256[] memory redeemAmounts) = strategy.getRedeemStrategy(
+            protocolsCache,
+            _asset,
+            supplies,
+            amount
+        );
 
         for (uint256 i = 0; i < protocolsCache.length; ++i) {
             if (redeemAmounts[i] > 0) {
@@ -281,44 +350,10 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
             }
         }
 
-        for (uint256 i = 0; i < protocolsCache.length; ++i) {
-            if (supplyAmounts[i] > 0) {
-                Utils.delegateCall(
-                    address(protocolsCache[i]),
-                    abi.encodeWithSelector(
-                        protocolsCache[i].supply.selector,
-                        _asset,
-                        supplyAmounts[i]
-                    )
-                );
-            }
-        }
-    }
+        _asset.safeTransfer(_to, amount, 0);
+        emit Redeemed(_asset, amount);
 
-    function supply(
-        address _asset,
-        uint256 _amount,
-        uint256[] memory supplies,
-        uint256 _totalSupplied
-    ) internal {
-        redeemAndSupply(_asset, supplies, _totalSupplied + _amount);
-        emit Supplied(_asset, _amount);
-    }
-
-    function redeem(
-        address _asset,
-        uint256 _amount,
-        uint256[] memory supplies,
-        uint256 _totalSupplied,
-        address _to
-    ) internal returns (uint256 amount) {
-        amount = Math.min(_amount, _totalSupplied);
-
-        if (amount > 0) {
-            redeemAndSupply(_asset, supplies, _totalSupplied - amount);
-            _asset.safeTransfer(_to, amount, 0);
-            emit Redeemed(_asset, amount);
-        }
+        return amount;
     }
 
     function borrow(
@@ -347,18 +382,14 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         }
 
         _asset.safeTransfer(_to, _amount, 0);
-
         emit Borrowed(_asset, _amount);
 
         return _amount;
     }
 
-    function repay(
-        address _asset,
-        uint256 _amount
-    ) internal returns (uint256 amount) {
+    function repay(address _asset, uint256 _amount) internal returns (uint256) {
         (, uint256 total) = totalBorrowed(_asset);
-        amount = Math.min(_amount, total);
+        uint amount = Math.min(_amount, total);
         if (amount == 0) {
             return amount;
         }
@@ -367,7 +398,7 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         uint256[] memory amounts = strategy.getRepayStrategy(
             protocolsCache,
             _asset,
-            amount
+            _amount
         );
 
         for (uint256 i = 0; i < protocolsCache.length; ++i) {
@@ -383,7 +414,8 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
             }
         }
 
-        emit Repaid(_asset, amount);
+        emit Repaid(_asset, _amount);
+        return _amount;
     }
 
     function addProtocol(IProtocol _protocol) external override onlyOwner {
@@ -403,13 +435,8 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         }
     }
 
-    function claimRewards(
-        address _account,
-        uint256[] memory _amounts
-    ) external override onlyOwner {
-        for (uint256 i = 0; i < protocols.length; ++i) {
-            address token = protocols[i].rewardToken();
-            token.safeTransfer(_account, _amounts[i], 0);
-        }
+    function toggleAutoRebalance() external override onlyOwner {
+        autoRebalance = !autoRebalance;
+        emit AutoRebalanceToggled(autoRebalance);
     }
 }

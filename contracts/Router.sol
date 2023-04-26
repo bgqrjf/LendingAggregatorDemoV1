@@ -619,6 +619,10 @@ contract Router is RouterStorage, OwnableUpgradeable {
         emit PriceOracleUpdated(_priceOracle);
     }
 
+    function toggleAutoRebalance() external override onlyOwner {
+        protocols.toggleAutoRebalance();
+    }
+
     // --- getters
     function getAsset(
         address _underlying

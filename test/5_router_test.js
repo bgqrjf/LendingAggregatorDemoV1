@@ -72,17 +72,13 @@ describe("Router tests", function () {
     // strategy
     let Strategy = await ethers.getContractFactory("Strategy");
     let strategy = await Strategy.deploy();
-    await strategy.setMaxLTVs(
-      [token0.address, ETHAddress, usdt.address],
-      [700000, 700000, 700000]
-    );
+    await strategy.setMaxLTV(700000);
 
     // protocolsHandler
     const proxyAdmin = await transparentProxy.deployProxyAdmin();
     let protocolsHandler = await transparentProxy.deployProxy({
       implementationFactory: "ProtocolsHandler",
-      libraries: {},
-      initializeParams: [[], strategy.address],
+      initializeParams: [[], strategy.address, true],
       proxyAdmin: proxyAdmin,
     });
 
@@ -124,8 +120,10 @@ describe("Router tests", function () {
     await config.transferOwnership(deployer.address);
 
     // rewards
-    let Rewards = await ethers.getContractFactory("Rewards");
-    let rewards = await Rewards.deploy(protocolsHandler.address);
+    let rewards = await transparentProxy.deployProxy({
+      implementationFactory: "Rewards",
+      proxyAdmin: proxyAdmin,
+    });
 
     // sToken
     let SToken = await ethers.getContractFactory("SToken");
@@ -169,7 +167,6 @@ describe("Router tests", function () {
         BorrowLogic: borrowLogic.address,
         RepayLogic: repayLogic.address,
         LiquidateLogic: liquidateLogic.address,
-        RewardLogic: ethers.constants.AddressZero,
       },
       initializeParams: [
         protocolsHandler.address,

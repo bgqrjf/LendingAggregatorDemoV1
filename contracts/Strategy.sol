@@ -4,17 +4,16 @@ pragma solidity ^0.8.14;
 import "./interfaces/IStrategy.sol";
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "./libraries/internals/StrategyCalculations.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
+import "./libraries/internals/Utils.sol";
 
 contract Strategy is IStrategy, Ownable {
-    using StrategyCalculations for StrategyCalculations.StrategyParams;
-
-    mapping(address => uint256) public maxLTVs;
+    uint256 public maxLTV;
 
     function getSupplyStrategy(
         IProtocol[] memory _protocols,
         address _asset,
-        uint256[] memory _currentSupplies,
+        uint256[] memory,
         uint256 _amount
     )
         external
@@ -22,35 +21,37 @@ contract Strategy is IStrategy, Ownable {
         override
         returns (uint256[] memory supplyAmounts, uint256[] memory redeemAmounts)
     {
-        StrategyCalculations.StrategyParams memory params;
-        params.usageParams = new bytes[](_protocols.length);
-        params.minAmounts = new uint256[](_protocols.length);
-
-        for (uint256 i = 0; i < _protocols.length; ++i) {
-            params.usageParams[i] = _protocols[i].getUsageParams(
-                _asset,
-                _currentSupplies[i]
-            );
-
-            uint256 rate = _protocols[i].getCurrentSupplyRate(_asset);
-            if (rate > params.maxRate) {
-                params.bestPoolToAddExtra = i;
-            }
-            params.maxRate = uint128(Math.max(rate, params.maxRate));
-        }
-
-        params.targetAmount = _amount;
-        uint256[] memory amounts = params.calculateAmountsToSupply(_protocols);
-
         supplyAmounts = new uint256[](_protocols.length);
         redeemAmounts = new uint256[](_protocols.length);
 
-        for (uint256 i = 0; i < amounts.length; ++i) {
-            if (amounts[i] < _currentSupplies[i]) {
-                redeemAmounts[i] = _currentSupplies[i] - amounts[i];
-            } else {
-                supplyAmounts[i] = amounts[i] - _currentSupplies[i];
+        // if shortage on supply
+        for (uint256 i = 0; i < _protocols.length; ++i) {
+            (uint256 currentCollateral, uint256 currentBorrowed) = _protocols[i]
+                .totalColletralAndBorrow(msg.sender, _asset);
+
+            if (currentBorrowed * Utils.MILLION > maxLTV * currentCollateral) {
+                supplyAmounts[i] = Math.min(
+                    (currentBorrowed * Utils.MILLION) /
+                        maxLTV -
+                        currentCollateral,
+                    _amount
+                );
+                _amount -= supplyAmounts[i];
             }
+        }
+
+        if (_amount > 0) {
+            uint256 bestPoolID;
+            uint256 maxRate;
+            for (uint256 i = 0; i < _protocols.length; ++i) {
+                uint256 rate = _protocols[i].getCurrentSupplyRate(_asset);
+                if (rate > maxRate) {
+                    bestPoolID = i;
+                    maxRate = rate;
+                }
+            }
+
+            supplyAmounts[bestPoolID] += _amount;
         }
     }
 
@@ -59,32 +60,44 @@ contract Strategy is IStrategy, Ownable {
         address _asset,
         uint256 _amount
     ) external view override returns (uint256[] memory amounts) {
-        StrategyCalculations.StrategyParams memory params;
-        params.usageParams = new bytes[](_protocols.length);
-        params.minAmounts = new uint256[](_protocols.length);
+        amounts = new uint256[](_protocols.length);
 
+        uint256 bestPoolID;
+        uint256 maxRate;
         for (uint256 i = 0; i < _protocols.length; ++i) {
-            params.usageParams[i] = _protocols[i].getUsageParams(_asset, 0);
-            params.minAmounts[i] = 0;
-
-            uint256 rate = _protocols[i].getCurrentSupplyRate(_asset);
-            if (rate > params.maxRate) {
-                params.bestPoolToAddExtra = i;
+            if (_protocols[i].getCurrentSupplyRate(_asset) > maxRate) {
+                bestPoolID = i;
             }
-            params.maxRate = uint128(Math.max(rate, params.maxRate));
         }
 
-        params.targetAmount = _amount;
-        amounts = params.calculateAmountsToSupply(_protocols);
+        amounts[bestPoolID] = _amount;
     }
 
     function getRedeemStrategy(
-        IProtocol[] memory,
-        address,
+        IProtocol[] memory _protocols,
+        address _asset,
         uint256[] memory,
-        uint256
-    ) external pure override returns (uint256[] memory, uint256[] memory) {
-        revert("not implemented, auto rebalance");
+        uint256 _amount
+    )
+        external
+        view
+        override
+        returns (uint256[] memory supplyAmounts, uint256[] memory redeemAmounts)
+    {
+        supplyAmounts = new uint256[](_protocols.length);
+        redeemAmounts = new uint256[](_protocols.length);
+
+        // if shortage on supply
+        uint256[] memory rates = new uint256[](_protocols.length);
+        uint256[] memory maxRedeems = new uint256[](_protocols.length);
+        for (uint256 i = 0; i < _protocols.length; ++i) {
+            maxRedeems[i] = _maxRedeemAmount(_protocols[i], _asset);
+            rates[i] = maxRedeems[i] > 0
+                ? _protocols[i].getCurrentSupplyRate(_asset)
+                : Utils.MAX_UINT;
+        }
+
+        redeemAmounts = calculateAmountOut(_amount, maxRedeems, rates);
     }
 
     function getBorrowStrategy(
@@ -92,31 +105,21 @@ contract Strategy is IStrategy, Ownable {
         address _asset,
         uint256 _amount
     ) external view override returns (uint256[] memory amounts) {
-        StrategyCalculations.StrategyParams memory params;
-        params.usageParams = new bytes[](_protocols.length);
-        params.maxAmounts = new uint256[](_protocols.length);
-        uint256 maxBorrowAmount;
-
+        uint256[] memory rates = new uint256[](_protocols.length);
+        uint256[] memory maxBorrows = new uint256[](_protocols.length);
         for (uint256 i = 0; i < _protocols.length; ++i) {
-            params.usageParams[i] = _protocols[i].getUsageParams(_asset, 0);
+            (uint256 currentCollateral, uint256 currentBorrowed) = _protocols[i]
+                .totalColletralAndBorrow(msg.sender, _asset);
 
-            params.maxAmounts[i] = maxBorrowAllowed(
-                _protocols[i],
-                _asset,
-                msg.sender
-            );
+            uint256 maxBorrow = (currentCollateral * maxLTV) / Utils.MILLION;
+            maxBorrows[i] = currentBorrowed < maxBorrow
+                ? currentCollateral - currentBorrowed
+                : 0;
 
-            maxBorrowAmount += params.maxAmounts[i];
-
-            uint256 rate = _protocols[i].getCurrentBorrowRate(_asset);
-            params.minRate = uint128(Math.min(rate, params.minRate));
+            rates[i] = _protocols[i].getCurrentBorrowRate(_asset);
         }
 
-        require(maxBorrowAmount >= _amount, "Strategy: insufficient balance");
-
-        params.targetAmount = _amount;
-
-        amounts = params.calculateAmountsToBorrow(_protocols);
+        amounts = calculateAmountOut(_amount, maxBorrows, rates);
     }
 
     function getSimulateBorrowStrategy(
@@ -124,19 +127,15 @@ contract Strategy is IStrategy, Ownable {
         address _asset,
         uint256 _amount
     ) external view override returns (uint256[] memory amounts) {
-        StrategyCalculations.StrategyParams memory params;
-        params.usageParams = new bytes[](_protocols.length);
-        params.maxAmounts = new uint256[](_protocols.length);
+        uint256[] memory rates = new uint256[](_protocols.length);
+        uint256[] memory maxBorrows = new uint256[](_protocols.length);
 
         for (uint256 i = 0; i < _protocols.length; ++i) {
-            params.usageParams[i] = _protocols[i].getUsageParams(_asset, 0);
-            params.maxAmounts[i] = Utils.MAX_UINT;
-            uint256 rate = _protocols[i].getCurrentBorrowRate(_asset);
-            params.minRate = uint128(Math.min(rate, params.minRate));
+            rates[i] = _protocols[i].getCurrentBorrowRate(_asset);
+            maxBorrows[i] = Utils.MAX_UINT;
         }
 
-        params.targetAmount = _amount;
-        amounts = params.calculateAmountsToBorrow(_protocols);
+        amounts = calculateAmountOut(_amount, maxBorrows, rates);
     }
 
     function getRepayStrategy(
@@ -144,95 +143,185 @@ contract Strategy is IStrategy, Ownable {
         address _asset,
         uint256 _amount
     ) external view override returns (uint256[] memory amounts) {
-        StrategyCalculations.StrategyParams memory params;
-        params.usageParams = new bytes[](_protocols.length);
+        amounts = new uint256[](_protocols.length);
 
-        params.minAmounts = new uint256[](_protocols.length);
-        params.maxAmounts = new uint256[](_protocols.length);
-
-        uint256 minRepayAmount;
+        // if shortage on supply
         for (uint256 i = 0; i < _protocols.length; ++i) {
-            params.usageParams[i] = _protocols[i].getUsageParams(_asset, 0);
+            (uint256 currentCollateral, uint256 currentBorrowed) = _protocols[i]
+                .totalColletralAndBorrow(msg.sender, _asset);
 
-            params.minAmounts[i] = Math.min(
-                _amount - minRepayAmount,
-                minRepay(_protocols[i], _asset, msg.sender)
-            );
-
-            minRepayAmount += params.minAmounts[i];
-            params.maxAmounts[i] = _protocols[i].debtOf(_asset, msg.sender);
-
-            uint256 rate = _protocols[i].getCurrentBorrowRate(_asset);
-            params.maxRate = uint128(Math.max(rate, params.maxRate));
+            if (currentBorrowed * Utils.MILLION > maxLTV * currentCollateral) {
+                amounts[i] = Math.min(
+                    currentBorrowed - maxLTV * currentCollateral,
+                    _amount
+                );
+                _amount -= amounts[i];
+            }
         }
 
-        if (_amount > minRepayAmount) {
-            params.targetAmount = _amount;
+        if (_amount > 0) {
+            uint256 bestPoolID;
+            uint256 maxRate;
+            for (uint256 i = 0; i < _protocols.length; ++i) {
+                uint256 rate = _protocols[i].getCurrentBorrowRate(_asset);
+                if (rate > maxRate) {
+                    bestPoolID = i;
+                    maxRate = rate;
+                }
+            }
 
-            uint256[] memory strategyAmounts = params.calculateAmountsToRepay(
-                _protocols
+            amounts[bestPoolID] += _amount;
+        }
+    }
+
+    function getRebalanceStrategy(
+        IProtocol[] memory _protocols,
+        address _asset
+    )
+        external
+        view
+        override
+        returns (uint256[] memory redeemAmounts, uint256[] memory supplyAmounts)
+    {
+        uint256 length = _protocols.length;
+        uint256[] memory maxRedeemAmounts = new uint256[](length);
+        uint256[] memory targetAmounts;
+
+        bytes[] memory usageParams = new bytes[](length);
+        uint256 maxRate;
+        uint256 bestPoolToAddExtra;
+        uint256 targetAmount;
+
+        for (uint256 i = 0; i < length; ++i) {
+            IProtocol protocol = _protocols[i];
+
+            maxRedeemAmounts[i] = _maxRedeemAmount(protocol, _asset);
+            usageParams[i] = _protocols[i].getUsageParams(
+                _asset,
+                maxRedeemAmounts[i]
             );
 
-            return strategyAmounts;
+            uint256 rate = protocol.getCurrentSupplyRate(_asset);
+            if (rate > maxRate) {
+                bestPoolToAddExtra = i;
+                maxRate = rate;
+            }
+
+            targetAmount += maxRedeemAmounts[i];
         }
 
-        return params.minAmounts;
-    }
-
-    function maxRedeemAllowed(
-        IProtocol _protocol,
-        address _underlying,
-        address _account
-    ) public view returns (uint256 amount) {
-        (uint256 collateral, uint256 borrowed) = _protocol
-            .totalColletralAndBorrow(_account, _underlying);
-        uint256 minCollateralNeeded = (borrowed * Utils.MILLION) /
-            maxLTVs[_underlying];
-        return
-            minCollateralNeeded < collateral
-                ? Math.min(
-                    collateral - minCollateralNeeded,
-                    _protocol.supplyOf(_underlying, _account)
-                )
-                : 0;
-    }
-
-    function maxBorrowAllowed(
-        IProtocol _protocol,
-        address _underlying,
-        address _account
-    ) public view returns (uint256 amount) {
-        (uint256 collateral, uint256 borrowed) = _protocol
-            .totalColletralAndBorrow(_account, _underlying);
-
-        uint256 maxDebtAllowed = (collateral * maxLTVs[_underlying]) /
-            Utils.MILLION;
-        return maxDebtAllowed > borrowed ? maxDebtAllowed - borrowed : 0;
-    }
-
-    function minRepay(
-        IProtocol _protocol,
-        address _underlying,
-        address _account
-    ) public view returns (uint256 amount) {
-        (uint256 collateral, uint256 borrowed) = _protocol
-            .totalColletralAndBorrow(_account, _underlying);
-        uint256 maxDebtAllowed = (collateral * maxLTVs[_underlying]) /
-            Utils.MILLION;
-        return maxDebtAllowed < borrowed ? borrowed - maxDebtAllowed : 0;
-    }
-
-    function setMaxLTVs(
-        address[] memory _assets,
-        uint256[] memory _maxLTVs
-    ) external onlyOwner {
-        require(
-            _assets.length == _maxLTVs.length,
-            "Strategy: wrong length of _maxLTVs"
+        targetAmounts = calculateRebalanceAmount(
+            _protocols,
+            targetAmount,
+            bestPoolToAddExtra,
+            maxRate,
+            usageParams
         );
 
-        for (uint256 i = 0; i < _assets.length; ++i) {
-            maxLTVs[_assets[i]] = _maxLTVs[i];
+        supplyAmounts = new uint256[](length);
+        redeemAmounts = new uint256[](length);
+
+        for (uint256 i = 0; i < length; ++i) {
+            if (targetAmounts[i] < maxRedeemAmounts[i]) {
+                redeemAmounts[i] = maxRedeemAmounts[i] - targetAmounts[i];
+            } else {
+                supplyAmounts[i] = targetAmounts[i] - maxRedeemAmounts[i];
+            }
         }
+    }
+
+    function calculateAmountOut(
+        uint256 _amount,
+        uint256[] memory _maxAmount,
+        uint256[] memory _rates
+    ) internal view returns (uint256[] memory amounts) {
+        amounts = new uint256[](_rates.length);
+        uint256 minRate = Utils.MAX_UINT;
+        uint256 bestPoolID;
+        for (uint256 i = 0; i < _rates.length; i++) {
+            if (_rates[i] < minRate) {
+                minRate = _rates[i];
+                bestPoolID = i;
+            }
+        }
+
+        if (_amount > _maxAmount[bestPoolID]) {
+            uint256 amountLeft = _amount - _maxAmount[bestPoolID];
+            _rates[bestPoolID] = Utils.MAX_UINT;
+            amounts = calculateAmountOut(amountLeft, _maxAmount, _rates);
+            amounts[bestPoolID] = _maxAmount[bestPoolID];
+        } else {
+            amounts[bestPoolID] = _amount;
+        }
+    }
+
+    function _maxRedeemAmount(
+        IProtocol _protocol,
+        address _quote
+    ) internal view returns (uint maxRedeem) {
+        (uint256 currentCollateral, uint256 currentBorrowed) = _protocol
+            .totalColletralAndBorrow(msg.sender, _quote);
+
+        uint256 minCollateral = (currentBorrowed * Utils.MILLION) / maxLTV;
+        maxRedeem = currentCollateral > minCollateral
+            ? currentCollateral - minCollateral
+            : 0;
+    }
+
+    function setMaxLTV(uint256 _maxLTV) external onlyOwner {
+        maxLTV = _maxLTV;
+    }
+
+    function calculateRebalanceAmount(
+        IProtocol[] memory _protocols,
+        uint256 _targetAmount,
+        uint256 _bestPoolToAddExtra,
+        uint256 _maxRate,
+        bytes[] memory _usageParams
+    ) internal pure returns (uint256[] memory amounts) {
+        amounts = new uint256[](_protocols.length);
+        uint256 totalAmountToSupply;
+
+        uint256 minRate;
+        while (_maxRate > minRate + 1) {
+            totalAmountToSupply = 0;
+            uint256 targetRate = (_maxRate + minRate) / 2;
+            for (uint256 i = 0; i < _protocols.length; ++i) {
+                amounts[i] = getAmountToSupply(
+                    _protocols[i],
+                    targetRate,
+                    _usageParams[i]
+                );
+                totalAmountToSupply += amounts[i];
+            }
+
+            if (totalAmountToSupply < _targetAmount) {
+                _maxRate = targetRate;
+            } else if (totalAmountToSupply > _targetAmount) {
+                minRate = targetRate;
+            } else {
+                break;
+            }
+        }
+
+        if (totalAmountToSupply <= _targetAmount) {
+            amounts[_bestPoolToAddExtra] += _targetAmount - totalAmountToSupply;
+        } else {
+            amounts[_bestPoolToAddExtra] -= totalAmountToSupply - _targetAmount;
+        }
+
+        return amounts;
+    }
+
+    function getAmountToSupply(
+        IProtocol _protocol,
+        uint256 _targetRate,
+        bytes memory _usageParams
+    ) internal pure returns (uint256) {
+        int256 amount = _protocol.supplyToTargetSupplyRate(
+            _targetRate,
+            _usageParams
+        );
+        return amount > 0 ? uint256(amount) : 0;
     }
 }
