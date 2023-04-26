@@ -7,6 +7,7 @@ import "../libraries/internals/Types.sol";
 interface ISToken is IERC20Upgradeable {
     function initialize(
         address _underlying,
+        address _rewards,
         string memory name,
         string memory symbol
     ) external;

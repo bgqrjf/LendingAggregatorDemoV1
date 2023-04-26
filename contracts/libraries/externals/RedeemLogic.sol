@@ -55,8 +55,7 @@ library RedeemLogic {
                     newInterest,
                     msg.sender,
                     true,
-                    _params.collateralable,
-                    _params.rewards
+                    _params.collateralable
                 ),
                 assets
             );
@@ -127,13 +126,6 @@ library RedeemLogic {
             _params.userParams.amount,
             _params.totalUnderlying - uncollectedFee
         );
-
-        // _params.rewards.stopMiningSupplyReward(
-        //     _params.userParams.asset,
-        //     _params.redeemFrom,
-        //     sTokenAmount,
-        //     redeemAsset.sToken.totalSupply() + sTokenAmount
-        // );
 
         emit Redeemed(
             _params.redeemFrom,

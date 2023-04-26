@@ -99,7 +99,9 @@ contract ETHStrategy is IStrategy, Ownable {
                 ? currentCollateral - minCollateral
                 : 0;
 
-            rates[i] = _protocols[i].getCurrentSupplyRate(_asset);
+            rates[i] = maxRedeems[i] > 0
+                ? _protocols[i].getCurrentSupplyRate(_asset)
+                : Utils.MAX_UINT;
         }
 
         redeemAmounts = calculateAmountOut(_amount, maxRedeems, rates);
@@ -183,8 +185,9 @@ contract ETHStrategy is IStrategy, Ownable {
         uint256 _amount,
         uint256[] memory _maxAmount,
         uint256[] memory _rates
-    ) internal pure returns (uint256[] memory amounts) {
-        uint256 minRate;
+    ) internal view returns (uint256[] memory amounts) {
+        amounts = new uint256[](_rates.length);
+        uint256 minRate = Utils.MAX_UINT;
         uint256 bestPoolID;
         for (uint256 i = 0; i < _rates.length; i++) {
             if (_rates[i] < minRate) {
@@ -193,17 +196,17 @@ contract ETHStrategy is IStrategy, Ownable {
             }
         }
 
-        if (_amount < _maxAmount[bestPoolID]) {
-            amounts[bestPoolID] = _amount;
-        } else {
+        if (_amount > _maxAmount[bestPoolID]) {
             uint256 amountLeft = _amount - _maxAmount[bestPoolID];
             _rates[bestPoolID] = Utils.MAX_UINT;
             amounts = calculateAmountOut(amountLeft, _maxAmount, _rates);
             amounts[bestPoolID] = _maxAmount[bestPoolID];
+        } else {
+            amounts[bestPoolID] = _amount;
         }
     }
 
-    function setMaxLTVs(uint256 _maxLTV) external onlyOwner {
+    function setMaxLTV(uint256 _maxLTV) external onlyOwner {
         maxLTV = _maxLTV;
     }
 }

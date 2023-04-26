@@ -181,8 +181,20 @@ contract CompoundLogic is IProtocol {
             uint256 totalReserves,
 
         ) = accrueInterest(_underlying, cToken);
-        uint256 cTokentotalSupply = cToken.totalSupply();
-        uint256 cTokenBalance = cToken.balanceOf(_account);
+
+        return
+            _supplyOf(cToken, _account, totalCash, totalBorrows, totalReserves);
+    }
+
+    function _supplyOf(
+        CTokenInterface _cToken,
+        address _account,
+        uint256 _totalCash,
+        uint256 _totalBorrows,
+        uint256 _totalReserves
+    ) internal view returns (uint256) {
+        uint256 cTokentotalSupply = _cToken.totalSupply();
+        uint256 cTokenBalance = _cToken.balanceOf(_account);
 
         // Compound reverts redeemUnderlying(_underlyingAmount) calls when user cToken
         // balance is 1. Floor division has been applied to calculate cToken when
@@ -196,8 +208,8 @@ contract CompoundLogic is IProtocol {
 
         return
             cTokentotalSupply > 0
-                ? ((totalCash + totalBorrows - totalReserves) * cTokenBalance) /
-                    (cTokentotalSupply)
+                ? ((_totalCash + _totalBorrows - _totalReserves) *
+                    cTokenBalance) / (cTokentotalSupply)
                 : 0;
     }
 
@@ -209,9 +221,17 @@ contract CompoundLogic is IProtocol {
             LOGIC_STORAGE.cTokens(_underlying)
         );
         (, , , uint256 borrowIndex) = accrueInterest(_underlying, cToken);
+        return _debtOf(cToken, _account, borrowIndex);
+    }
+
+    function _debtOf(
+        CTokenInterface _cToken,
+        address _account,
+        uint256 _borrowIndex
+    ) internal view returns (uint256) {
         return
-            (cToken.borrowBalanceStored(_account) * borrowIndex) /
-            cToken.borrowIndex();
+            (_cToken.borrowBalanceStored(_account) * _borrowIndex) /
+            _cToken.borrowIndex();
     }
 
     function totalColletralAndBorrow(
@@ -226,22 +246,31 @@ contract CompoundLogic is IProtocol {
 
         for (uint256 i = 0; i < userCTokens.length; ++i) {
             CTokenInterface cToken = userCTokens[i];
-            // Read the balances and exchange rate from the cToken
-            (
-                ,
-                uint256 cTokenBalance,
-                uint256 borrowBalance,
-                uint256 exchangeRate
-            ) = cToken.getAccountSnapshot(_account);
-
             uint256 oraclePrice = oracle.getUnderlyingPrice(cToken);
-            require(oraclePrice > 0, "Compound Logic: Price Not found");
+            require(oraclePrice > 0, "Compound Logic: Price Not Found");
 
-            uint256 underlyingAmount = (cTokenBalance * exchangeRate) /
-                Utils.QUINTILLION;
-            collateralValue += underlyingAmount * oraclePrice;
+            (
+                uint256 totalCash,
+                uint256 totalBorrows,
+                uint256 totalReserves,
+                uint256 borrowIndex
+            ) = accrueInterest(
+                    address(cToken) == LOGIC_STORAGE.cTokens(TransferHelper.ETH)
+                        ? TransferHelper.ETH
+                        : cToken.underlying(),
+                    cToken
+                );
 
-            borrowValue += borrowBalance * oraclePrice;
+            collateralValue +=
+                _supplyOf(
+                    cToken,
+                    _account,
+                    totalCash,
+                    totalBorrows,
+                    totalReserves
+                ) *
+                oraclePrice;
+            borrowValue += _debtOf(cToken, _account, borrowIndex) * oraclePrice;
         }
 
         address cQuote = LOGIC_STORAGE.cTokens(_quote);

@@ -52,7 +52,6 @@ library RepayLogic {
         (amount, newFee) = recordRepay(
             Types.RecordRepayParams(
                 _params.userParams,
-                _params.rewards,
                 _params.asset,
                 newInterest,
                 totalBorrowedAmount
@@ -130,13 +129,6 @@ library RepayLogic {
             _params.totalBorrows,
             _params.newInterest
         );
-
-        // _params.rewards.stopMiningBorrowReward(
-        //     _params.userParams.asset,
-        //     _params.userParams.to,
-        //     dTokenAmount,
-        //     dTokenTotalSupply
-        // );
 
         emit Repaid(
             _params.userParams.to,

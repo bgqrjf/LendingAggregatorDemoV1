@@ -5,7 +5,6 @@ import "./IConfig.sol";
 import "./IPriceOracle.sol";
 import "./IProtocolsHandler.sol";
 import "./IReservePool.sol";
-import "./IRewards.sol";
 import "./IStrategy.sol";
 import "./IMultiImplementationBeacon.sol";
 
@@ -147,8 +146,6 @@ interface IRouter is IMultiImplementationBeacon {
     ) external payable;
 
     function sync(address _asset) external;
-
-    function claimRewards(address _account) external;
 
     function userStatus(
         address,

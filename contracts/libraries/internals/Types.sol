@@ -18,7 +18,6 @@ library Types {
         bool actionNotPaused;
         IProtocolsHandler protocols;
         IReservePool reservePool;
-        IRewards rewards;
         IConfig config;
         Asset asset;
     }
@@ -46,7 +45,6 @@ library Types {
         bool actionNotPaused;
         IProtocolsHandler protocols;
         IReservePool reservePool;
-        IRewards rewards;
         IConfig config;
         IPriceOracle priceOracle;
     }
@@ -58,7 +56,6 @@ library Types {
         address redeemFrom;
         bool notLiquidate;
         bool collateralable;
-        IRewards rewards;
     }
 
     struct ExecuteRedeemParams {
@@ -75,7 +72,6 @@ library Types {
         bool actionNotPaused;
         IProtocolsHandler protocols;
         IReservePool reservePool;
-        IRewards rewards;
         IConfig config;
         IPriceOracle priceOracle;
     }
@@ -85,7 +81,6 @@ library Types {
         uint256 newInterest;
         uint256 totalBorrows;
         address borrowBy;
-        IRewards rewards;
     }
 
     struct RepayParams {
@@ -95,7 +90,6 @@ library Types {
         address feeCollector;
         IProtocolsHandler protocols;
         IReservePool reservePool;
-        IRewards rewards;
         IConfig config;
         IPriceOracle priceOracle;
         Asset asset;
@@ -103,7 +97,6 @@ library Types {
 
     struct RecordRepayParams {
         UserAssetParams userParams;
-        IRewards rewards;
         Asset asset;
         uint256 newInterest;
         uint256 totalBorrows;
@@ -115,7 +108,6 @@ library Types {
         address feeCollector;
         IProtocolsHandler protocols;
         IReservePool reservePool;
-        IRewards rewards;
         IConfig config;
         IPriceOracle priceOracle;
         bool actionNotPaused;
@@ -154,14 +146,5 @@ library Types {
         address asset;
         uint256 amount;
         address to;
-    }
-
-    struct ClaimRewardsParams {
-        bool actionNotPaused;
-        address account;
-        IProtocolsHandler protocols;
-        IConfig config;
-        IRewards rewards;
-        address[] underlyings;
     }
 }

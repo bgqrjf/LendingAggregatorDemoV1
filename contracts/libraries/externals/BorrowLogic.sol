@@ -49,8 +49,7 @@ library BorrowLogic {
                 _params.userParams,
                 newInterest,
                 totalBorrowedAmount,
-                msg.sender,
-                _params.rewards
+                msg.sender
             ),
             assets
         );
@@ -143,13 +142,6 @@ library BorrowLogic {
             _params.totalBorrows,
             _params.newInterest
         );
-
-        // _params.rewards.startMiningBorrowReward(
-        //     _params.userParams.asset,
-        //     _params.borrowBy,
-        //     dTokenAmount,
-        //     dTokenTotalSupply
-        // );
     }
 
     function executeBorrowInternal(

@@ -47,7 +47,6 @@ library LiquidateLogic {
                 _params.feeCollector,
                 _params.protocols,
                 _params.reservePool,
-                _params.rewards,
                 _params.config,
                 _params.priceOracle,
                 assets[_params.repayParams.asset]
@@ -108,8 +107,7 @@ library LiquidateLogic {
                 newInterest,
                 _params.repayParams.to,
                 false,
-                true,
-                _params.rewards
+                true
             ),
             assets
         );

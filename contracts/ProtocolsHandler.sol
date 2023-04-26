@@ -403,10 +403,6 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         }
     }
 
-    // function updateStrategy(IStrategy _newStrategy) external {
-    //     strategy = _newStrategy;
-    // }
-
     function claimRewards(
         address _account,
         uint256[] memory _amounts

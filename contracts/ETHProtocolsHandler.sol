@@ -288,15 +288,17 @@ contract ETHProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         address _asset,
         uint256 _amount,
         uint256[] memory supplies,
-        uint256,
+        uint256 _totalSupplied,
         address _to
-    ) internal returns (uint256) {
+    ) internal returns (uint256 amount) {
+        amount = Math.min(_amount, _totalSupplied);
+
         IProtocol[] memory protocolsCache = protocols;
-        (uint256[] memory redeemAmounts, ) = strategy.getRedeemStrategy(
+        (, uint256[] memory redeemAmounts) = strategy.getRedeemStrategy(
             protocolsCache,
             _asset,
             supplies,
-            _amount
+            amount
         );
 
         for (uint256 i = 0; i < protocolsCache.length; ++i) {
@@ -312,10 +314,10 @@ contract ETHProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
             }
         }
 
-        _asset.safeTransfer(_to, _amount, 0);
-        emit Redeemed(_asset, _amount);
+        _asset.safeTransfer(_to, amount, 0);
+        emit Redeemed(_asset, amount);
 
-        return _amount;
+        return amount;
     }
 
     function borrow(
@@ -350,6 +352,12 @@ contract ETHProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
     }
 
     function repay(address _asset, uint256 _amount) internal returns (uint256) {
+        (, uint256 total) = totalBorrowed(_asset);
+        uint amount = Math.min(_amount, total);
+        if (amount == 0) {
+            return amount;
+        }
+
         IProtocol[] memory protocolsCache = protocols;
         uint256[] memory amounts = strategy.getRepayStrategy(
             protocolsCache,

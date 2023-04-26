@@ -9,7 +9,6 @@ import "./libraries/externals/RedeemLogic.sol";
 import "./libraries/externals/BorrowLogic.sol";
 import "./libraries/externals/RepayLogic.sol";
 import "./libraries/externals/LiquidateLogic.sol";
-import "./libraries/externals/RewardLogic.sol";
 
 import "./libraries/internals/TransferHelper.sol";
 
@@ -62,7 +61,6 @@ contract Router is RouterStorage, OwnableUpgradeable {
                 actionNotPaused(_params.asset, Action.supply),
                 protocols,
                 reservePool,
-                rewards,
                 config,
                 assets[_params.asset]
             ),
@@ -83,7 +81,6 @@ contract Router is RouterStorage, OwnableUpgradeable {
                 actionNotPaused(_params.asset, Action.redeem),
                 protocols,
                 reservePool,
-                rewards,
                 config,
                 priceOracle
             ),
@@ -104,7 +101,6 @@ contract Router is RouterStorage, OwnableUpgradeable {
                 actionNotPaused(_params.asset, Action.borrow),
                 protocols,
                 reservePool,
-                rewards,
                 config,
                 priceOracle
             ),
@@ -126,7 +122,6 @@ contract Router is RouterStorage, OwnableUpgradeable {
                 feeCollector,
                 protocols,
                 reservePool,
-                rewards,
                 config,
                 priceOracle,
                 assets[_params.asset]
@@ -147,7 +142,6 @@ contract Router is RouterStorage, OwnableUpgradeable {
                 feeCollector,
                 protocols,
                 reservePool,
-                rewards,
                 config,
                 priceOracle,
                 actionNotPaused(_repayParams.asset, Action.liquidate)
@@ -155,20 +149,6 @@ contract Router is RouterStorage, OwnableUpgradeable {
             underlyings,
             assets,
             totalLendings
-        );
-    }
-
-    function claimRewards(address _account) external override {
-        RewardLogic.claimRewards(
-            Types.ClaimRewardsParams(
-                actionNotPaused(address(0), Action.claimRewards),
-                _account,
-                protocols,
-                config,
-                rewards,
-                underlyings
-            ),
-            assets
         );
     }
 
@@ -208,8 +188,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
                     _newInterest,
                     _redeemFrom,
                     true,
-                    _collateralable,
-                    rewards
+                    _collateralable
                 ),
                 assets
             );
@@ -226,8 +205,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
                 _params,
                 _newInterest,
                 _totalBorrows,
-                _borrowBy,
-                rewards
+                _borrowBy
             ),
             assets
         );
@@ -550,6 +528,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
                         abi.encodeWithSelector(
                             ISToken.initialize.selector,
                             _newAsset.underlying,
+                            address(rewards),
                             _newAsset.sTokenName,
                             _newAsset.sTokenSymbol
                         )
@@ -563,6 +542,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
                         abi.encodeWithSelector(
                             IDToken.initialize.selector,
                             _newAsset.underlying,
+                            address(rewards),
                             _newAsset.dTokenName,
                             _newAsset.dTokenSymbol,
                             _newAsset.feeRate
@@ -580,6 +560,9 @@ contract Router is RouterStorage, OwnableUpgradeable {
             _newAsset.maxReserve,
             _newAsset.executeSupplyThreshold
         );
+
+        rewards.addRewardAdmin(address(asset.sToken));
+        rewards.addRewardAdmin(address(asset.dToken));
 
         emit AssetAdded(_newAsset.underlying, asset);
     }

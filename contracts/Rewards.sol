@@ -1,223 +1,142 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.14;
+// SP// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
-
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "./interfaces/IRewards.sol";
-import "./libraries/internals/TransferHelper.sol";
+import "./RewardsDistribution.sol";
 
-contract Rewards is IRewards, Ownable {
+contract Rewards is
+    IRewards,
+    RewardsDistribution,
+    AccessControlUpgradeable,
+    OwnableUpgradeable
+{
+    using TransferHelper for address;
+
     IProtocol[] public protocols;
     address public protocolsHandler;
+    mapping(address => mapping(uint8 => uint256)) public reserves;
 
-    // mapping user => asset => isSupply => userData
-    mapping(address => mapping(address => mapping(bool => UserData)))
-        public userData;
+    bytes32 public constant REWARD_ADMIN =
+        keccak256(abi.encode("reward admin"));
+    bytes32 public constant OWNER = keccak256(abi.encode("owner"));
 
-    // mapping asset => protocols => isSupply => amount
-    mapping(address => mapping(IProtocol => mapping(bool => uint256)))
-        public totalClaimed;
-    mapping(address => mapping(IProtocol => mapping(bool => uint256)))
-        public totalRewardslast;
-
-    constructor(address _protocolsHandler) Ownable() {
-        protocolsHandler = _protocolsHandler;
+    enum RewardType {
+        CompoundSupply,
+        CompoundBorrow
     }
 
-    function startMiningSupplyReward(
-        address _asset,
-        address _account,
-        uint256 _share,
-        uint256 _totalShare
-    ) external override onlyOwner {
-        IProtocol[] memory protocolsCache = protocols;
-        UserData memory data = userData[_account][_asset][true];
-        while (data.rewards.length <= protocolsCache.length) {
-            userData[_account][_asset][true].rewards.push();
-            data = userData[_account][_asset][true];
-        }
+    function initialize() external initializer {
+        __Ownable_init();
+        __AccessControl_init();
+    }
 
-        for (uint256 i = 0; i < protocolsCache.length; ++i) {
-            uint256 currentRewardPerShare = getRewardPerShare(
+    function updateRewardShare(
+        address _asset,
+        bool _isBorrow,
+        address _account,
+        uint256 _userBalanceBefore,
+        uint256 _userBalanceAfter,
+        uint256 _totalAmountBefore
+    ) external override onlyRole(REWARD_ADMIN) {
+        _userBalanceAfter > _userBalanceBefore
+            ? _newStake(
                 _asset,
-                protocolsCache[i],
-                _totalShare,
-                true
-            );
-
-            userData[_account][_asset][true].rewards[i].claimed =
-                data.rewards[i].claimed +
-                currentRewardPerShare *
-                _share;
-        }
-
-        userData[_account][_asset][true].shares = data.shares + _share;
-    }
-
-    function stopMiningSupplyReward(
-        address _asset,
-        address _account,
-        uint256 _share,
-        uint256 _totalShare
-    ) public override onlyOwner {
-        IProtocol[] memory protocolsCache = protocols;
-        UserData memory data = userData[_account][_asset][true];
-        while (data.rewards.length < protocolsCache.length) {
-            userData[_account][_asset][true].rewards.push();
-            data = userData[_account][_asset][true];
-        }
-
-        for (uint256 i = 0; i < protocolsCache.length; ++i) {
-            uint256 currentRewardPerShare = getRewardPerShare(
+                _isBorrow
+                    ? uint8(RewardType.CompoundBorrow)
+                    : uint8(RewardType.CompoundSupply),
+                _account,
+                _userBalanceAfter,
+                _userBalanceAfter - _userBalanceBefore,
+                _totalAmountBefore,
+                protocolsHandler
+            )
+            : _newUnstake(
                 _asset,
-                protocolsCache[i],
-                _totalShare,
-                true
-            );
-
-            userData[_account][_asset][true].rewards[i].lastReward = data
-                .rewards[i]
-                .lastReward +
-                _totalShare >
-                0
-                ? ((currentRewardPerShare -
-                    data.rewards[i].lastRewardPerShare) * data.shares) /
-                    _totalShare
-                : 0;
-
-            userData[_account][_asset][true]
-                .rewards[i]
-                .lastRewardPerShare = currentRewardPerShare;
-        }
-
-        userData[_account][_asset][true].shares = data.shares - _share;
-    }
-
-    function startMiningBorrowReward(
-        address _asset,
-        address _account,
-        uint256 _share,
-        uint256 _totalShare
-    ) external override onlyOwner {
-        IProtocol[] memory protocolsCache = protocols;
-        UserData memory data = userData[_account][_asset][false];
-        while (data.rewards.length < protocolsCache.length) {
-            userData[_account][_asset][false].rewards.push();
-            data = userData[_account][_asset][false];
-        }
-
-        for (uint256 i = 0; i < protocolsCache.length; ++i) {
-            uint256 currentRewardPerShare = getRewardPerShare(
-                _asset,
-                protocolsCache[i],
-                _totalShare,
-                false
-            );
-
-            userData[_account][_asset][false].rewards[i].claimed =
-                data.rewards[i].claimed +
-                currentRewardPerShare *
-                _share;
-        }
-
-        userData[_account][_asset][false].shares += data.shares + _share;
-    }
-
-    function stopMiningBorrowReward(
-        address _asset,
-        address _account,
-        uint256 _share,
-        uint256 _totalShare
-    ) public override onlyOwner {
-        IProtocol[] memory protocolsCache = protocols;
-        UserData memory data = userData[_account][_asset][false];
-        while (data.rewards.length < protocolsCache.length) {
-            userData[_account][_asset][false].rewards.push();
-            data = userData[_account][_asset][false];
-        }
-
-        for (uint256 i = 0; i < protocolsCache.length; ++i) {
-            uint256 currentRewardPerShare = getRewardPerShare(
-                _asset,
-                protocolsCache[i],
-                _totalShare,
-                false
-            );
-
-            userData[_account][_asset][false].rewards[i].lastReward = data
-                .rewards[i]
-                .lastReward +
-                _totalShare >
-                0
-                ? ((currentRewardPerShare -
-                    data.rewards[i].lastRewardPerShare) * data.shares) /
-                    _totalShare
-                : 0;
-            userData[_account][_asset][false]
-                .rewards[i]
-                .lastRewardPerShare = currentRewardPerShare;
-        }
-
-        userData[_account][_asset][false].shares = data.shares - _share;
-    }
-
-    function claim(
-        address _asset,
-        address _account,
-        uint256 _totalShare
-    ) external override onlyOwner returns (uint256[] memory rewardsToCollect) {
-        stopMiningSupplyReward(_asset, _account, 0, _totalShare);
-        stopMiningBorrowReward(_asset, _account, 0, _totalShare);
-
-        UserData memory supplyData = userData[_account][_asset][false];
-        UserData memory borrowData = userData[_account][_asset][true];
-
-        rewardsToCollect = new uint256[](supplyData.rewards.length);
-        for (uint256 i = 0; i < supplyData.rewards.length; ++i) {
-            supplyData.rewards[i].claimed += supplyData.rewards[i].lastReward;
-            borrowData.rewards[i].claimed += borrowData.rewards[i].lastReward;
-
-            rewardsToCollect[i] +=
-                supplyData.rewards[i].lastReward +
-                borrowData.rewards[i].lastReward;
-
-            supplyData.rewards[i].lastReward = 0;
-            borrowData.rewards[i].lastReward = 0;
-
-            uint256 protocolRewardBalance = TransferHelper.balanceOf(
-                protocols[i].rewardToken(),
+                _account,
+                _isBorrow
+                    ? uint8(RewardType.CompoundBorrow)
+                    : uint8(RewardType.CompoundSupply),
+                _userBalanceBefore - _userBalanceAfter,
+                _totalAmountBefore,
                 protocolsHandler
             );
-
-            if (rewardsToCollect[i] > protocolRewardBalance) {
-                protocols[i].claimRewards(protocolsHandler);
-            }
-        }
     }
 
-    function addProtocol(IProtocol _protocol) external onlyOwner {
+    function getUserRewards(
+        address _asset,
+        bool _isSupply,
+        address _account,
+        uint256 _amount,
+        uint256 _totalAmount
+    ) external view override returns (uint256) {
+        uint8 rewardType = uint8(
+            _isSupply ? RewardType.CompoundSupply : RewardType.CompoundBorrow
+        );
+
+        uint256 currentIndex = _getCurrentIndex(
+            _asset,
+            rewardType,
+            _totalAmount,
+            _getNewRewards(_asset, rewardType, protocolsHandler)
+        );
+
+        return
+            _getUserRewards(
+                _asset,
+                rewardType,
+                _account,
+                _amount,
+                currentIndex
+            );
+    }
+
+    function addRewardAdmin(address _newAdmin) external override onlyOwner {
+        _grantRole(REWARD_ADMIN, _newAdmin);
+    }
+
+    function addProtocol(IProtocol _protocol) external override onlyOwner {
         protocols.push(_protocol);
     }
 
-    function getRewardPerShare(
-        address _asset,
-        IProtocol _protocol,
-        uint256 _totalShare,
-        bool _isSupply
-    ) internal view returns (uint256 rewardPerShare) {
-        uint256 totalRewards = IProtocol(_protocol).totalRewards(
-            _asset,
-            protocolsHandler,
-            _isSupply
-        );
-
-        rewardPerShare = _totalShare > 0
-            ? (totalRewards - totalRewardslast[_asset][_protocol][_isSupply]) /
-                _totalShare
-            : 0;
+    function _rewardTokens(
+        address,
+        uint8
+    ) internal view override returns (address) {
+        return protocols[1].rewardToken();
     }
 
-    function setProtocolsHandler(address _protocolsHandler) external onlyOwner {
-        protocolsHandler = _protocolsHandler;
+    function _getNewRewards(
+        address _asset,
+        uint8 _type,
+        address _account
+    ) internal view override returns (uint256 amount) {
+        amount =
+            _getTotalRewards(_asset, _type, _account) -
+            reserves[_asset][_type];
+    }
+
+    function _collectRewards(
+        address _asset,
+        uint256 _newAmount
+    ) internal override returns (uint256) {
+        if (_asset.balanceOf(protocolsHandler) < _newAmount) {
+            protocols[1].claimRewards(protocolsHandler);
+        }
+        return _newAmount;
+    }
+
+    function _getTotalRewards(
+        address _asset,
+        uint8 _type,
+        address _account
+    ) internal view override returns (uint256) {
+        return
+            protocols[1].totalRewards(
+                _asset,
+                _account,
+                _type == uint8(RewardType.CompoundSupply)
+            );
     }
 }

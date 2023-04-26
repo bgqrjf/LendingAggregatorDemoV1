@@ -36,17 +36,17 @@ contract CompoundLogicStorage is Ownable {
         rewardToken = _compTokenAddress;
     }
 
-    function setLastSimulatedSupply(address _asset, SimulateData memory data)
-        external
-        onlyOwner
-    {
+    function setLastSimulatedSupply(
+        address _asset,
+        SimulateData memory data
+    ) external onlyOwner {
         lastSimulatedSupply[_asset] = data;
     }
 
-    function setLastSimulatedBorrow(address _asset, SimulateData memory data)
-        external
-        onlyOwner
-    {
+    function setLastSimulatedBorrow(
+        address _asset,
+        SimulateData memory data
+    ) external onlyOwner {
         lastSimulatedBorrow[_asset] = data;
     }
 
@@ -56,19 +56,15 @@ contract CompoundLogicStorage is Ownable {
         cTokens[CTokenInterface(_cToken).underlying()] = _cToken;
     }
 
-    function getLastSimulatedSupply(address _asset)
-        public
-        view
-        returns (SimulateData memory data)
-    {
+    function getLastSimulatedSupply(
+        address _asset
+    ) public view returns (SimulateData memory data) {
         return lastSimulatedSupply[_asset];
     }
 
-    function getLastSimulatedBorrow(address _asset)
-        public
-        view
-        returns (SimulateData memory data)
-    {
+    function getLastSimulatedBorrow(
+        address _asset
+    ) public view returns (SimulateData memory data) {
         return lastSimulatedBorrow[_asset];
     }
 }

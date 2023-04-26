@@ -9,6 +9,7 @@ interface IDToken {
 
     function initialize(
         address _underlying,
+        address _rewards,
         string memory _name,
         string memory _symbol,
         uint256 feeRate

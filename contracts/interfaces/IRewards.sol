@@ -5,50 +5,24 @@ import "./IProtocol.sol";
 import "./IRouter.sol";
 
 interface IRewards {
-    struct UserReward {
-        uint256 lastReward;
-        uint256 lastRewardPerShare;
-        uint256 claimed;
-    }
-
-    struct UserData {
-        uint256 shares;
-        UserReward[] rewards;
-    }
-
-    function startMiningSupplyReward(
-        address asset,
-        address account,
-        uint256 amount,
-        uint256 _totalShare
-    ) external;
-
-    function stopMiningSupplyReward(
-        address asset,
-        address account,
-        uint256 amount,
-        uint256 _totalShare
-    ) external;
-
-    function startMiningBorrowReward(
-        address asset,
-        address account,
-        uint256 amount,
-        uint256 _totalShare
-    ) external;
-
-    function stopMiningBorrowReward(
-        address asset,
-        address account,
-        uint256 amount,
-        uint256 _totalShare
-    ) external;
-
-    function claim(
+    function updateRewardShare(
         address _asset,
+        bool _isBorrow,
         address _account,
-        uint256 _totalShare
-    ) external returns (uint256[] memory rewardsToCollect);
+        uint256 _userBalanceBefore,
+        uint256 _userBalanceAfter,
+        uint256 _totalAmountBefore
+    ) external;
+
+    function getUserRewards(
+        address _asset,
+        bool _isSupply,
+        address _account,
+        uint256 _amount,
+        uint256 _totalAmount
+    ) external view returns (uint256);
+
+    function addRewardAdmin(address _newAdmin) external;
 
     function addProtocol(IProtocol _protocol) external;
 }

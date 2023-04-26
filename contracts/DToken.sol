@@ -3,6 +3,7 @@ pragma solidity ^0.8.14;
 
 import "./storages/DTokenStorage.sol";
 import "./interfaces/IRouter.sol";
+import "./interfaces/IRewards.sol";
 
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -12,12 +13,14 @@ import "./libraries/internals/Utils.sol";
 // DebtToken
 contract DToken is DTokenSotrage, OwnableUpgradeable {
     using Math for uint256;
+    IRewards public rewards;
 
     function initialize(
         address _underlying,
+        address _rewards,
         string memory _name,
         string memory _symbol,
-        uint _feeRate
+        uint256 _feeRate
     ) external initializer {
         __Ownable_init();
 
@@ -25,6 +28,7 @@ contract DToken is DTokenSotrage, OwnableUpgradeable {
         name = _name;
         symbol = _symbol;
         feeRate = _feeRate;
+        rewards = IRewards(_rewards);
     }
 
     function mint(
@@ -119,16 +123,27 @@ contract DToken is DTokenSotrage, OwnableUpgradeable {
         require(_account != address(0), "ERC20: mint to the zero address");
 
         _updateNewFee(_newInterest);
-        uint256 userFeeIndex = (feeIndexOf[_account] *
-            balanceOf[_account] +
-            feeIndex *
-            _amount) / (balanceOf[_account] + _amount);
 
+        uint256 balance = balanceOf[_account];
+        uint256 newBalance = balance + _amount;
+
+        uint256 userFeeIndex = (feeIndexOf[_account] *
+            balance +
+            feeIndex *
+            _amount) / (balance + _amount);
         feeIndexOf[_account] = userFeeIndex;
         emit UserFeeIndexUpdated(_account, userFeeIndex);
 
+        rewards.updateRewardShare(
+            underlying,
+            true,
+            _account,
+            balance,
+            newBalance,
+            totalSupply
+        );
+        balanceOf[_account] = newBalance;
         totalSupply += _amount;
-        balanceOf[_account] += _amount;
 
         emit Transfer(address(0), _account, _amount);
     }
@@ -141,7 +156,18 @@ contract DToken is DTokenSotrage, OwnableUpgradeable {
         require(_account != address(0), "ERC20: burn from the zero address");
         _updateNewFee(_newInterest);
 
-        balanceOf[_account] -= _amount;
+        uint256 balance = balanceOf[_account];
+        uint256 newBalance = balance - _amount;
+        rewards.updateRewardShare(
+            underlying,
+            true,
+            _account,
+            balance,
+            newBalance,
+            totalSupply
+        );
+
+        balanceOf[_account] = newBalance;
         totalSupply -= _amount;
         emit Transfer(_account, address(0), _amount);
 

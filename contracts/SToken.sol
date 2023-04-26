@@ -3,6 +3,7 @@ pragma solidity ^0.8.14;
 
 import "./interfaces/ISToken.sol";
 import "./interfaces/IRouter.sol";
+import "./interfaces/IRewards.sol";
 
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -13,9 +14,11 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 contract SToken is ISToken, OwnableUpgradeable, ERC20Upgradeable {
     using Math for uint256;
     address public override underlying;
+    IRewards public rewards;
 
     function initialize(
         address _underlying,
+        address _rewards,
         string memory _name,
         string memory _symbol
     ) external initializer {
@@ -23,6 +26,7 @@ contract SToken is ISToken, OwnableUpgradeable, ERC20Upgradeable {
         __ERC20_init(_name, _symbol);
 
         underlying = _underlying;
+        rewards = IRewards(_rewards);
     }
 
     function mint(
@@ -89,13 +93,39 @@ contract SToken is ISToken, OwnableUpgradeable, ERC20Upgradeable {
         return IRouter(owner()).totalSupplied(underlying);
     }
 
-    function _afterTokenTransfer(
+    function _beforeTokenTransfer(
         address _from,
         address _to,
         uint256 _amount
+    ) internal override {
+        if (_from != address(0)) {
+            rewards.updateRewardShare(
+                underlying,
+                false,
+                _from,
+                balanceOf(_from),
+                balanceOf(_from) - _amount,
+                totalSupply()
+            );
+        }
+
+        if (_to != address(0)) {
+            rewards.updateRewardShare(
+                underlying,
+                false,
+                _from,
+                balanceOf(_to),
+                balanceOf(_to) + _amount,
+                totalSupply()
+            );
+        }
+    }
+
+    function _afterTokenTransfer(
+        address _from,
+        address,
+        uint256
     ) internal view override {
-        _amount;
-        _to;
         if (msg.sender != owner()) {
             _validatePosition(_from);
         }
