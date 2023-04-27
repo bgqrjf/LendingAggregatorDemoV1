@@ -109,7 +109,7 @@ contract ReservePool is IReservePool, OwnableUpgradeable {
         uint256 newInterest;
         Types.ExecuteRedeemParams memory executeParams;
         (
-            executeParams.supplies,
+            ,
             executeParams.protocolsSupplies,
             executeParams.totalLending,
             totalSuppliedAmountWithFee,
@@ -290,7 +290,7 @@ contract ReservePool is IReservePool, OwnableUpgradeable {
         IRouter router = IRouter(owner());
         // record
         (
-            uint256[] memory supplies,
+            ,
             uint256 protocolsSupplies,
             uint256 totalLending,
             uint256 totalSuppliedAmountWithFee,
@@ -334,7 +334,6 @@ contract ReservePool is IReservePool, OwnableUpgradeable {
                 _asset,
                 totalAmountToSupply,
                 totalLending,
-                supplies,
                 protocolsSupplies
             )
         );

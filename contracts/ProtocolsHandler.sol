@@ -71,7 +71,6 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
     function repayAndSupply(
         address _asset,
         uint256 _amount,
-        uint256[] memory supplies,
         uint256 _totalSupplied
     )
         external
@@ -83,7 +82,7 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
 
         if (repayAmount < _amount) {
             supplyAmount = _amount - repayAmount;
-            supply(_asset, supplyAmount, supplies, _totalSupplied);
+            supply(_asset, supplyAmount, _totalSupplied);
         }
 
         if (autoRebalance) {
@@ -94,7 +93,6 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
     function redeemAndBorrow(
         address _asset,
         uint256 _amount,
-        uint256[] memory supplies,
         uint256 _totalSupplied,
         address _to
     )
@@ -103,7 +101,7 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         onlyOwner
         returns (uint256 redeemAmount, uint256 borrowAmount)
     {
-        redeemAmount = redeem(_asset, _amount, supplies, _totalSupplied, _to);
+        redeemAmount = redeem(_asset, _amount, _totalSupplied, _to);
 
         if (redeemAmount < _amount) {
             borrowAmount = _amount - redeemAmount;
@@ -270,7 +268,8 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
             _totalLending
         );
 
-        for (uint256 i = 0; i < protocolsCache.length; ++i) {
+        uint256 length = protocolsCache.length;
+        for (uint256 i = 0; i < length; ++i) {
             Utils.delegateCall(
                 address(protocolsCache[i]),
                 abi.encodeWithSelector(
@@ -291,17 +290,11 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         }
     }
 
-    function supply(
-        address _asset,
-        uint256 _amount,
-        uint256[] memory supplies,
-        uint256
-    ) internal {
+    function supply(address _asset, uint256 _amount, uint256) internal {
         IProtocol[] memory protocolsCache = protocols;
-        (uint256[] memory supplyAmounts, ) = strategy.getSupplyStrategy(
+        uint256[] memory supplyAmounts = strategy.getSupplyStrategy(
             protocolsCache,
             _asset,
-            supplies,
             _amount
         );
 
@@ -323,17 +316,15 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
     function redeem(
         address _asset,
         uint256 _amount,
-        uint256[] memory supplies,
         uint256 _totalSupplied,
         address _to
     ) internal returns (uint256 amount) {
         amount = Math.min(_amount, _totalSupplied);
 
         IProtocol[] memory protocolsCache = protocols;
-        (, uint256[] memory redeemAmounts) = strategy.getRedeemStrategy(
+        uint256[] memory redeemAmounts = strategy.getRedeemStrategy(
             protocolsCache,
             _asset,
-            supplies,
             amount
         );
 

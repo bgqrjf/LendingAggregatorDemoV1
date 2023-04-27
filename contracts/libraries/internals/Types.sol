@@ -34,7 +34,6 @@ library Types {
         address asset;
         uint256 amount;
         uint256 totalLending;
-        uint256[] supplies;
         uint256 protocolsSupplies;
     }
 
@@ -61,7 +60,6 @@ library Types {
     struct ExecuteRedeemParams {
         UserAssetParams userParams;
         IProtocolsHandler protocols;
-        uint256[] supplies;
         uint256 protocolsSupplies;
         uint256 totalLending;
     }

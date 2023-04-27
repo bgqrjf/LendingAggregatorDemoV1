@@ -66,7 +66,7 @@ library LiquidateLogic {
 
         // redeem
         (
-            uint256[] memory supplies,
+            ,
             uint256 protocolsSupplies,
             uint256 totalLending,
             uint256 totalsupplies,
@@ -116,7 +116,6 @@ library LiquidateLogic {
             Types.ExecuteRedeemParams(
                 _params.redeemParams,
                 _params.protocols,
-                supplies,
                 protocolsSupplies,
                 totalLending
             ),

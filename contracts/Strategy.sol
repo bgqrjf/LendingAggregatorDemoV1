@@ -13,16 +13,9 @@ contract Strategy is IStrategy, Ownable {
     function getSupplyStrategy(
         IProtocol[] memory _protocols,
         address _asset,
-        uint256[] memory,
         uint256 _amount
-    )
-        external
-        view
-        override
-        returns (uint256[] memory supplyAmounts, uint256[] memory redeemAmounts)
-    {
+    ) external view override returns (uint256[] memory supplyAmounts) {
         supplyAmounts = new uint256[](_protocols.length);
-        redeemAmounts = new uint256[](_protocols.length);
 
         // if shortage on supply
         for (uint256 i = 0; i < _protocols.length; ++i) {
@@ -76,15 +69,8 @@ contract Strategy is IStrategy, Ownable {
     function getRedeemStrategy(
         IProtocol[] memory _protocols,
         address _asset,
-        uint256[] memory,
         uint256 _amount
-    )
-        external
-        view
-        override
-        returns (uint256[] memory supplyAmounts, uint256[] memory redeemAmounts)
-    {
-        supplyAmounts = new uint256[](_protocols.length);
+    ) external view override returns (uint256[] memory redeemAmounts) {
         redeemAmounts = new uint256[](_protocols.length);
 
         // if shortage on supply

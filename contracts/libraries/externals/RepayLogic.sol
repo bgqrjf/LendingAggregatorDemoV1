@@ -168,13 +168,11 @@ library RepayLogic {
             0
         );
 
-        (uint256[] memory supplies, uint256 protocolsSupplies) = protocols
-            .totalSupplied(_asset);
+        (, uint256 protocolsSupplies) = protocols.totalSupplied(_asset);
 
         (, uint256 supplied) = protocols.repayAndSupply(
             _asset,
             _amount,
-            supplies,
             protocolsSupplies
         );
 

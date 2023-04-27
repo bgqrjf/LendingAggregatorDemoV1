@@ -47,7 +47,7 @@ library SupplyLogic {
             );
 
             (
-                uint256[] memory supplies,
+                ,
                 uint256 protocolsSupplies,
                 uint256 totalLending,
                 uint256 totalSuppliedAmountWithFee,
@@ -74,7 +74,6 @@ library SupplyLogic {
                     _params.userParams.asset,
                     _params.userParams.amount,
                     totalLending,
-                    supplies,
                     protocolsSupplies
                 ),
                 _params.protocols,
@@ -138,7 +137,6 @@ library SupplyLogic {
         (uint256 repayed, ) = _protocols.repayAndSupply(
             _params.asset,
             _params.amount,
-            _params.supplies,
             _params.protocolsSupplies
         );
 

@@ -7,28 +7,14 @@ interface IStrategy {
     function getSupplyStrategy(
         IProtocol[] memory _protocols,
         address _asset,
-        uint256[] memory _currentSupplies,
         uint256 _amount
-    )
-        external
-        view
-        returns (
-            uint256[] memory supplyAmounts,
-            uint256[] memory redeemAmounts
-        );
+    ) external view returns (uint256[] memory supplyAmounts);
 
     function getRedeemStrategy(
         IProtocol[] memory _protocols,
         address _asset,
-        uint256[] memory _currentSupplies,
         uint256 _amount
-    )
-        external
-        view
-        returns (
-            uint256[] memory supplyAmounts,
-            uint256[] memory redeemAmounts
-        );
+    ) external view returns (uint256[] memory redeemAmounts);
 
     function getBorrowStrategy(
         IProtocol[] memory _protocols,

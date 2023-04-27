@@ -20,7 +20,6 @@ contract Rewards is
 
     bytes32 public constant REWARD_ADMIN =
         keccak256(abi.encode("reward admin"));
-    bytes32 public constant OWNER = keccak256(abi.encode("owner"));
 
     enum RewardType {
         CompoundSupply,

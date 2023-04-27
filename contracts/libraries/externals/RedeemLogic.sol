@@ -36,7 +36,7 @@ library RedeemLogic {
             );
         } else {
             (
-                uint256[] memory supplies,
+                ,
                 uint256 protocolsSupplies,
                 uint256 totalLending,
                 uint256 totalsupplies,
@@ -64,7 +64,6 @@ library RedeemLogic {
                 Types.ExecuteRedeemParams(
                     _params.userParams,
                     _params.protocols,
-                    supplies,
                     protocolsSupplies,
                     totalLending
                 ),
@@ -143,7 +142,6 @@ library RedeemLogic {
         (, uint256 borrowed) = protocolsCache.redeemAndBorrow(
             _params.userParams.asset,
             _params.userParams.amount,
-            _params.supplies,
             _params.protocolsSupplies,
             _params.userParams.to
         );

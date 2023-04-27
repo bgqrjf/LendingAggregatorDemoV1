@@ -150,13 +150,11 @@ library BorrowLogic {
         uint256 _totalLending,
         mapping(address => uint256) storage totalLendings
     ) internal {
-        (uint256[] memory supplies, uint256 protocolsSupplies) = _protocols
-            .totalSupplied(_params.asset);
+        (, uint256 protocolsSupplies) = _protocols.totalSupplied(_params.asset);
 
         (uint256 redeemed, ) = _protocols.redeemAndBorrow(
             _params.asset,
             _params.amount,
-            supplies,
             protocolsSupplies,
             _params.to
         );

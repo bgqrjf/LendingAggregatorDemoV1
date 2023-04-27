@@ -26,16 +26,12 @@ describe("ProtocolsHandler tests", function () {
 
     let Strategy = await ethers.getContractFactory("Strategy");
     let strategy = await Strategy.deploy();
-    await strategy.setMaxLTVs(
-      [token0.address, ETHAddress, usdt.address],
-      [700000, 700000, 700000]
-    );
+    await strategy.setMaxLTV(700000);
 
     const proxyAdmin = await transparentProxy.deployProxyAdmin();
     let protocolsHandler = await transparentProxy.deployProxy({
       implementationFactory: "ProtocolsHandler",
-      libraries: {},
-      initializeParams: [[], strategy.address],
+      initializeParams: [[], strategy.address, false],
       proxyAdmin: proxyAdmin,
     });
 
@@ -124,12 +120,7 @@ describe("ProtocolsHandler tests", function () {
     await aPool.supply(token0.address, supplyAmount, deployer.address, 0);
 
     await token0.mint(protocolsHandler.address, supplyAmount);
-    await protocolsHandler.repayAndSupply(
-      token0.address,
-      supplyAmount,
-      [0, 0],
-      0
-    );
+    await protocolsHandler.repayAndSupply(token0.address, supplyAmount, 0);
 
     let [amounts, totalAmount] = await protocolsHandler.totalSupplied(
       token0.address
@@ -156,20 +147,12 @@ describe("ProtocolsHandler tests", function () {
     await aPool.supply(token0.address, supplyAmount, deployer.address, 0);
 
     await token0.mint(protocolsHandler.address, supplyAmount);
-    await protocolsHandler.repayAndSupply(
-      token0.address,
-      supplyAmount,
-      [0, 0],
-      0
-    );
+    await protocolsHandler.repayAndSupply(token0.address, supplyAmount, 0);
 
-    let [amounts, totalAmount] = await protocolsHandler.totalSupplied(
-      token0.address
-    );
+    let [, totalAmount] = await protocolsHandler.totalSupplied(token0.address);
     await protocolsHandler.redeemAndBorrow(
       token0.address,
       supplyAmount,
-      amounts,
       totalAmount,
       deployer.address
     );
@@ -199,26 +182,16 @@ describe("ProtocolsHandler tests", function () {
     await aPool.borrow(token0.address, borrowAmount, 2, 0, deployer.address);
 
     await token0.mint(protocolsHandler.address, supplyAmount);
-    await protocolsHandler.repayAndSupply(
-      token0.address,
-      supplyAmount,
-      [0, 0],
-      0
-    );
-
-    // console.log(borrowAmount)
+    await protocolsHandler.repayAndSupply(token0.address, supplyAmount, 0);
 
     await protocolsHandler.redeemAndBorrow(
       token0.address,
       borrowAmount,
-      [0, 0],
       0,
       deployer.address
     );
 
     let [, totalAmount] = await protocolsHandler.totalBorrowed(token0.address);
-
-    // console.log(await protocolsHandler.totalBorrowed(token0.address));
 
     expect(totalAmount).to.equal(borrowAmount);
   });
@@ -244,17 +217,11 @@ describe("ProtocolsHandler tests", function () {
     await aPool.borrow(token0.address, borrowAmount, 2, 0, deployer.address);
 
     await token0.mint(protocolsHandler.address, supplyAmount.mul(2));
-    await protocolsHandler.repayAndSupply(
-      token0.address,
-      supplyAmount,
-      [0, 0],
-      0
-    );
+    await protocolsHandler.repayAndSupply(token0.address, supplyAmount, 0);
 
     await protocolsHandler.redeemAndBorrow(
       token0.address,
       borrowAmount,
-      [0, 0],
       0,
       deployer.address
     );
@@ -272,17 +239,10 @@ describe("ProtocolsHandler tests", function () {
     );
 
     let [, totalAmount] = await protocolsHandler.totalBorrowed(token0.address);
-
-    await protocolsHandler.repayAndSupply(
-      token0.address,
-      borrowAmount,
-      [0, 0],
-      0
-    );
-
+    await protocolsHandler.repayAndSupply(token0.address, borrowAmount, 0);
     [, totalAmount] = await protocolsHandler.totalBorrowed(token0.address);
 
-    expect(totalAmount).to.equal(237815306);
+    expect(totalAmount).to.equal("475646882");
   });
 
   it("should simulateLendings properly", async () => {
@@ -306,18 +266,11 @@ describe("ProtocolsHandler tests", function () {
     await aPool.borrow(token0.address, borrowAmount, 2, 0, deployer.address);
 
     await token0.mint(protocolsHandler.address, supplyAmount);
-    await protocolsHandler.repayAndSupply(
-      token0.address,
-      supplyAmount,
-      [0, 0],
-      0
-    );
+    await protocolsHandler.repayAndSupply(token0.address, supplyAmount, 0);
 
-    // let (amounts, totalAmount) = await totalSupplied(token0.address)
     await protocolsHandler.redeemAndBorrow(
       token0.address,
       borrowAmount,
-      [0, 0],
       0,
       deployer.address
     );
@@ -336,11 +289,42 @@ describe("ProtocolsHandler tests", function () {
     );
 
     expect(lendings.totalLending).to.equal(
-      ethers.BigNumber.from("500000415182060167")
+      ethers.BigNumber.from("500000243531205434")
     );
     expect(lendings.newInterest).to.equal(
-      ethers.BigNumber.from("415182060167")
+      ethers.BigNumber.from("243531205434")
     );
+  });
+
+  it("should rebalance all protocols", async () => {
+    const deploys = await loadFixture(ProtocolsHandlerTestFixture);
+
+    let protocolsHandler = deploys.protocolsHandler;
+    let deployer = deploys.deployer;
+    let token0 = deploys.token0;
+    let cToken0 = deploys.cToken0;
+    let aPool = deploys.aPool;
+    let aaveHandler = deploys.aaveHandler;
+    let compoundHandler = deploys.compoundHandler;
+
+    let borrowAmount = ethers.BigNumber.from("100000000000000000");
+    let supplyAmount = borrowAmount.mul(2);
+
+    await token0.mint(deployer.address, supplyAmount.mul(4));
+    await token0.approve(cToken0.address, supplyAmount.mul(2));
+    await token0.approve(aPool.address, supplyAmount.mul(2));
+    await cToken0.mint(supplyAmount);
+    await aPool.supply(token0.address, supplyAmount, deployer.address, 0);
+    await token0.mint(protocolsHandler.address, supplyAmount);
+
+    await protocolsHandler.rebalanceAllProtocols(token0.address);
+
+    aaveSupplyRate = await aaveHandler.getCurrentSupplyRate(token0.address);
+    compoundSupplyRate = await compoundHandler.getCurrentSupplyRate(
+      token0.address
+    );
+
+    expect(aaveSupplyRate).to.equal(compoundSupplyRate);
   });
 
   it("should addProtocol properly", async () => {
