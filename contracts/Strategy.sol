@@ -128,35 +128,68 @@ contract Strategy is IStrategy, Ownable {
         IProtocol[] memory _protocols,
         address _asset,
         uint256 _amount
-    ) external view override returns (uint256[] memory amounts) {
-        amounts = new uint256[](_protocols.length);
-
-        // if shortage on supply
-        for (uint256 i = 0; i < _protocols.length; ++i) {
+    ) external view override returns (uint256[] memory repayAmounts) {
+        uint256 length = _protocols.length;
+        uint256[] memory maxRepays = new uint256[](length);
+        uint256[] memory minRepays = new uint256[](length);
+        uint256[] memory rates = new uint256[](length);
+        for (uint256 i = 0; i < length; ++i) {
             (uint256 currentCollateral, uint256 currentBorrowed) = _protocols[i]
                 .totalColletralAndBorrow(msg.sender, _asset);
 
             if (currentBorrowed * Utils.MILLION > maxLTV * currentCollateral) {
-                amounts[i] = Math.min(
+                minRepays[i] = Math.min(
                     currentBorrowed - maxLTV * currentCollateral,
                     _amount
                 );
-                _amount -= amounts[i];
+                _amount -= minRepays[i];
             }
+
+            maxRepays[i] = currentBorrowed;
+            rates[i] = _protocols[i].getCurrentBorrowRate(_asset);
         }
 
+        repayAmounts = calculateRepayAmounts(_amount, maxRepays, rates);
+
+        for (uint256 i = 0; i < length; ++i) {
+            repayAmounts[i] += minRepays[i];
+        }
+    }
+
+    function calculateRepayAmounts(
+        uint256 _amount,
+        uint256[] memory _maxRepays,
+        uint256[] memory _rates
+    ) internal pure returns (uint256[] memory amounts) {
+        uint256 length = _rates.length;
+        amounts = new uint256[](length);
+
+        uint256 bestPoolID;
         if (_amount > 0) {
-            uint256 bestPoolID;
             uint256 maxRate;
-            for (uint256 i = 0; i < _protocols.length; ++i) {
-                uint256 rate = _protocols[i].getCurrentBorrowRate(_asset);
-                if (rate > maxRate) {
+            for (uint256 i = 0; i < length; ++i) {
+                if (_rates[i] > maxRate) {
                     bestPoolID = i;
-                    maxRate = rate;
+                    maxRate = _rates[i];
                 }
             }
 
-            amounts[bestPoolID] += _amount;
+            uint256 repayAmount = Math.min(_amount, _maxRepays[bestPoolID]);
+            amounts[bestPoolID] += repayAmount;
+            _amount -= repayAmount;
+        }
+
+        if (_amount > 0) {
+            _rates[bestPoolID] = 0;
+            uint256[] memory nextRoundAmounts = calculateRepayAmounts(
+                _amount,
+                _maxRepays,
+                _rates
+            );
+
+            for (uint256 i = 0; i < length; ++i) {
+                amounts[i] += nextRoundAmounts[i];
+            }
         }
     }
 
@@ -220,11 +253,12 @@ contract Strategy is IStrategy, Ownable {
         uint256 _amount,
         uint256[] memory _maxAmount,
         uint256[] memory _rates
-    ) internal view returns (uint256[] memory amounts) {
-        amounts = new uint256[](_rates.length);
+    ) internal pure returns (uint256[] memory amounts) {
+        uint256 length = _rates.length;
+        amounts = new uint256[](length);
         uint256 minRate = Utils.MAX_UINT;
         uint256 bestPoolID;
-        for (uint256 i = 0; i < _rates.length; i++) {
+        for (uint256 i = 0; i < length; i++) {
             if (_rates[i] < minRate) {
                 minRate = _rates[i];
                 bestPoolID = i;

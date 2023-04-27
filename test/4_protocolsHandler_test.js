@@ -31,7 +31,7 @@ describe("ProtocolsHandler tests", function () {
     const proxyAdmin = await transparentProxy.deployProxyAdmin();
     let protocolsHandler = await transparentProxy.deployProxy({
       implementationFactory: "ProtocolsHandler",
-      initializeParams: [[], strategy.address, false],
+      initializeParams: [[], strategy.address, true],
       proxyAdmin: proxyAdmin,
     });
 
@@ -238,11 +238,10 @@ describe("ProtocolsHandler tests", function () {
       protocolsHandler.address
     );
 
-    let [, totalAmount] = await protocolsHandler.totalBorrowed(token0.address);
     await protocolsHandler.repayAndSupply(token0.address, borrowAmount, 0);
-    [, totalAmount] = await protocolsHandler.totalBorrowed(token0.address);
+    let [, totalAmount] = await protocolsHandler.totalBorrowed(token0.address);
 
-    expect(totalAmount).to.equal("475646882");
+    expect(totalAmount).to.equal("29296987");
   });
 
   it("should simulateLendings properly", async () => {
@@ -289,10 +288,10 @@ describe("ProtocolsHandler tests", function () {
     );
 
     expect(lendings.totalLending).to.equal(
-      ethers.BigNumber.from("500000243531205434")
+      ethers.BigNumber.from("500000210418203983")
     );
     expect(lendings.newInterest).to.equal(
-      ethers.BigNumber.from("243531205434")
+      ethers.BigNumber.from("210418203983")
     );
   });
 
