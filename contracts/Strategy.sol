@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
 import "./libraries/internals/Utils.sol";
 
 contract Strategy is IStrategy, Ownable {
-    uint256 public maxLTV;
+    uint256 public maxLTV; // max loan to value
 
     function getSupplyStrategy(
         IProtocol[] memory _protocols,
@@ -73,7 +73,6 @@ contract Strategy is IStrategy, Ownable {
     ) external view override returns (uint256[] memory redeemAmounts) {
         redeemAmounts = new uint256[](_protocols.length);
 
-        // if shortage on supply
         uint256[] memory rates = new uint256[](_protocols.length);
         uint256[] memory maxRedeems = new uint256[](_protocols.length);
         for (uint256 i = 0; i < _protocols.length; ++i) {
@@ -255,7 +254,6 @@ contract Strategy is IStrategy, Ownable {
         uint256[] memory _rates
     ) internal pure returns (uint256[] memory amounts) {
         uint256 length = _rates.length;
-        amounts = new uint256[](length);
         uint256 minRate = Utils.MAX_UINT;
         uint256 bestPoolID;
         for (uint256 i = 0; i < length; i++) {
@@ -271,6 +269,7 @@ contract Strategy is IStrategy, Ownable {
             amounts = calculateAmountOut(amountLeft, _maxAmount, _rates);
             amounts[bestPoolID] = _maxAmount[bestPoolID];
         } else {
+            amounts = new uint256[](length);
             amounts[bestPoolID] = _amount;
         }
     }
@@ -283,9 +282,12 @@ contract Strategy is IStrategy, Ownable {
             .totalColletralAndBorrow(msg.sender, _quote);
 
         uint256 minCollateral = (currentBorrowed * Utils.MILLION) / maxLTV;
-        maxRedeem = currentCollateral > minCollateral
-            ? currentCollateral - minCollateral
-            : 0;
+        maxRedeem = Math.min(
+            currentCollateral > minCollateral
+                ? currentCollateral - minCollateral
+                : 0,
+            _protocol.supplyOf(_quote, msg.sender)
+        );
     }
 
     function setMaxLTV(uint256 _maxLTV) external onlyOwner {

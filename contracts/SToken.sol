@@ -113,7 +113,7 @@ contract SToken is ISToken, OwnableUpgradeable, ERC20Upgradeable {
             rewards.updateRewardShare(
                 underlying,
                 false,
-                _from,
+                _to,
                 balanceOf(_to),
                 balanceOf(_to) + _amount,
                 totalSupply()

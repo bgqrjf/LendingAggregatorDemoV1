@@ -47,7 +47,7 @@ contract RewardsDistribution {
         address _distributeFrom
     ) internal virtual {
         // update index value based on total amount and new rewards gained since last update
-        uint currentIndex = _updateCurrentIndex(
+        uint256 currentIndex = _updateCurrentIndex(
             _asset,
             _type,
             _totalAmount,

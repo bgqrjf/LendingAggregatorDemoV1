@@ -509,7 +509,7 @@ describe("Router tests", function () {
         balance = await sToken0.scaledBalanceOf(deployer.address);
 
         expect(sBalance).to.equal(supplyAmount);
-        expect(balance).to.equal("200000596832083294");
+        expect(balance).to.equal("200000596832090476");
       });
 
       it("should emit events when supply token0 via protocols supply", async () => {
@@ -617,7 +617,7 @@ describe("Router tests", function () {
         balance = await sToken0.scaledBalanceOf(deployer.address);
 
         expect(sBalance).to.equal(supplyAmount);
-        expect(balance).to.equal("200000602740149726");
+        expect(balance).to.equal("200000602740156908");
       });
 
       it("should emit events when supply token0 via protocols reapy", async () => {
@@ -781,7 +781,7 @@ describe("Router tests", function () {
         balance = await sETH.scaledBalanceOf(deployer.address);
 
         expect(sBalance).to.equal(supplyAmount);
-        expect(balance).to.equal("200000596831975804");
+        expect(balance).to.equal("200000596831982937");
       });
 
       it("should emit events when supply ETH via protocols supply", async () => {
@@ -892,7 +892,7 @@ describe("Router tests", function () {
         balance = await sETH.scaledBalanceOf(deployer.address);
 
         expect(sBalance).to.equal(supplyAmount);
-        expect(balance).to.equal("200000602740041649");
+        expect(balance).to.equal("200000602740048780");
       });
 
       it("should emit events when supply ETH via protocols reapy", async () => {
@@ -1090,7 +1090,7 @@ describe("Router tests", function () {
           protocolsHandler.address
         );
 
-        let expectRedeemedAmount = "200000597997770957";
+        let expectRedeemedAmount = "200000597997778153";
 
         expect(accFee).to.equal(0);
         expect(feeIndex).to.equal(0);
@@ -1127,7 +1127,7 @@ describe("Router tests", function () {
         let receipt = await tx.wait();
         m.log("redeem gas used:", receipt.gasUsed);
 
-        let expectRedeemedAmount = "200000597997770957";
+        let expectRedeemedAmount = "200000597997778153";
 
         await expect(tx)
           .to.emit(token0, "Transfer")
@@ -1184,6 +1184,7 @@ describe("Router tests", function () {
           false,
           true
         );
+
         let accFeeAfter = await dToken0.accFee();
         let feeIndexAfter = await dToken0.feeIndex();
         let userBalanceAfter = await token0.balanceOf(deployer.address);
@@ -1202,18 +1203,18 @@ describe("Router tests", function () {
           protocolsHandler.address
         );
 
-        let expectRedeemedAmount = "200000629481311601";
+        let expectRedeemedAmount = "200000629481318831";
 
-        expect(accFee).to.equal("6346622463");
-        expect(feeIndex).to.equal("15866556157");
         expect(sToken0BurntAmount).to.equal(supplyAmount);
         expect(userTokenRedeemed).to.equal(expectRedeemedAmount);
+        expect(accFee).to.equal("6346622536");
+        expect(feeIndex).to.equal("15866556340");
         expect(routerBalance).to.equal(0);
         expect(protocolsHandlerBalance).to.equal(0);
         expect(collateralStatusBefore).to.equal(11);
         expect(collateralStatusAfter).to.equal(9);
-        expect(totalLendingsBefore).to.equal("200000001165687704");
-        expect(totalLendingsAfter).to.equal("6346622463");
+        expect(totalLendingsBefore).to.equal("200000001165687718");
+        expect(totalLendingsAfter).to.equal("6346622536");
       });
 
       it("should emit events when redeem token0 via protocols borrow", async () => {
@@ -1241,7 +1242,7 @@ describe("Router tests", function () {
         let receipt = await tx.wait();
         m.log("redeem gas used:", receipt.gasUsed);
 
-        let expectRedeemedAmount = "200000629481311601";
+        let expectRedeemedAmount = "200000629481318831";
 
         await expect(tx)
           .to.emit(token0, "Transfer")
@@ -1252,7 +1253,7 @@ describe("Router tests", function () {
           );
         await expect(tx)
           .to.emit(dToken0, "AccFeeUpdated")
-          .withArgs("6346622463", "15866556157");
+          .withArgs("6346622536", "15866556340");
         await expect(tx)
           .to.emit(sToken0, "Transfer")
           .withArgs(
@@ -1265,7 +1266,7 @@ describe("Router tests", function () {
           .withArgs(deployer.address, token0.address, expectRedeemedAmount);
         await expect(tx)
           .to.emit(router, "TotalLendingsUpdated")
-          .withArgs(token0.address, "6346622463");
+          .withArgs(token0.address, "6346622536");
         await expect(tx)
           .to.emit(config, "UserDebtAndCollateralSet")
           .withArgs(deployer.address, 11, 9);
@@ -1381,7 +1382,7 @@ describe("Router tests", function () {
           protocolsHandler.address
         );
 
-        let expectRedeemedAmount = "200000597997663257";
+        let expectRedeemedAmount = "200000597997670403";
 
         expect(accFee).to.equal(0);
         expect(feeIndex).to.equal(0);
@@ -1417,7 +1418,7 @@ describe("Router tests", function () {
         let receipt = await tx.wait();
         m.log("redeem gas used:", receipt.gasUsed);
 
-        let expectRedeemedAmount = "200000597997663257";
+        let expectRedeemedAmount = "200000597997670403";
 
         await expect(tx).to.not.emit(dETH, "AccFeeUpdated");
         await expect(tx)
@@ -1488,16 +1489,16 @@ describe("Router tests", function () {
           protocolsHandler.address
         );
 
-        let expectRedeemedAmount = "200000629481203730";
+        let expectRedeemedAmount = "200000629481210908";
 
-        expect(accFee).to.equal("6346621376");
-        expect(feeIndex).to.equal("15866553440");
         expect(sETHBurntAmount).to.equal(supplyAmount);
         expect(userTokenRedeemed).to.equal(expectRedeemedAmount);
+        expect(accFee).to.equal("6346621448");
+        expect(feeIndex).to.equal("15866553620");
         expect(routerBalance).to.equal(0);
         expect(protocolsHandlerBalance).to.equal(0);
-        expect(totalLendingsBefore).to.equal("200000001165687494");
-        expect(totalLendingsAfter).to.equal("6346621376");
+        expect(totalLendingsBefore).to.equal("200000001165687508");
+        expect(totalLendingsAfter).to.equal("6346621448");
         expect(collateralStatusBefore).to.equal(56);
         expect(collateralStatusAfter).to.equal(24);
       });
@@ -1526,11 +1527,11 @@ describe("Router tests", function () {
         let receipt = await tx.wait();
         m.log("redeem gas used:", receipt.gasUsed);
 
-        let expectRedeemedAmount = "200000629481203730";
+        let expectRedeemedAmount = "200000629481210908";
 
         await expect(tx)
           .to.emit(dETH, "AccFeeUpdated")
-          .withArgs("6346621376", "15866553440");
+          .withArgs("6346621448", "15866553620");
         await expect(tx)
           .to.emit(sETH, "Transfer")
           .withArgs(
@@ -1543,7 +1544,7 @@ describe("Router tests", function () {
           .withArgs(deployer.address, ETHAddress, expectRedeemedAmount);
         await expect(tx)
           .emit(router, "TotalLendingsUpdated")
-          .withArgs(ETHAddress, "6346621376");
+          .withArgs(ETHAddress, "6346621448");
         await expect(tx)
           .to.emit(config, "UserDebtAndCollateralSet")
           .withArgs(deployer.address, 56, 24);
@@ -1731,7 +1732,7 @@ describe("Router tests", function () {
         balance = await dToken0.scaledDebtOf(deployer.address);
 
         expect(dBalance).to.equal(borrowAmount);
-        expect(balance).to.equal("100000614916486809");
+        expect(balance).to.equal("100000614916490393");
       });
 
       it("should emit events when borrow token0 via protocols borrow", async () => {
@@ -1850,7 +1851,7 @@ describe("Router tests", function () {
         balance = await dToken0.scaledDebtOf(deployer.address);
 
         expect(dBalance).to.equal(borrowAmount);
-        expect(balance).to.equal("100000301392744448");
+        expect(balance).to.equal("100000301392748031");
       });
 
       it("should emit events when borrow token0 via protocols redeem", async () => {
@@ -2036,7 +2037,7 @@ describe("Router tests", function () {
         balance = await dETH.scaledDebtOf(deployer.address);
 
         expect(dBalance).to.equal(borrowAmount);
-        expect(balance).to.equal("100000614916440217");
+        expect(balance).to.equal("100000614916443801");
       });
 
       it("should emit events when borrow ETH via protocols borrow", async () => {
@@ -2155,7 +2156,7 @@ describe("Router tests", function () {
         balance = await dETH.scaledDebtOf(deployer.address);
 
         expect(dBalance).to.equal(borrowAmount);
-        expect(balance).to.equal("100000301392690408");
+        expect(balance).to.equal("100000301392694017");
       });
 
       it("should emit events when borrow ETH via protocols redeem", async () => {
@@ -2361,7 +2362,7 @@ describe("Router tests", function () {
           protocolsHandler.address
         );
 
-        let expectRepayAmount = ethers.BigNumber.from("100000618519513099");
+        let expectRepayAmount = ethers.BigNumber.from("100000618519516704");
 
         expect(accFee).to.equal(0);
         expect(collectedFee).to.equal(0);
@@ -2397,7 +2398,7 @@ describe("Router tests", function () {
         let receipt = await tx.wait();
         m.log("repay gas used:", receipt.gasUsed);
 
-        let expectRepayAmount = ethers.BigNumber.from("100000618519513099");
+        let expectRepayAmount = ethers.BigNumber.from("100000618519516704");
         let collectedFeeExpected = 0;
 
         await expect(tx)
@@ -2476,16 +2477,17 @@ describe("Router tests", function () {
           protocolsHandler.address
         );
 
-        let expectRepayAmount = ethers.BigNumber.from("100000303158717560");
+        let expectRepayAmount = ethers.BigNumber.from("100000303158721164");
         let accFeeDeltaExpect = expectRepayAmount
           .sub(borrowAmount)
           .mul(await dToken0.feeRate())
           .div(ethers.BigNumber.from("1000000"));
 
-        expect(accFee).to.equal(accFeeDeltaExpect);
-        expect(collectedFee).to.equal(accFeeDeltaExpect);
         expect(dToken0BurntAmount).to.equal(borrowAmount);
         expect(userTokenRepaid).to.equal(expectRepayAmount);
+        expect(accFee).to.equal(accFeeDeltaExpect);
+        expect(collectedFee).to.equal(accFeeDeltaExpect);
+
         expect(routerBalance).to.equal(0);
         expect(protocolsHandlerBalance).to.equal(0);
         expect(userDebtStatusBefore).to.equal(3);
@@ -2517,7 +2519,7 @@ describe("Router tests", function () {
         let receipt = await tx.wait();
         m.log("repay gas used:", receipt.gasUsed);
 
-        let expectRepayAmount = ethers.BigNumber.from("100000303158717560");
+        let expectRepayAmount = ethers.BigNumber.from("100000303158721164");
         let collectedFeeExpected = expectRepayAmount
           .sub(borrowAmount)
           .mul(await dToken0.feeRate())
@@ -2530,6 +2532,7 @@ describe("Router tests", function () {
             protocolsHandler.address,
             expectRepayAmount.sub(collectedFeeExpected)
           );
+
         await expect(tx)
           .to.emit(token0, "Transfer")
           .withArgs(
@@ -2664,7 +2667,7 @@ describe("Router tests", function () {
           protocolsHandler.address
         );
 
-        let expectRepayAmount = ethers.BigNumber.from("100000616117448889");
+        let expectRepayAmount = ethers.BigNumber.from("100000616117452480");
 
         expect(accFee).to.equal(0);
         expect(collectedFee).to.equal(0);
@@ -2700,7 +2703,7 @@ describe("Router tests", function () {
         let receipt = await tx.wait();
         m.log("repay gas used:", receipt.gasUsed);
 
-        let expectRepayAmount = ethers.BigNumber.from("100000616117448889");
+        let expectRepayAmount = ethers.BigNumber.from("100000616117452480");
         let collectedFeeExpected = 0;
 
         await expect(tx).to.not.emit(dETH, "AccFeeUpdated");
@@ -2776,16 +2779,16 @@ describe("Router tests", function () {
           protocolsHandler.address
         );
 
-        let expectRepayAmount = ethers.BigNumber.from("100000301981348006");
+        let expectRepayAmount = ethers.BigNumber.from("100000301981351623");
         let accFeeDeltaExpect = expectRepayAmount
           .sub(borrowAmount)
           .mul(await dETH.feeRate())
           .div(ethers.BigNumber.from("1000000"));
 
-        expect(accFee).to.equal(accFeeDeltaExpect);
-        expect(collectedFee).to.equal(accFeeDeltaExpect);
         expect(dETHBurntAmount).to.equal(borrowAmount);
         expect(userTokenRepaid).to.equal(expectRepayAmount);
+        expect(accFee).to.equal(accFeeDeltaExpect);
+        expect(collectedFee).to.equal(accFeeDeltaExpect);
         expect(routerBalance).to.equal(0);
         expect(protocolsHandlerBalance).to.equal(0);
         expect(userDebtStatusBefore).to.equal(48);
@@ -2817,7 +2820,7 @@ describe("Router tests", function () {
         let receipt = await tx.wait();
         m.log("repay gas used:", receipt.gasUsed);
 
-        let expectRepayAmount = ethers.BigNumber.from("100000301981348006");
+        let expectRepayAmount = ethers.BigNumber.from("100000301981351623");
         let collectedFeeExpected = expectRepayAmount
           .sub(borrowAmount)
           .mul(await dETH.feeRate())
@@ -3070,8 +3073,8 @@ describe("Router tests", function () {
       let expectLiquidatorRepaidAmount = "62500018750000000";
 
       expect(liquidatorRepaid).to.equal(expectLiquidatorRepaidAmount);
-      expect(dTokenRepaid).to.equal("62500016498107975");
-      expect(debtsRemaining).to.equal("37499984853026289");
+      expect(dTokenRepaid).to.equal("62500016498107962");
+      expect(debtsRemaining).to.equal("37499984853026310");
       expect(sUsdtBurned).to.equal("10800000");
       expect(usdtReceived).to.equal("10800003");
     });

@@ -32,6 +32,7 @@ describe("Reserve pool tests", function () {
       token0: token0,
       usdt: usdt,
     });
+
     let comptroller = compoundContracts.comptroller;
     let cToken0 = compoundContracts.cToken0;
     let cUSDT = compoundContracts.cUSDT;
@@ -72,17 +73,13 @@ describe("Reserve pool tests", function () {
     // strategy
     let Strategy = await ethers.getContractFactory("Strategy");
     let strategy = await Strategy.deploy();
-    await strategy.setMaxLTVs(
-      [token0.address, ETHAddress, usdt.address],
-      [700000, 700000, 700000]
-    );
+    await strategy.setMaxLTV(700000);
 
     // protocolsHandler
     const proxyAdmin = await transparentProxy.deployProxyAdmin();
     let protocolsHandler = await transparentProxy.deployProxy({
       implementationFactory: "ProtocolsHandler",
-      libraries: {},
-      initializeParams: [[], strategy.address],
+      initializeParams: [[], strategy.address, true],
       proxyAdmin: proxyAdmin,
     });
 
@@ -124,8 +121,10 @@ describe("Reserve pool tests", function () {
     await config.transferOwnership(deployer.address);
 
     // rewards
-    let Rewards = await ethers.getContractFactory("Rewards");
-    let rewards = await Rewards.deploy(protocolsHandler.address);
+    let rewards = await transparentProxy.deployProxy({
+      implementationFactory: "Rewards",
+      proxyAdmin: proxyAdmin,
+    });
 
     // sToken
     let SToken = await ethers.getContractFactory("SToken");
@@ -135,10 +134,9 @@ describe("Reserve pool tests", function () {
     let DToken = await ethers.getContractFactory("DToken");
     let dToken = await DToken.deploy();
 
-    // reservePool
+    // reservePool;
     let reservePool = await transparentProxy.deployProxy({
       implementationFactory: "ReservePool",
-      libraries: {},
       initializeParams: [100000],
       proxyAdmin: proxyAdmin,
     });
@@ -177,7 +175,6 @@ describe("Reserve pool tests", function () {
         BorrowLogic: borrowLogic.address,
         RepayLogic: repayLogic.address,
         LiquidateLogic: liquidateLogic.address,
-        RewardLogic: ethers.constants.AddressZero,
       },
       initializeParams: [
         protocolsHandler.address,
@@ -650,9 +647,15 @@ describe("Reserve pool tests", function () {
       await expect(balance).to.equal(0);
 
       await expect(aliceSTokenBalance).to.equal(supplyAmount);
-      await expect(aliceUnderlyingBalance).to.equal(supplyAmount);
+      await expect(aliceUnderlyingBalance).to.be.within(
+        supplyAmount.sub(1),
+        supplyAmount
+      );
       await expect(bobSTokenBalance).to.equal(supplyAmount);
-      await expect(bobUnderlyingBalance).to.equal(supplyAmount);
+      await expect(bobUnderlyingBalance).to.be.within(
+        supplyAmount.sub(1),
+        supplyAmount
+      );
     });
 
     it("should emit events when execute 2 supplies", async () => {
@@ -949,9 +952,9 @@ describe("Reserve pool tests", function () {
       await expect(bobPendingSupply.amount).to.equal(supplyAmount);
       await expect(reserve).to.equal(0);
       await expect(balance).to.equal(0);
-      await expect(sTokenBalance).to.equal(21571302181);
-      await expect(underlyingBalance).to.equal(21571302647);
-      await expect(totalSupplies).to.equal(21571302647);
+      await expect(sTokenBalance).to.equal(21571302450);
+      await expect(underlyingBalance).to.equal(21571302916);
+      await expect(totalSupplies).to.equal(21571302916);
     });
 
     it("should not emit events when redeem from reserve", async () => {

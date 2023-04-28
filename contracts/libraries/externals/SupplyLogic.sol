@@ -115,13 +115,6 @@ library SupplyLogic {
             _params.totalUnderlying - uncollectedFee
         );
 
-        // _params.rewards.startMiningSupplyReward(
-        //     _params.userParams.asset,
-        //     _params.userParams.to,
-        //     sTokenAmount,
-        //     _params.asset.sToken.totalSupply()
-        // );
-
         emit Supplied(
             _params.userParams.to,
             _params.userParams.asset,
