@@ -16,7 +16,7 @@ interface IRewards {
 
     function getUserRewards(
         address _asset,
-        bool _isSupply,
+        bool _isBorrow,
         address _account,
         uint256 _amount,
         uint256 _totalAmount

@@ -122,6 +122,7 @@ describe("Router tests", function () {
     // rewards
     let rewards = await transparentProxy.deployProxy({
       implementationFactory: "Rewards",
+      initializeParams: [protocolsHandler.address],
       proxyAdmin: proxyAdmin,
     });
 

@@ -18,14 +18,14 @@ contract RewardsDistribution {
         uint256 _userBalance,
         uint256 _newAmount,
         uint256 _totalAmount,
-        address _distributeFrom
+        uint256 _newRewards
     ) internal virtual {
         // update index value based on total amount and new rewards gained since last update
         uint256 currentIndex = _updateCurrentIndex(
             _asset,
             _type,
             _totalAmount,
-            _getNewRewards(_asset, _type, _distributeFrom)
+            _newRewards
         );
 
         // weighted average formula
@@ -44,14 +44,14 @@ contract RewardsDistribution {
         uint8 _type,
         uint256 _amount,
         uint256 _totalAmount,
-        address _distributeFrom
+        uint256 _newRewards
     ) internal virtual {
         // update index value based on total amount and new rewards gained since last update
         uint256 currentIndex = _updateCurrentIndex(
             _asset,
             _type,
             _totalAmount,
-            _getNewRewards(_asset, _type, _distributeFrom)
+            _newRewards
         );
 
         // collect rewards earned since last checkpoint
@@ -60,12 +60,12 @@ contract RewardsDistribution {
             _getUserRewards(_asset, _type, _account, _amount, currentIndex)
         );
 
-        // transfer reward token
-        _rewardTokens(_asset, _type).safeTransfer(
-            _account,
-            rewardsToCollect,
-            0
-        );
+        // following transfer will always fail since token is not collected by rewards but protocolshandler.
+        // _rewardTokens(_asset, _type).safeTransfer(
+        //     _account,
+        //     rewardsToCollect,
+        //     0
+        // );
     }
 
     // Returns new rewards token address (must be overridden in child contract)

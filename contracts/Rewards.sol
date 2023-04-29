@@ -26,9 +26,10 @@ contract Rewards is
         CompoundBorrow
     }
 
-    function initialize() external initializer {
+    function initialize(address _protocolsHandler) external initializer {
         __Ownable_init();
         __AccessControl_init();
+        protocolsHandler = _protocolsHandler;
     }
 
     function updateRewardShare(
@@ -39,39 +40,48 @@ contract Rewards is
         uint256 _userBalanceAfter,
         uint256 _totalAmountBefore
     ) external override onlyRole(REWARD_ADMIN) {
+        uint8 rewardType = _isBorrow
+            ? uint8(RewardType.CompoundBorrow)
+            : uint8(RewardType.CompoundSupply);
+
+        uint256 totalRewards = _getTotalRewards(
+            _asset,
+            rewardType,
+            protocolsHandler
+        );
+
+        uint256 newRewards = totalRewards - reserves[_asset][rewardType];
+        reserves[_asset][rewardType] = totalRewards;
+
         _userBalanceAfter > _userBalanceBefore
             ? _newStake(
                 _asset,
-                _isBorrow
-                    ? uint8(RewardType.CompoundBorrow)
-                    : uint8(RewardType.CompoundSupply),
+                rewardType,
                 _account,
                 _userBalanceAfter,
                 _userBalanceAfter - _userBalanceBefore,
                 _totalAmountBefore,
-                protocolsHandler
+                newRewards
             )
             : _newUnstake(
                 _asset,
                 _account,
-                _isBorrow
-                    ? uint8(RewardType.CompoundBorrow)
-                    : uint8(RewardType.CompoundSupply),
+                rewardType,
                 _userBalanceBefore - _userBalanceAfter,
                 _totalAmountBefore,
-                protocolsHandler
+                newRewards
             );
     }
 
     function getUserRewards(
         address _asset,
-        bool _isSupply,
+        bool _isBorrow,
         address _account,
         uint256 _amount,
         uint256 _totalAmount
     ) external view override returns (uint256) {
         uint8 rewardType = uint8(
-            _isSupply ? RewardType.CompoundSupply : RewardType.CompoundBorrow
+            _isBorrow ? RewardType.CompoundBorrow : RewardType.CompoundSupply
         );
 
         uint256 currentIndex = _getCurrentIndex(
