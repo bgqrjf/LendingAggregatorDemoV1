@@ -156,6 +156,30 @@ contract Router is RouterStorage, OwnableUpgradeable {
         ExternalUtils.sync(_asset, protocols, totalLendings);
     }
 
+    // only 1 rewardToken for now rewrite following if there is multiple
+    function claimRewards(
+        address _account,
+        address[] memory _underlyings
+    ) external override {
+        uint256 length = _underlyings.length;
+        uint256 amount;
+        for (uint256 i = 0; i < length; ) {
+            Types.Asset memory asset = assets[_underlyings[i]];
+
+            amount +=
+                asset.sToken.claimRewards(_account) +
+                asset.dToken.claimRewards(_account);
+
+            unchecked {
+                ++i;
+            }
+        }
+
+        address rewardToken = rewards.rewardsToken(address(0), 0);
+        protocols.distributeRewards(rewardToken, _account, amount);
+        emit RewardsClaimed(rewardToken, _account, amount);
+    }
+
     // reservePool callbacks
     function recordSupply(
         Types.UserAssetParams memory _params,

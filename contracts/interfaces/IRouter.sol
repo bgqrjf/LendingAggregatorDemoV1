@@ -50,6 +50,12 @@ interface IRouter is IMultiImplementationBeacon {
         Types.UserAssetParams redeemParams
     );
 
+    event RewardsClaimed(
+        address indexed rewardToken,
+        address indexed account,
+        uint256 amount
+    );
+
     event TotalLendingsUpdated(address indexed asset, uint256 newLending);
 
     event AccFeeUpdated(address indexed asset, uint256 newAccFee);
@@ -146,6 +152,11 @@ interface IRouter is IMultiImplementationBeacon {
     ) external payable;
 
     function sync(address _asset) external;
+
+    function claimRewards(
+        address _account,
+        address[] memory _underlyings
+    ) external;
 
     function userStatus(
         address,

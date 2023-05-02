@@ -487,4 +487,33 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         autoRebalance = !autoRebalance;
         emit AutoRebalanceToggled(autoRebalance);
     }
+
+    function distributeRewards(
+        address _rewardToken,
+        address _account,
+        uint256 _amount
+    ) external override onlyOwner {
+        IProtocol[] memory protocolsCache = protocols;
+        uint256 length = protocolsCache.length;
+
+        for (
+            (uint256 i, uint256 balance) = (
+                0,
+                _rewardToken.balanceOf(address(this))
+            );
+            i < length && balance < _amount;
+
+        ) {
+            if (protocolsCache[i].rewardToken() == _rewardToken) {
+                protocolsCache[i].claimRewards(address(this));
+                balance = _rewardToken.balanceOf(address(this));
+            }
+
+            unchecked {
+                ++i;
+            }
+        }
+
+        _rewardToken.safeTransfer(_account, _amount, 0);
+    }
 }

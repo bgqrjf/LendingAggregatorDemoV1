@@ -55,4 +55,10 @@ interface IProtocolsHandler {
     function getProtocols() external view returns (IProtocol[] memory);
 
     function toggleAutoRebalance() external;
+
+    function distributeRewards(
+        address _rewardToken,
+        address _account,
+        uint256 _amount
+    ) external;
 }

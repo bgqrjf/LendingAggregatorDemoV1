@@ -17,6 +17,8 @@ contract Rewards is
     IProtocol[] public protocols;
     address public protocolsHandler;
     mapping(address => mapping(uint8 => uint256)) public reserves;
+    mapping(address => mapping(uint8 => mapping(address => uint256)))
+        public uncollectedRewards;
 
     bytes32 public constant REWARD_ADMIN =
         keccak256(abi.encode("reward admin"));
@@ -40,9 +42,9 @@ contract Rewards is
         uint256 _userBalanceAfter,
         uint256 _totalAmountBefore
     ) external override onlyRole(REWARD_ADMIN) {
-        uint8 rewardType = _isBorrow
-            ? uint8(RewardType.CompoundBorrow)
-            : uint8(RewardType.CompoundSupply);
+        uint8 rewardType = uint8(
+            _isBorrow ? RewardType.CompoundBorrow : RewardType.CompoundSupply
+        );
 
         uint256 totalRewards = _getTotalRewards(
             _asset,
@@ -53,8 +55,8 @@ contract Rewards is
         uint256 newRewards = totalRewards - reserves[_asset][rewardType];
         reserves[_asset][rewardType] = totalRewards;
 
-        _userBalanceAfter > _userBalanceBefore
-            ? _newStake(
+        if (_userBalanceAfter > _userBalanceBefore) {
+            _newStake(
                 _asset,
                 rewardType,
                 _account,
@@ -62,8 +64,9 @@ contract Rewards is
                 _userBalanceAfter - _userBalanceBefore,
                 _totalAmountBefore,
                 newRewards
-            )
-            : _newUnstake(
+            );
+        } else {
+            uncollectedRewards[_asset][rewardType][_account] += _newUnstake(
                 _asset,
                 _account,
                 rewardType,
@@ -71,6 +74,49 @@ contract Rewards is
                 _totalAmountBefore,
                 newRewards
             );
+        }
+    }
+
+    //  rewards are expected to be transfered out to _account afterwards
+    function claimRewards(
+        address _asset,
+        bool _isBorrow,
+        address _account,
+        uint256 _userBalance,
+        uint256 _totalAmount
+    ) external override onlyRole(REWARD_ADMIN) returns (uint256 userRewards) {
+        uint8 rewardType = uint8(
+            _isBorrow ? RewardType.CompoundBorrow : RewardType.CompoundSupply
+        );
+
+        uint256 uncollectedReward = uncollectedRewards[_asset][rewardType][
+            _account
+        ];
+
+        if (_userBalance + uncollectedReward == 0) {
+            return 0;
+        }
+
+        uint256 currentIndex = _updateCurrentIndex(
+            _asset,
+            rewardType,
+            _totalAmount,
+            _getTotalRewards(_asset, rewardType, protocolsHandler) -
+                reserves[_asset][rewardType]
+        );
+
+        uint256 newUserRewards = _getUserRewards(
+            _asset,
+            rewardType,
+            _account,
+            _userBalance,
+            currentIndex
+        );
+
+        userRewards = uncollectedReward + newUserRewards;
+
+        userIndexes[_asset][rewardType][_account] = currentIndex;
+        delete uncollectedRewards[_asset][rewardType][_account];
     }
 
     function getUserRewards(
@@ -109,6 +155,13 @@ contract Rewards is
         protocols.push(_protocol);
     }
 
+    function rewardsToken(
+        address _asset,
+        uint8 _type
+    ) external view override returns (address) {
+        return _rewardTokens(_asset, _type);
+    }
+
     function _rewardTokens(
         address,
         uint8
@@ -124,16 +177,6 @@ contract Rewards is
         amount =
             _getTotalRewards(_asset, _type, _account) -
             reserves[_asset][_type];
-    }
-
-    function _collectRewards(
-        address _asset,
-        uint256 _newAmount
-    ) internal override returns (uint256) {
-        if (_asset.balanceOf(protocolsHandler) < _newAmount) {
-            protocols[1].claimRewards(protocolsHandler);
-        }
-        return _newAmount;
     }
 
     function _getTotalRewards(

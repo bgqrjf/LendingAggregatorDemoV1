@@ -57,6 +57,19 @@ contract SToken is ISToken, OwnableUpgradeable, ERC20Upgradeable {
         }
     }
 
+    function claimRewards(
+        address _account
+    ) external override onlyOwner returns (uint256) {
+        return
+            rewards.claimRewards(
+                underlying,
+                false,
+                _account,
+                balanceOf(_account),
+                totalSupply()
+            );
+    }
+
     function scaledAmount(
         uint256 _amount,
         uint256 _totalSupplied

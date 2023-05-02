@@ -29,6 +29,8 @@ interface IDToken {
         uint256 _newInterest
     ) external returns (uint256 amountOfUnderlying, uint256 newCollectedFee);
 
+    function claimRewards(address _account) external returns (uint256);
+
     function updateNewFee(
         uint256 _newInterest
     ) external returns (uint256 uncollectedFee);

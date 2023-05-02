@@ -45,7 +45,7 @@ contract RewardsDistribution {
         uint256 _amount,
         uint256 _totalAmount,
         uint256 _newRewards
-    ) internal virtual {
+    ) internal virtual returns (uint256 rewardsToCollect) {
         // update index value based on total amount and new rewards gained since last update
         uint256 currentIndex = _updateCurrentIndex(
             _asset,
@@ -55,17 +55,13 @@ contract RewardsDistribution {
         );
 
         // collect rewards earned since last checkpoint
-        uint256 rewardsToCollect = _collectRewards(
-            _rewardTokens(_asset, _type),
-            _getUserRewards(_asset, _type, _account, _amount, currentIndex)
+        rewardsToCollect = _getUserRewards(
+            _asset,
+            _type,
+            _account,
+            _amount,
+            currentIndex
         );
-
-        // following transfer will always fail since token is not collected by rewards but protocolshandler.
-        // _rewardTokens(_asset, _type).safeTransfer(
-        //     _account,
-        //     rewardsToCollect,
-        //     0
-        // );
     }
 
     // Returns new rewards token address (must be overridden in child contract)
@@ -83,14 +79,6 @@ contract RewardsDistribution {
         address
     ) internal view virtual returns (uint256) {
         return 0;
-    }
-
-    // Collects rewards (must be overridden in child contract)
-    function _collectRewards(
-        address,
-        uint256 _newAmount
-    ) internal virtual returns (uint256) {
-        return _newAmount;
     }
 
     // View the total rewards earned by a user
@@ -136,7 +124,7 @@ contract RewardsDistribution {
         uint8 _type,
         uint256 _totalAmount,
         uint256 _newRewards
-    ) private returns (uint256 currentIndex) {
+    ) internal returns (uint256 currentIndex) {
         currentIndex = _getCurrentIndex(
             _asset,
             _type,

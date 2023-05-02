@@ -64,6 +64,19 @@ contract DToken is DTokenSotrage, OwnableUpgradeable {
         );
     }
 
+    function claimRewards(
+        address _account
+    ) external override onlyOwner returns (uint256) {
+        return
+            rewards.claimRewards(
+                underlying,
+                true,
+                _account,
+                balanceOf[_account],
+                totalSupply
+            );
+    }
+
     function updateNewFee(
         uint256 _newInterest
     ) external override onlyOwner returns (uint256 uncollectedFee) {

@@ -14,6 +14,14 @@ interface IRewards {
         uint256 _totalAmountBefore
     ) external;
 
+    function claimRewards(
+        address _asset,
+        bool _isBorrow,
+        address _account,
+        uint256 _userBalance,
+        uint256 _totalAmount
+    ) external returns (uint256 userRewards);
+
     function getUserRewards(
         address _asset,
         bool _isBorrow,
@@ -21,6 +29,11 @@ interface IRewards {
         uint256 _amount,
         uint256 _totalAmount
     ) external view returns (uint256);
+
+    function rewardsToken(
+        address _asset,
+        uint8 _type
+    ) external view returns (address);
 
     function addRewardAdmin(address _newAdmin) external;
 
