@@ -74,7 +74,7 @@ contract SToken is ISToken, OwnableUpgradeable, ERC20Upgradeable {
         uint256 _amount,
         uint256 _totalSupplied
     ) public view override returns (uint256) {
-        uint totalSupply = totalSupply();
+        uint256 totalSupply = totalSupply();
         return
             totalSupply > 0
                 ? (_amount * _totalSupplied) / totalSupply

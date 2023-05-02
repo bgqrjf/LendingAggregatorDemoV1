@@ -5,7 +5,7 @@ interface IDToken {
     event Transfer(address indexed from, address indexed to, uint256 amount);
     event AccFeeUpdated(uint256 newAccFee, uint256 newIndex);
     event UserFeeIndexUpdated(address account, uint256 newIndex);
-    event CollectedFeeUpdated(uint collectedFee);
+    event CollectedFeeUpdated(uint256 collectedFee);
 
     function initialize(
         address _underlying,
@@ -39,7 +39,7 @@ interface IDToken {
 
     function calculateFee(
         uint256 _newInterest
-    ) external view returns (uint newAccFee, uint256 newFeeIndex);
+    ) external view returns (uint256 newAccFee, uint256 newFeeIndex);
 
     function scaledAmount(
         uint256 _amount,

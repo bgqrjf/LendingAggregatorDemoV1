@@ -421,7 +421,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
             ,
             ,
             uint256 totalSuppliedAmountWithFee,
-            uint newInterest
+            uint256 newInterest
         ) = ExternalUtils.getSupplyStatus(
                 _underlying,
                 reservePool,
@@ -430,8 +430,8 @@ contract Router is RouterStorage, OwnableUpgradeable {
             );
 
         IDToken dToken = assets[_underlying].dToken;
-        (uint newAccFee, ) = dToken.calculateFee(newInterest);
-        uint fee = newAccFee - dToken.collectedFee();
+        (uint256 newAccFee, ) = dToken.calculateFee(newInterest);
+        uint256 fee = newAccFee - dToken.collectedFee();
 
         return totalSuppliedAmountWithFee - fee;
     }

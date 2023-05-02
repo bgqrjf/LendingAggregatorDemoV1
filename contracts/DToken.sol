@@ -120,8 +120,8 @@ contract DToken is DTokenSotrage, OwnableUpgradeable {
 
     function calculateFee(
         uint256 _newInterest
-    ) public view override returns (uint newAccFee, uint256 newFeeIndex) {
-        uint newFee = (_newInterest * feeRate) / Utils.MILLION;
+    ) public view override returns (uint256 newAccFee, uint256 newFeeIndex) {
+        uint256 newFee = (_newInterest * feeRate) / Utils.MILLION;
         newAccFee = accFee + newFee;
         newFeeIndex = totalSupply > 0
             ? feeIndex + (newFee * Utils.QUINTILLION) / totalSupply

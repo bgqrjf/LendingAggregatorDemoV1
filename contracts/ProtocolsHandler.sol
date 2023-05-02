@@ -426,7 +426,7 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
 
     function repay(address _asset, uint256 _amount) internal returns (uint256) {
         (, uint256 total) = totalBorrowed(_asset);
-        uint amount = Math.min(_amount, total);
+        uint256 amount = Math.min(_amount, total);
         if (amount == 0) {
             return amount;
         }

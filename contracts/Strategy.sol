@@ -329,7 +329,7 @@ contract Strategy is IStrategy, Ownable {
     function _maxRedeemAmount(
         IProtocol _protocol,
         address _quote
-    ) internal view returns (uint maxRedeem) {
+    ) internal view returns (uint256 maxRedeem) {
         (uint256 currentCollateral, uint256 currentBorrowed) = _protocol
             .totalColletralAndBorrow(msg.sender, _quote);
 

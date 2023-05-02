@@ -21,7 +21,7 @@ contract Rewards is
         public uncollectedRewards;
 
     bytes32 public constant REWARD_ADMIN =
-        keccak256(abi.encode("reward admin"));
+        keccak256(abi.encode("REWARD_ADMIN"));
 
     enum RewardType {
         CompoundSupply,
