@@ -15,10 +15,11 @@ contract Strategy is IStrategy, Ownable {
         address _asset,
         uint256 _amount
     ) external view override returns (uint256[] memory supplyAmounts) {
-        supplyAmounts = new uint256[](_protocols.length);
+        uint256 length = _protocols.length;
+        supplyAmounts = new uint256[](length);
 
         // if shortage on supply
-        for (uint256 i = 0; i < _protocols.length; ++i) {
+        for (uint256 i = 0; i < length; ) {
             (uint256 currentCollateral, uint256 currentBorrowed) = _protocols[i]
                 .totalColletralAndBorrow(msg.sender, _asset);
 
@@ -31,16 +32,24 @@ contract Strategy is IStrategy, Ownable {
                 );
                 _amount -= supplyAmounts[i];
             }
+
+            unchecked {
+                ++i;
+            }
         }
 
         if (_amount > 0) {
             uint256 bestPoolID;
             uint256 maxRate;
-            for (uint256 i = 0; i < _protocols.length; ++i) {
+            for (uint256 i = 0; i < length; ) {
                 uint256 rate = _protocols[i].getCurrentSupplyRate(_asset);
                 if (rate > maxRate) {
                     bestPoolID = i;
                     maxRate = rate;
+                }
+
+                unchecked {
+                    ++i;
                 }
             }
 
@@ -53,13 +62,19 @@ contract Strategy is IStrategy, Ownable {
         address _asset,
         uint256 _amount
     ) external view override returns (uint256[] memory amounts) {
-        amounts = new uint256[](_protocols.length);
+        uint256 length = _protocols.length;
+
+        amounts = new uint256[](length);
 
         uint256 bestPoolID;
         uint256 maxRate;
-        for (uint256 i = 0; i < _protocols.length; ++i) {
+        for (uint256 i = 0; i < length; ) {
             if (_protocols[i].getCurrentSupplyRate(_asset) > maxRate) {
                 bestPoolID = i;
+            }
+
+            unchecked {
+                ++i;
             }
         }
 
@@ -71,15 +86,19 @@ contract Strategy is IStrategy, Ownable {
         address _asset,
         uint256 _amount
     ) external view override returns (uint256[] memory redeemAmounts) {
-        redeemAmounts = new uint256[](_protocols.length);
+        uint256 length = _protocols.length;
+        redeemAmounts = new uint256[](length);
 
-        uint256[] memory rates = new uint256[](_protocols.length);
-        uint256[] memory maxRedeems = new uint256[](_protocols.length);
-        for (uint256 i = 0; i < _protocols.length; ++i) {
+        uint256[] memory rates = new uint256[](length);
+        uint256[] memory maxRedeems = new uint256[](length);
+        for (uint256 i = 0; i < length; ) {
             maxRedeems[i] = _maxRedeemAmount(_protocols[i], _asset);
             rates[i] = maxRedeems[i] > 0
                 ? _protocols[i].getCurrentSupplyRate(_asset)
                 : Utils.MAX_UINT;
+            unchecked {
+                ++i;
+            }
         }
 
         redeemAmounts = calculateAmountOut(_amount, maxRedeems, rates);
@@ -90,9 +109,11 @@ contract Strategy is IStrategy, Ownable {
         address _asset,
         uint256 _amount
     ) external view override returns (uint256[] memory amounts) {
-        uint256[] memory rates = new uint256[](_protocols.length);
-        uint256[] memory maxBorrows = new uint256[](_protocols.length);
-        for (uint256 i = 0; i < _protocols.length; ++i) {
+        uint256 length = _protocols.length;
+
+        uint256[] memory rates = new uint256[](length);
+        uint256[] memory maxBorrows = new uint256[](length);
+        for (uint256 i = 0; i < length; ) {
             (uint256 currentCollateral, uint256 currentBorrowed) = _protocols[i]
                 .totalColletralAndBorrow(msg.sender, _asset);
 
@@ -102,6 +123,9 @@ contract Strategy is IStrategy, Ownable {
                 : 0;
 
             rates[i] = _protocols[i].getCurrentBorrowRate(_asset);
+            unchecked {
+                ++i;
+            }
         }
 
         amounts = calculateAmountOut(_amount, maxBorrows, rates);
@@ -112,12 +136,18 @@ contract Strategy is IStrategy, Ownable {
         address _asset,
         uint256 _amount
     ) external view override returns (uint256[] memory amounts) {
-        uint256[] memory rates = new uint256[](_protocols.length);
-        uint256[] memory maxBorrows = new uint256[](_protocols.length);
+        uint256 length = _protocols.length;
 
-        for (uint256 i = 0; i < _protocols.length; ++i) {
+        uint256[] memory rates = new uint256[](length);
+        uint256[] memory maxBorrows = new uint256[](length);
+
+        for (uint256 i = 0; i < length; ) {
             rates[i] = _protocols[i].getCurrentBorrowRate(_asset);
             maxBorrows[i] = Utils.MAX_UINT;
+
+            unchecked {
+                ++i;
+            }
         }
 
         amounts = calculateAmountOut(_amount, maxBorrows, rates);
@@ -132,7 +162,7 @@ contract Strategy is IStrategy, Ownable {
         uint256[] memory maxRepays = new uint256[](length);
         uint256[] memory minRepays = new uint256[](length);
         uint256[] memory rates = new uint256[](length);
-        for (uint256 i = 0; i < length; ++i) {
+        for (uint256 i = 0; i < length; ) {
             (uint256 currentCollateral, uint256 currentBorrowed) = _protocols[i]
                 .totalColletralAndBorrow(msg.sender, _asset);
 
@@ -146,12 +176,18 @@ contract Strategy is IStrategy, Ownable {
 
             maxRepays[i] = currentBorrowed;
             rates[i] = _protocols[i].getCurrentBorrowRate(_asset);
+            unchecked {
+                ++i;
+            }
         }
 
         repayAmounts = calculateRepayAmounts(_amount, maxRepays, rates);
 
-        for (uint256 i = 0; i < length; ++i) {
+        for (uint256 i = 0; i < length; ) {
             repayAmounts[i] += minRepays[i];
+            unchecked {
+                ++i;
+            }
         }
     }
 
@@ -166,10 +202,13 @@ contract Strategy is IStrategy, Ownable {
         uint256 bestPoolID;
         if (_amount > 0) {
             uint256 maxRate;
-            for (uint256 i = 0; i < length; ++i) {
+            for (uint256 i = 0; i < length; ) {
                 if (_rates[i] > maxRate) {
                     bestPoolID = i;
                     maxRate = _rates[i];
+                }
+                unchecked {
+                    ++i;
                 }
             }
 
@@ -186,8 +225,11 @@ contract Strategy is IStrategy, Ownable {
                 _rates
             );
 
-            for (uint256 i = 0; i < length; ++i) {
+            for (uint256 i = 0; i < length; ) {
                 amounts[i] += nextRoundAmounts[i];
+                unchecked {
+                    ++i;
+                }
             }
         }
     }
@@ -210,7 +252,7 @@ contract Strategy is IStrategy, Ownable {
         uint256 bestPoolToAddExtra;
         uint256 targetAmount;
 
-        for (uint256 i = 0; i < length; ++i) {
+        for (uint256 i = 0; i < length; ) {
             IProtocol protocol = _protocols[i];
 
             maxRedeemAmounts[i] = _maxRedeemAmount(protocol, _asset);
@@ -226,6 +268,9 @@ contract Strategy is IStrategy, Ownable {
             }
 
             targetAmount += maxRedeemAmounts[i];
+            unchecked {
+                ++i;
+            }
         }
 
         targetAmounts = calculateRebalanceAmount(
@@ -239,11 +284,14 @@ contract Strategy is IStrategy, Ownable {
         supplyAmounts = new uint256[](length);
         redeemAmounts = new uint256[](length);
 
-        for (uint256 i = 0; i < length; ++i) {
+        for (uint256 i = 0; i < length; ) {
             if (targetAmounts[i] < maxRedeemAmounts[i]) {
                 redeemAmounts[i] = maxRedeemAmounts[i] - targetAmounts[i];
             } else {
                 supplyAmounts[i] = targetAmounts[i] - maxRedeemAmounts[i];
+            }
+            unchecked {
+                ++i;
             }
         }
     }
@@ -256,10 +304,14 @@ contract Strategy is IStrategy, Ownable {
         uint256 length = _rates.length;
         uint256 minRate = Utils.MAX_UINT;
         uint256 bestPoolID;
-        for (uint256 i = 0; i < length; i++) {
+        for (uint256 i = 0; i < length; ) {
             if (_rates[i] < minRate) {
                 minRate = _rates[i];
                 bestPoolID = i;
+            }
+
+            unchecked {
+                ++i;
             }
         }
 
@@ -301,20 +353,25 @@ contract Strategy is IStrategy, Ownable {
         uint256 _maxRate,
         bytes[] memory _usageParams
     ) internal pure returns (uint256[] memory amounts) {
-        amounts = new uint256[](_protocols.length);
+        uint256 length = _protocols.length;
+        amounts = new uint256[](length);
         uint256 totalAmountToSupply;
 
         uint256 minRate;
         while (_maxRate > minRate + 1) {
             totalAmountToSupply = 0;
             uint256 targetRate = (_maxRate + minRate) / 2;
-            for (uint256 i = 0; i < _protocols.length; ++i) {
+            for (uint256 i = 0; i < length; ) {
                 amounts[i] = getAmountToSupply(
                     _protocols[i],
                     targetRate,
                     _usageParams[i]
                 );
                 totalAmountToSupply += amounts[i];
+
+                unchecked {
+                    ++i;
+                }
             }
 
             if (totalAmountToSupply < _targetAmount) {

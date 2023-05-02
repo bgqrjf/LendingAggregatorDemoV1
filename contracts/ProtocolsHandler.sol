@@ -35,13 +35,14 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
 
     function rebalanceAllProtocols(address _asset) public override {
         IProtocol[] memory protocolsCache = protocols;
+        uint256 length = protocolsCache.length;
 
         (
             uint256[] memory redeemAmounts,
             uint256[] memory supplyAmounts
         ) = strategy.getRebalanceStrategy(protocolsCache, _asset);
 
-        for (uint256 i = 0; i < protocolsCache.length; ++i) {
+        for (uint256 i = 0; i < length; ) {
             if (redeemAmounts[i] > 0) {
                 Utils.delegateCall(
                     address(protocolsCache[i]),
@@ -52,9 +53,12 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
                     )
                 );
             }
+            unchecked {
+                ++i;
+            }
         }
 
-        for (uint256 i = 0; i < protocolsCache.length; ++i) {
+        for (uint256 i = 0; i < length; ) {
             if (supplyAmounts[i] > 0) {
                 Utils.delegateCall(
                     address(protocolsCache[i]),
@@ -64,6 +68,9 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
                         supplyAmounts[i]
                     )
                 );
+            }
+            unchecked {
+                ++i;
             }
         }
     }
@@ -126,10 +133,15 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         returns (uint256[] memory amounts, uint256 totalAmount)
     {
         IProtocol[] memory protocolsCache = protocols;
-        amounts = new uint256[](protocolsCache.length);
-        for (uint256 i = 0; i < protocolsCache.length; ++i) {
+        uint256 length = protocolsCache.length;
+        amounts = new uint256[](length);
+        for (uint256 i = 0; i < length; ) {
             amounts[i] = protocolsCache[i].supplyOf(asset, address(this));
             totalAmount = totalAmount + amounts[i];
+
+            unchecked {
+                ++i;
+            }
         }
     }
 
@@ -142,10 +154,15 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         returns (uint256[] memory amounts, uint256 totalAmount)
     {
         IProtocol[] memory protocolsCache = protocols;
-        amounts = new uint256[](protocolsCache.length);
-        for (uint256 i = 0; i < protocolsCache.length; ++i) {
+        uint256 length = protocolsCache.length;
+        amounts = new uint256[](length);
+        for (uint256 i = 0; i < length; ) {
             amounts[i] = protocolsCache[i].debtOf(asset, address(this));
             totalAmount = totalAmount + amounts[i];
+
+            unchecked {
+                ++i;
+            }
         }
     }
 
@@ -154,12 +171,16 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         uint256 _totalLending
     ) public view override returns (uint256 totalLending, uint256 newInterest) {
         IProtocol[] memory protocolsCache = protocols;
+        uint256 length = protocolsCache.length;
         uint256 supplyInterest;
         uint256 borrowInterest;
 
-        for (uint256 i = 0; i < protocolsCache.length; ++i) {
+        for (uint256 i = 0; i < length; ) {
             supplyInterest += protocolsCache[i].lastSupplyInterest(_asset);
             borrowInterest += protocolsCache[i].lastBorrowInterest(_asset);
+            unchecked {
+                ++i;
+            }
         }
 
         uint256 interestDelta = borrowInterest > supplyInterest
@@ -197,10 +218,11 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         address _underlying
     ) external view override returns (uint256 supplyRate, uint256 borrowRate) {
         IProtocol[] memory protocolsCache = protocols;
+        uint256 length = protocolsCache.length;
 
         uint256 supplyWeight;
         uint256 borrowWeight;
-        for (uint256 i = 0; i < protocolsCache.length; i++) {
+        for (uint256 i = 0; i < length; ) {
             uint256 protocolSupplyRate = protocolsCache[i].getCurrentSupplyRate(
                 _underlying
             );
@@ -248,6 +270,10 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
                     ? Math.min(borrowRate, protocolBorrowRate)
                     : protocolBorrowRate;
             }
+
+            unchecked {
+                ++i;
+            }
         }
     }
 
@@ -269,7 +295,7 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         );
 
         uint256 length = protocolsCache.length;
-        for (uint256 i = 0; i < length; ++i) {
+        for (uint256 i = 0; i < length; ) {
             Utils.delegateCall(
                 address(protocolsCache[i]),
                 abi.encodeWithSelector(
@@ -287,18 +313,24 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
                     borrowAmounts[i]
                 )
             );
+
+            unchecked {
+                ++i;
+            }
         }
     }
 
     function supply(address _asset, uint256 _amount, uint256) internal {
         IProtocol[] memory protocolsCache = protocols;
+        uint256 length = protocolsCache.length;
+
         uint256[] memory supplyAmounts = strategy.getSupplyStrategy(
             protocolsCache,
             _asset,
             _amount
         );
 
-        for (uint256 i = 0; i < protocolsCache.length; ++i) {
+        for (uint256 i = 0; i < length; ) {
             if (supplyAmounts[i] > 0) {
                 Utils.delegateCall(
                     address(protocolsCache[i]),
@@ -308,6 +340,10 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
                         supplyAmounts[i]
                     )
                 );
+            }
+
+            unchecked {
+                ++i;
             }
         }
         emit Supplied(_asset, _amount);
@@ -322,13 +358,15 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         amount = Math.min(_amount, _totalSupplied);
 
         IProtocol[] memory protocolsCache = protocols;
+        uint256 length = protocolsCache.length;
+
         uint256[] memory redeemAmounts = strategy.getRedeemStrategy(
             protocolsCache,
             _asset,
             amount
         );
 
-        for (uint256 i = 0; i < protocolsCache.length; ++i) {
+        for (uint256 i = 0; i < length; ) {
             if (redeemAmounts[i] > 0) {
                 Utils.delegateCall(
                     address(protocolsCache[i]),
@@ -338,6 +376,9 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
                         redeemAmounts[i]
                     )
                 );
+            }
+            unchecked {
+                ++i;
             }
         }
 
@@ -353,13 +394,15 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         address _to
     ) internal returns (uint256 amount) {
         IProtocol[] memory protocolsCache = protocols;
+        uint256 length = protocolsCache.length;
+
         uint256[] memory amounts = strategy.getBorrowStrategy(
             protocolsCache,
             _asset,
             _amount
         );
 
-        for (uint256 i = 0; i < protocolsCache.length; ++i) {
+        for (uint256 i = 0; i < length; ) {
             if (amounts[i] > 0) {
                 Utils.delegateCall(
                     address(protocolsCache[i]),
@@ -369,6 +412,9 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
                         amounts[i]
                     )
                 );
+            }
+            unchecked {
+                ++i;
             }
         }
 
@@ -386,13 +432,15 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         }
 
         IProtocol[] memory protocolsCache = protocols;
+        uint256 length = protocolsCache.length;
+
         uint256[] memory amounts = strategy.getRepayStrategy(
             protocolsCache,
             _asset,
             _amount
         );
 
-        for (uint256 i = 0; i < protocolsCache.length; ++i) {
+        for (uint256 i = 0; i < length; ) {
             if (amounts[i] > 0) {
                 Utils.delegateCall(
                     address(protocolsCache[i]),
@@ -402,6 +450,9 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
                         amounts[i]
                     )
                 );
+            }
+            unchecked {
+                ++i;
             }
         }
 
@@ -418,10 +469,16 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         IProtocol _new
     ) external override onlyOwner {
         IProtocol[] memory protocolsCache = protocols;
-        for (uint256 i = 0; i < protocolsCache.length; i++) {
+        uint256 length = protocolsCache.length;
+
+        for (uint256 i = 0; i < length; ) {
             if (_old == protocolsCache[i]) {
                 protocols[i] = _new;
                 break;
+            }
+
+            unchecked {
+                ++i;
             }
         }
     }

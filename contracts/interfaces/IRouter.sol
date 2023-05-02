@@ -150,7 +150,7 @@ interface IRouter is IMultiImplementationBeacon {
     function userStatus(
         address,
         address
-    ) external view returns (uint256, uint256, bool);
+    ) external view returns (uint256, uint256);
 
     function protocols() external view returns (IProtocolsHandler);
 

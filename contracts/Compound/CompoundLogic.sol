@@ -183,15 +183,17 @@ contract CompoundLogic is IProtocol {
         ) = accrueInterest(_underlying, cToken);
 
         return
-            _supplyOf(cToken, _account, totalCash, totalBorrows, totalReserves);
+            _supplyOf(
+                cToken,
+                _account,
+                totalCash + totalBorrows - totalReserves
+            );
     }
 
     function _supplyOf(
         CTokenInterface _cToken,
         address _account,
-        uint256 _totalCash,
-        uint256 _totalBorrows,
-        uint256 _totalReserves
+        uint256 _totalSupplies
     ) internal view returns (uint256) {
         uint256 cTokentotalSupply = _cToken.totalSupply();
         uint256 cTokenBalance = _cToken.balanceOf(_account);
@@ -208,8 +210,7 @@ contract CompoundLogic is IProtocol {
 
         return
             cTokentotalSupply > 0
-                ? ((_totalCash + _totalBorrows - _totalReserves) *
-                    cTokenBalance) / (cTokentotalSupply)
+                ? (_totalSupplies * cTokenBalance) / (cTokentotalSupply)
                 : 0;
     }
 
@@ -242,35 +243,43 @@ contract CompoundLogic is IProtocol {
         CTokenInterface[] memory userCTokens = LOGIC_STORAGE
             .comptroller()
             .getAssetsIn(_account);
+        uint256 length = userCTokens.length;
         IOracle oracle = LOGIC_STORAGE.comptroller().oracle();
 
-        for (uint256 i = 0; i < userCTokens.length; ++i) {
+        for (uint256 i = 0; i < length; ) {
             CTokenInterface cToken = userCTokens[i];
             uint256 oraclePrice = oracle.getUnderlyingPrice(cToken);
             require(oraclePrice > 0, "Compound Logic: Price Not Found");
 
-            (
-                uint256 totalCash,
-                uint256 totalBorrows,
-                uint256 totalReserves,
-                uint256 borrowIndex
-            ) = accrueInterest(
+            uint256 totalSupplies;
+            uint256 borrowIndex;
+            {
+                uint256 totalCash;
+                uint256 totalBorrows;
+                uint256 totalReserves;
+                (
+                    totalCash,
+                    totalBorrows,
+                    totalReserves,
+                    borrowIndex
+                ) = accrueInterest(
                     address(cToken) == LOGIC_STORAGE.cTokens(TransferHelper.ETH)
                         ? TransferHelper.ETH
                         : cToken.underlying(),
                     cToken
                 );
 
+                totalSupplies = totalCash + totalBorrows - totalReserves;
+            }
+
             collateralValue +=
-                _supplyOf(
-                    cToken,
-                    _account,
-                    totalCash,
-                    totalBorrows,
-                    totalReserves
-                ) *
+                _supplyOf(cToken, _account, totalSupplies) *
                 oraclePrice;
             borrowValue += _debtOf(cToken, _account, borrowIndex) * oraclePrice;
+
+            unchecked {
+                ++i;
+            }
         }
 
         address cQuote = LOGIC_STORAGE.cTokens(_quote);

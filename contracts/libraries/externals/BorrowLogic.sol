@@ -117,7 +117,7 @@ library BorrowLogic {
         IPriceOracle _priceOracle,
         address _account,
         address _borrowAsset,
-        address[] memory _underlyings,
+        address[] storage underlyings,
         mapping(address => Types.Asset) storage assets
     ) external view returns (uint256 amount) {
         return
@@ -127,7 +127,7 @@ library BorrowLogic {
                 _priceOracle,
                 _account,
                 _borrowAsset,
-                _underlyings,
+                underlyings,
                 assets
             );
     }

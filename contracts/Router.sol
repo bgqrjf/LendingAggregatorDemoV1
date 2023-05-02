@@ -292,9 +292,9 @@ contract Router is RouterStorage, OwnableUpgradeable {
             LiquidateLogic.getLiquidationData(
                 _account,
                 _repayAsset,
-                underlyings,
                 config,
                 priceOracle,
+                underlyings,
                 assets
             );
     }
@@ -306,11 +306,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
         external
         view
         override
-        returns (
-            uint256 collateralValue,
-            uint256 borrowingValue,
-            bool blackListedCollateral
-        )
+        returns (uint256 collateralValue, uint256 borrowingValue)
     {
         return
             ExternalUtils.userStatus(
@@ -338,9 +334,13 @@ contract Router is RouterStorage, OwnableUpgradeable {
         override
         returns (Types.Asset[] memory _assets)
     {
-        _assets = new Types.Asset[](underlyings.length);
-        for (uint256 i = 0; i < _assets.length; ++i) {
+        uint256 length = underlyings.length;
+        _assets = new Types.Asset[](length);
+        for (uint256 i = 0; i < length; ) {
             _assets[i] = assets[underlyings[i]];
+            unchecked {
+                ++i;
+            }
         }
     }
 

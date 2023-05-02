@@ -116,30 +116,18 @@ library ExternalUtils {
         );
     }
 
-    function calculateAmountByRatio(
-        address _underlying,
-        uint256 _amount,
-        uint256 _ratio,
-        mapping(address => Types.Asset) storage assets
-    ) internal view returns (uint256 amount, bool blackListed) {
-        if (assets[_underlying].paused) {
-            blackListed = true;
-        } else {
-            amount = (_ratio * _amount) / Utils.MILLION;
-        }
-    }
-
     // internal views
     function getUserDebts(
         address _account,
         uint256 _userConfig,
-        address[] memory _underlyings,
         address _quote,
         IPriceOracle priceOracle,
+        address[] storage underlyings,
         mapping(address => Types.Asset) storage assets
     ) internal view returns (uint256 amount) {
-        for (uint256 i = 0; i < _underlyings.length; ++i) {
-            address underlying = _underlyings[i];
+        uint256 length = underlyings.length;
+        for (uint256 i = 0; i < length; ) {
+            address underlying = underlyings[i];
             Types.Asset memory asset = assets[underlying];
 
             if (_userConfig.isBorrowing(asset.index)) {
@@ -151,33 +139,39 @@ library ExternalUtils {
                     ? balance
                     : priceOracle.valueOfAsset(underlying, _quote, balance);
             }
+
+            unchecked {
+                ++i;
+            }
         }
     }
 
     function getUserCollateral(
         address _account,
         uint256 _userConfig,
-        address[] memory _underlyings,
         address _quote,
         IPriceOracle _priceOracle,
+        address[] storage underlyings,
         mapping(address => Types.Asset) storage assets
     ) internal view returns (uint256 amount) {
-        for (uint256 i = 0; i < _underlyings.length; ++i) {
-            address underlying = _underlyings[i];
+        uint256 length = underlyings.length;
+
+        for (uint256 i = 0; i < length; ) {
+            address underlying = underlyings[i];
             Types.Asset memory asset = assets[underlying];
 
-            if (_userConfig.isUsingAsCollateral(asset.index)) {
-                uint256 balance = asset.sToken.scaledBalanceOf(_account);
+            if (_userConfig.isUsingAsCollateral(asset.index) && !asset.paused) {
+                amount += getCollateralValue(
+                    underlying,
+                    _account,
+                    _quote,
+                    _priceOracle,
+                    asset
+                );
+            }
 
-                if (!assets[underlying].paused) {
-                    amount += underlying == _quote
-                        ? balance
-                        : _priceOracle.valueOfAsset(
-                            underlying,
-                            _quote,
-                            balance
-                        );
-                }
+            unchecked {
+                ++i;
             }
         }
     }
@@ -188,27 +182,28 @@ library ExternalUtils {
         IPriceOracle _priceOracle,
         address _account,
         address _borrowAsset,
-        address[] memory _underlyings,
+        address[] storage underlyings,
         mapping(address => Types.Asset) storage assets
     ) internal view returns (uint256 amount) {
-        // uint256 userConfig = _config.userDebtAndCollateral(_account);
-        for (uint256 i = 0; i < _underlyings.length; ++i) {
-            address underlying = _underlyings[i];
+        uint256 length = underlyings.length;
+        for (uint256 i = 0; i < length; ) {
+            address underlying = underlyings[i];
             Types.Asset memory asset = assets[underlying];
 
             if (_userConfig.isUsingAsCollateral(asset.index) && !asset.paused) {
-                uint256 collateralAmount = underlying == _borrowAsset
-                    ? asset.sToken.scaledBalanceOf(_account)
-                    : _priceOracle.valueOfAsset(
-                        underlying,
-                        _borrowAsset,
-                        asset.sToken.scaledBalanceOf(_account)
-                    );
+                uint256 collateralAmount = getCollateralValue(
+                    underlying,
+                    _account,
+                    _borrowAsset,
+                    _priceOracle,
+                    asset
+                );
 
-                amount +=
-                    // (_config.assetConfigs(underlying).maxLTV *
-                    (_maxLTV * collateralAmount) /
-                    Utils.MILLION;
+                amount += (_maxLTV * collateralAmount) / Utils.MILLION;
+            }
+
+            unchecked {
+                ++i;
             }
         }
     }
@@ -218,50 +213,41 @@ library ExternalUtils {
         address _quote,
         IPriceOracle _priceOracle,
         IConfig _config,
-        address[] memory _underlyings,
+        address[] storage underlyings,
         mapping(address => Types.Asset) storage assets
-    )
-        internal
-        view
-        returns (
-            uint256 collateralValue,
-            uint256 borrowingValue,
-            bool blackListedCollateral
-        )
-    {
+    ) internal view returns (uint256 collateralValue, uint256 borrowingValue) {
         uint256 userConfig = _config.userDebtAndCollateral(_account);
-        for (uint256 i = 0; i < _underlyings.length; ++i) {
-            address underlying = _underlyings[i];
+        uint256 length = underlyings.length;
+        for (uint256 i = 0; i < length; ) {
+            address underlying = underlyings[i];
             Types.Asset memory asset = assets[underlying];
 
             if (userConfig.isUsingAsCollateralOrBorrowing(asset.index)) {
-                if (userConfig.isUsingAsCollateral(asset.index)) {
-                    uint256 balance = asset.sToken.scaledBalanceOf(_account);
-
-                    if (assets[underlying].paused) {
-                        blackListedCollateral = true;
-                    } else {
-                        collateralValue += underlying == _quote
-                            ? balance
-                            : _priceOracle.valueOfAsset(
-                                underlying,
-                                _quote,
-                                balance
-                            );
-                    }
+                if (
+                    userConfig.isUsingAsCollateral(asset.index) && !asset.paused
+                ) {
+                    collateralValue += getCollateralValue(
+                        underlying,
+                        _account,
+                        _quote,
+                        _priceOracle,
+                        asset
+                    );
                 }
 
                 if (userConfig.isBorrowing(asset.index)) {
-                    uint256 balance = asset.dToken.scaledDebtOf(_account);
-
-                    borrowingValue += underlying == _quote
-                        ? balance
-                        : _priceOracle.valueOfAsset(
-                            underlying,
-                            _quote,
-                            balance
-                        );
+                    borrowingValue += getDebtsValue(
+                        underlying,
+                        _account,
+                        _quote,
+                        _priceOracle,
+                        asset
+                    );
                 }
+            }
+
+            unchecked {
+                ++i;
             }
         }
     }
@@ -287,12 +273,44 @@ library ExternalUtils {
         uint256 currentDebts = ExternalUtils.getUserDebts(
             _account,
             _config.userDebtAndCollateral(_account),
-            _underlyings,
             _underlying,
             _priceOracle,
+            _underlyings,
             assets
         );
 
         return (currentDebts <= maxDebtAllowed, maxDebtAllowed, currentDebts);
+    }
+
+    function getCollateralValue(
+        address _underlying,
+        address _account,
+        address _quote,
+        IPriceOracle _priceOracle,
+        Types.Asset memory asset
+    ) internal view returns (uint256 amount) {
+        if (!asset.paused) {
+            uint256 balance = asset.sToken.scaledBalanceOf(_account);
+
+            return
+                _underlying == _quote
+                    ? balance
+                    : _priceOracle.valueOfAsset(_underlying, _quote, balance);
+        }
+    }
+
+    function getDebtsValue(
+        address _underlying,
+        address _account,
+        address _quote,
+        IPriceOracle _priceOracle,
+        Types.Asset memory asset
+    ) internal view returns (uint256) {
+        uint256 debts = asset.dToken.scaledDebtOf(_account);
+
+        return
+            _underlying == _quote
+                ? debts
+                : _priceOracle.valueOfAsset(_underlying, _quote, debts);
     }
 }

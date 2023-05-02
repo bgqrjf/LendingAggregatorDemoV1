@@ -141,9 +141,9 @@ library LiquidateLogic {
     function getLiquidationData(
         address _account,
         address _repayAsset,
-        address[] memory _underlyings,
         IConfig _config,
         IPriceOracle _priceOracle,
+        address[] storage underlyings,
         mapping(address => Types.Asset) storage assets
     )
         external
@@ -158,9 +158,9 @@ library LiquidateLogic {
             getLiquidationDataInternal(
                 _account,
                 _repayAsset,
-                _underlyings,
                 _config,
                 _priceOracle,
+                underlyings,
                 assets
             );
     }
@@ -179,9 +179,9 @@ library LiquidateLogic {
         uint256 debtsValue = ExternalUtils.getUserDebts(
             _params.repayParams.to,
             userConfig,
-            underlyings,
             _params.repayParams.asset,
             _params.priceOracle,
+            underlyings,
             assets
         );
 
@@ -192,9 +192,9 @@ library LiquidateLogic {
         ) = getLiquidationDataInternal(
                 _params.repayParams.to,
                 _params.repayParams.asset,
-                underlyings,
                 _params.config,
                 _params.priceOracle,
+                underlyings,
                 assets
             );
 
@@ -227,9 +227,9 @@ library LiquidateLogic {
     function getLiquidationDataInternal(
         address _account,
         address _repayAsset,
-        address[] memory _underlyings,
         IConfig _config,
         IPriceOracle _priceOracle,
+        address[] storage underlyings,
         mapping(address => Types.Asset) storage assets
     )
         internal
@@ -242,50 +242,40 @@ library LiquidateLogic {
     {
         uint256 userConfig = _config.userDebtAndCollateral(_account);
 
-        for (uint256 i = 0; i < _underlyings.length; ++i) {
-            if (userConfig.isUsingAsCollateral(i)) {
-                address underlying = _underlyings[i];
+        // stack overflowed if cache underlyings.length
+        // uint256 length = underlyings.length;
+        for (uint256 i = 0; i < underlyings.length; ) {
+            address underlying = underlyings[i];
+            Types.Asset memory asset = assets[underlying];
 
-                uint256 sTokenBalance = assets[underlying]
-                    .sToken
-                    .scaledBalanceOf(_account);
-
-                uint256 collateralAmount = underlying == _repayAsset
-                    ? sTokenBalance
-                    : _priceOracle.valueOfAsset(
+            if (userConfig.isUsingAsCollateral(asset.index)) {
+                if (asset.paused) {
+                    blackListed = true;
+                } else {
+                    uint256 collateralAmount = ExternalUtils.getCollateralValue(
                         underlying,
+                        _account,
                         _repayAsset,
-                        sTokenBalance
+                        _priceOracle,
+                        asset
                     );
 
-                Types.AssetConfig memory collateralConfig = _config
-                    .assetConfigs(underlying);
+                    Types.AssetConfig memory collateralConfig = _config
+                        .assetConfigs(underlying);
 
-                {
-                    (uint256 maxLiquidationAmountNew, ) = ExternalUtils
-                        .calculateAmountByRatio(
-                            underlying,
-                            collateralAmount,
-                            collateralConfig.maxLiquidateRatio,
-                            assets
-                        );
+                    maxLiquidationAmount +=
+                        (collateralConfig.maxLiquidateRatio *
+                            collateralAmount) /
+                        Utils.MILLION;
 
-                    maxLiquidationAmount += maxLiquidationAmountNew;
+                    liquidationAmount +=
+                        (collateralConfig.liquidateLTV * collateralAmount) /
+                        Utils.MILLION;
                 }
+            }
 
-                (
-                    uint256 liquidationAmountNew,
-                    bool blackListedNew
-                ) = ExternalUtils.calculateAmountByRatio(
-                        underlying,
-                        collateralAmount,
-                        collateralConfig.liquidateLTV,
-                        assets
-                    );
-
-                liquidationAmount += liquidationAmountNew;
-
-                blackListed = blackListed || blackListedNew;
+            unchecked {
+                ++i;
             }
         }
     }
