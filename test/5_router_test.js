@@ -621,7 +621,7 @@ describe("Router tests", function () {
         expect(balance).to.equal("200000602740156908");
       });
 
-      it("should emit events when supply token0 via protocols reapy", async () => {
+      it("should emit events when supply token0 via protocols repay", async () => {
         const {
           deployer,
           feeCollector,
@@ -896,7 +896,7 @@ describe("Router tests", function () {
         expect(balance).to.equal("200000602740048780");
       });
 
-      it("should emit events when supply ETH via protocols reapy", async () => {
+      it("should emit events when supply ETH via protocols repay", async () => {
         const {
           deployer,
           feeCollector,
