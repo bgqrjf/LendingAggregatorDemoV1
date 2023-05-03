@@ -15,17 +15,23 @@ contract CompoundLogicStorage is Ownable {
 
     ComptrollerInterface public comptroller;
     address public rewardToken;
+    address public rewards;
+    address public logic;
 
     mapping(address => address) public cTokens;
 
     mapping(address => SimulateData) public lastSimulatedSupply;
     mapping(address => SimulateData) public lastSimulatedBorrow;
 
+    mapping(address => mapping(address => uint256)) public lastSupplyIndexes;
+    mapping(address => mapping(address => uint256)) public lastBorrowIndexes;
+
     constructor(
         address _owner,
         address _comptroller,
         address _cETH,
-        address _compTokenAddress
+        address _compTokenAddress,
+        address _rewards
     ) {
         _transferOwnership(_owner);
         comptroller = ComptrollerInterface(_comptroller);
@@ -34,6 +40,8 @@ contract CompoundLogicStorage is Ownable {
         cTokens[TransferHelper.ETH] = _cETH;
 
         rewardToken = _compTokenAddress;
+        rewards = _rewards;
+        logic = msg.sender;
     }
 
     function setLastSimulatedSupply(
@@ -50,10 +58,36 @@ contract CompoundLogicStorage is Ownable {
         lastSimulatedBorrow[_asset] = data;
     }
 
+    function setRewards(
+        address _newRewards,
+        address _newRewardsToken
+    ) external onlyOwner {
+        rewardToken = _newRewardsToken;
+        rewards = _newRewards;
+    }
+
     function updateCTokenList(address _cToken) external {
         (bool isListed, , ) = comptroller.markets(address(_cToken));
         require(isListed, "CompoundLogic: cToken Not Listed");
         cTokens[CTokenInterface(_cToken).underlying()] = _cToken;
+    }
+
+    function updateLastSupplyRewards(
+        address _cToken,
+        address _account,
+        uint256 _index
+    ) external {
+        require(msg.sender == logic, "CompoundLogicStorage: unAuthorized");
+        lastSupplyIndexes[_cToken][_account] = _index;
+    }
+
+    function updateLastBorrowRewards(
+        address _cToken,
+        address _account,
+        uint256 _index
+    ) external {
+        require(msg.sender == logic, "CompoundLogicStorage: unAuthorized");
+        lastBorrowIndexes[_cToken][_account] = _index;
     }
 
     function getLastSimulatedSupply(

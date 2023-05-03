@@ -16,7 +16,6 @@ contract Rewards is
 
     IProtocol[] public protocols;
     address public protocolsHandler;
-    mapping(address => mapping(uint8 => uint256)) public reserves;
     mapping(address => mapping(uint8 => mapping(address => uint256)))
         public uncollectedRewards;
 
@@ -46,21 +45,14 @@ contract Rewards is
             _isBorrow ? RewardType.CompoundBorrow : RewardType.CompoundSupply
         );
 
-        uint256 totalRewards = _getTotalRewards(
-            _asset,
-            rewardType,
-            protocolsHandler
-        );
-
-        uint256 newRewards = totalRewards - reserves[_asset][rewardType];
-        reserves[_asset][rewardType] = totalRewards;
+        uint256 newRewards = _claimNewRewards(_asset, rewardType);
 
         if (_userBalanceAfter > _userBalanceBefore) {
             _newStake(
                 _asset,
                 rewardType,
                 _account,
-                _userBalanceAfter,
+                _userBalanceBefore,
                 _userBalanceAfter - _userBalanceBefore,
                 _totalAmountBefore,
                 newRewards
@@ -77,7 +69,7 @@ contract Rewards is
         }
     }
 
-    //  rewards are expected to be transfered out to _account afterwards
+    //  rewards are expected to be transfered out to _account afterwards by protocolshandler
     function claimRewards(
         address _asset,
         bool _isBorrow,
@@ -89,6 +81,7 @@ contract Rewards is
             _isBorrow ? RewardType.CompoundBorrow : RewardType.CompoundSupply
         );
 
+        uint256 newRewards = _claimNewRewards(_asset, rewardType);
         uint256 uncollectedReward = uncollectedRewards[_asset][rewardType][
             _account
         ];
@@ -101,8 +94,7 @@ contract Rewards is
             _asset,
             rewardType,
             _totalAmount,
-            _getTotalRewards(_asset, rewardType, protocolsHandler) -
-                reserves[_asset][rewardType]
+            newRewards
         );
 
         uint256 newUserRewards = _getUserRewards(
@@ -114,37 +106,8 @@ contract Rewards is
         );
 
         userRewards = uncollectedReward + newUserRewards;
-
         userIndexes[_asset][rewardType][_account] = currentIndex;
         delete uncollectedRewards[_asset][rewardType][_account];
-    }
-
-    function getUserRewards(
-        address _asset,
-        bool _isBorrow,
-        address _account,
-        uint256 _amount,
-        uint256 _totalAmount
-    ) external view override returns (uint256) {
-        uint8 rewardType = uint8(
-            _isBorrow ? RewardType.CompoundBorrow : RewardType.CompoundSupply
-        );
-
-        uint256 currentIndex = _getCurrentIndex(
-            _asset,
-            rewardType,
-            _totalAmount,
-            _getNewRewards(_asset, rewardType, protocolsHandler)
-        );
-
-        return
-            _getUserRewards(
-                _asset,
-                rewardType,
-                _account,
-                _amount,
-                currentIndex
-            );
     }
 
     function addRewardAdmin(address _newAdmin) external override onlyOwner {
@@ -169,25 +132,14 @@ contract Rewards is
         return protocols[1].rewardToken();
     }
 
-    function _getNewRewards(
+    function _claimNewRewards(
         address _asset,
-        uint8 _type,
-        address _account
-    ) internal view override returns (uint256 amount) {
-        amount =
-            _getTotalRewards(_asset, _type, _account) -
-            reserves[_asset][_type];
-    }
-
-    function _getTotalRewards(
-        address _asset,
-        uint8 _type,
-        address _account
-    ) internal view override returns (uint256) {
+        uint8 _type
+    ) internal override returns (uint256 newRewards) {
         return
-            protocols[1].totalRewards(
+            protocols[1].claimRewards(
                 _asset,
-                _account,
+                protocolsHandler,
                 _type == uint8(RewardType.CompoundSupply)
             );
     }

@@ -30,6 +30,7 @@ describe("Protocol Interfaces tests", function () {
       comptroller.address,
       cETH.address,
       comp.address,
+      ethers.constants.AddressZero,
       { gasLimit: 5000000 }
     );
 

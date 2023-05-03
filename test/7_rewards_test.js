@@ -11,7 +11,7 @@ describe("Rewards tests", function () {
   const ETHAddress = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
 
   async function RewardsTestFixture() {
-    const [deployer, Alice, Bob, Caro] = await ethers.getSigners();
+    const [deployer, feeCollector] = await ethers.getSigners();
 
     const ERC20Token = await ethers.getContractFactory(`MockERC20`);
     let token0 = await ERC20Token.deploy("Mock token0", "Token0", 18);
@@ -82,6 +82,13 @@ describe("Rewards tests", function () {
       proxyAdmin: proxyAdmin,
     });
 
+    // rewards
+    let rewards = await transparentProxy.deployProxy({
+      implementationFactory: "Rewards",
+      initializeParams: [protocolsHandler.address],
+      proxyAdmin: proxyAdmin,
+    });
+
     let AAVEHandler = await ethers.getContractFactory("AAVELogic");
     let aaveHandler = await AAVEHandler.deploy(
       protocolsHandler.address,
@@ -95,6 +102,7 @@ describe("Rewards tests", function () {
       comptroller.address,
       cETH.address,
       comp.address,
+      rewards.address,
       { gasLimit: 5000000 }
     );
 
@@ -119,91 +127,472 @@ describe("Rewards tests", function () {
 
     await config.transferOwnership(deployer.address);
 
-    // rewards
-    let rewards = await transparentProxy.deployProxy({
-      implementationFactory: "Rewards",
-      initializeParams: [deployer.address],
-      proxyAdmin: proxyAdmin,
-    });
+    // sToken
+    let SToken = await ethers.getContractFactory("SToken");
+    let sToken = await SToken.deploy();
 
-    // sToken Proxy
-    let sTokenProxy = await transparentProxy.deployProxy({
-      implementationFactory: "SToken",
-      initializeParams: [usdt.address, rewards.address, "sUSDT", "sUSDT"],
-      proxyAdmin: proxyAdmin,
-    });
+    // dToken
+    let DToken = await ethers.getContractFactory("DToken");
+    let dToken = await DToken.deploy();
 
-    // dToken Proxy
-    let dTokenProxy = await transparentProxy.deployProxy({
-      implementationFactory: "DToken",
+    // router
+    let SupplyLogic = await ethers.getContractFactory(
+      "contracts/libraries/externals/SupplyLogic.sol:SupplyLogic"
+    );
+    let supplyLogic = await SupplyLogic.deploy();
+
+    let RedeemLogic = await ethers.getContractFactory(
+      "contracts/libraries/externals/RedeemLogic.sol:RedeemLogic"
+    );
+    let redeemLogic = await RedeemLogic.deploy();
+
+    let BorrowLogic = await ethers.getContractFactory(
+      "contracts/libraries/externals/BorrowLogic.sol:BorrowLogic"
+    );
+    let borrowLogic = await BorrowLogic.deploy();
+
+    let RepayLogic = await ethers.getContractFactory(
+      "contracts/libraries/externals/RepayLogic.sol:RepayLogic"
+    );
+    let repayLogic = await RepayLogic.deploy();
+
+    let LiquidateLogic = await ethers.getContractFactory(
+      "contracts/libraries/externals/LiquidateLogic.sol:LiquidateLogic"
+    );
+    let liquidateLogic = await LiquidateLogic.deploy();
+
+    let router = await transparentProxy.deployProxy({
+      implementationFactory: "Router",
+      libraries: {
+        SupplyLogic: supplyLogic.address,
+        RedeemLogic: redeemLogic.address,
+        BorrowLogic: borrowLogic.address,
+        RepayLogic: repayLogic.address,
+        LiquidateLogic: liquidateLogic.address,
+      },
       initializeParams: [
-        usdt.address,
+        protocolsHandler.address,
+        priceOracle.address,
+        config.address,
         rewards.address,
-        "dUSDT",
-        "dUSDT",
-        "10000",
+        sToken.address,
+        dToken.address,
+        ethers.constants.AddressZero,
+        feeCollector.address,
       ],
       proxyAdmin: proxyAdmin,
     });
 
-    await rewards.connect(deployer).addRewardAdmin(sTokenProxy.address);
-    await rewards.connect(deployer).addRewardAdmin(dTokenProxy.address);
-    await rewards.connect(deployer).addProtocol(aaveHandler.address);
-    await rewards.connect(deployer).addProtocol(compoundHandler.address);
-    await usdt.mint(compoundHandler.address, supplyAmount.mul(2)); //40 USDT  直接去cToken mint
+    await config.setRouter(router.address);
+    await protocolsHandler.transferOwnership(router.address);
+    await rewards.transferOwnership(router.address);
 
-    await usdt.mint(Alice.address, supplyAmount.mul(2));
-    await usdt.mint(Bob.address, supplyAmount.mul(2));
+    await router.addProtocol(aaveHandler.address);
+    await router.addProtocol(compoundHandler.address);
 
-    await compoundHandler
-      .connect(deployer)
-      .supply(usdt.address, ethers.utils.parseEther("40"));
+    await router.addAsset({
+      underlying: token0.address,
+      decimals: 18,
+      collateralable: true,
+      sTokenName: "s-token0",
+      sTokenSymbol: "sT0",
+      dTokenName: "d-token0",
+      dTokenSymbol: "dT0",
+      config: {
+        maxLTV: 700000,
+        liquidateLTV: 750000,
+        maxLiquidateRatio: 500000,
+        liquidateRewardRatio: 1080000,
+      },
+      feeRate: 10000,
+      maxReserve: 0,
+      executeSupplyThreshold: 0,
+    });
+
+    await router.addAsset({
+      underlying: usdt.address,
+      decimals: 6,
+      collateralable: true,
+      sTokenName: "s-USDT",
+      sTokenSymbol: "sUSDT",
+      dTokenName: "d-USDT",
+      dTokenSymbol: "dUSDT",
+      config: {
+        maxLTV: 700000,
+        liquidateLTV: 750000,
+        maxLiquidateRatio: 500000,
+        liquidateRewardRatio: 1080000,
+      },
+      feeRate: 10000,
+      maxReserve: 0,
+      executeSupplyThreshold: 0,
+    });
+
+    await router.addAsset({
+      underlying: ETHAddress,
+      decimals: 18,
+      collateralable: true,
+      sTokenName: "s-ETH",
+      sTokenSymbol: "sETH",
+      dTokenName: "d-ETH",
+      dTokenSymbol: "dETH",
+      config: {
+        maxLTV: 700000,
+        liquidateLTV: 750000,
+        maxLiquidateRatio: 500000,
+        liquidateRewardRatio: 1080000,
+      },
+      feeRate: 10000,
+      maxReserve: 0,
+      executeSupplyThreshold: 0,
+    });
 
     return {
       deployer: deployer,
-      alice: Alice,
-      bob: Bob,
-      config: config,
-      priceOracle: priceOracle,
+      router: router,
+
       protocolsHandler: protocolsHandler,
       rewards: rewards,
-      sTokenProxy: sTokenProxy,
-      dTokenProxy: dTokenProxy,
+      sTokenImplement: sToken,
+      dTokenImplement: dToken,
+      aaveLogic: aaveHandler,
+      compoundLogic: compoundHandler,
+      comp: comp,
+
       token0: token0,
       usdt: usdt,
-      wETH: wETH,
       cToken0: cToken0,
       cUSDT: cUSDT,
-      cETH: cETH,
     };
   }
 
-  describe("rewards SToken  tests", function () {
-    it("should start farm token0 via SToken mint", async () => {
-      const { deployer, alice, bob, sTokenProxy, dTokenProxy, rewards, usdt } =
-        await loadFixture(RewardsTestFixture);
+  async function supply(deployer, router, token, supplyAmount) {
+    let sToken;
+    let dToken;
+    if (token == null) {
+      let asset = await router.assets(ETHAddress);
+      sToken = await ethers.getContractAt("ISToken", asset.sToken);
+      dToken = await ethers.getContractAt("IDToken", asset.dToken);
 
-      await sTokenProxy
-        .connect(deployer)
-        .mint(
-          alice.address,
-          ethers.utils.parseUnits("1", "ether"),
-          ethers.utils.parseUnits("0", "ether")
-        );
-      let aliceSTokenbalance = await sTokenProxy.balanceOf(alice.address);
-      m.log(aliceSTokenbalance.toString());
-      await hre.network.provider.send("hardhat_mine", ["0x200"]);
-      await rewards.getUserRewards(usdt.address);
+      let tx = await router.supply(
+        { asset: ETHAddress, amount: supplyAmount, to: deployer.address },
+        true,
+        true,
+        { value: supplyAmount }
+      );
+    } else {
+      await token.mint(deployer.address, supplyAmount);
+      await token.approve(router.address, supplyAmount);
 
-      await sTokenProxy
-        .connect(deployer)
-        .mint(
-          bob.address,
-          ethers.utils.parseUnits("1", "ether"),
-          ethers.utils.parseUnits("1.1", "ether")
-        );
-      let bobSTokenbalance = await sTokenProxy.balanceOf(bob.address);
-      m.log(bobSTokenbalance.toString());
+      let asset = await router.assets(token.address);
+      sToken = await ethers.getContractAt("ISToken", asset.sToken);
+      dToken = await ethers.getContractAt("IDToken", asset.dToken);
+
+      let tx = await router.supply(
+        { asset: token.address, amount: supplyAmount, to: deployer.address },
+        true,
+        true
+      );
+    }
+
+    return { sToken: sToken, dToken: dToken };
+  }
+
+  async function redeem(deployer, router, token, supplyAmount) {
+    let sToken;
+    let dToken;
+    if (token == null) {
+      let asset = await router.assets(ETHAddress);
+      sToken = await ethers.getContractAt("ISToken", asset.sToken);
+      dToken = await ethers.getContractAt("IDToken", asset.dToken);
+
+      let tx = await router.redeem(
+        { asset: ETHAddress, amount: supplyAmount, to: deployer.address },
+        true,
+        true
+      );
+    } else {
+      let asset = await router.assets(token.address);
+      sToken = await ethers.getContractAt("ISToken", asset.sToken);
+      dToken = await ethers.getContractAt("IDToken", asset.dToken);
+
+      let tx = await router.redeem(
+        { asset: token.address, amount: supplyAmount, to: deployer.address },
+        true,
+        true
+      );
+    }
+
+    return { sToken: sToken, dToken: dToken };
+  }
+
+  async function borrow(deployer, router, token, borrowAmount) {
+    let dToken;
+    if (token == null) {
+      let asset = await router.assets(ETHAddress);
+      dToken = await ethers.getContractAt("IDToken", asset.dToken);
+
+      let tx = await router.borrow(
+        {
+          asset: ETHAddress,
+          amount: borrowAmount,
+          to: deployer.address,
+        },
+        true
+      );
+    } else {
+      let asset = await router.assets(token.address);
+      dToken = await ethers.getContractAt("IDToken", asset.dToken);
+
+      let tx = await router.borrow(
+        {
+          asset: token.address,
+          amount: borrowAmount,
+          to: deployer.address,
+        },
+        true
+      );
+    }
+
+    return dToken;
+  }
+
+  async function repay(deployer, router, token, borrowAmount) {
+    let sToken;
+    let dToken;
+    if (token == null) {
+      let asset = await router.assets(ETHAddress);
+      sToken = await ethers.getContractAt("ISToken", asset.sToken);
+      dToken = await ethers.getContractAt("IDToken", asset.dToken);
+
+      let tx = await router.repay(
+        { asset: ETHAddress, amount: borrowAmount, to: deployer.address },
+        true,
+        { value: borrowAmount }
+      );
+    } else {
+      await token.mint(deployer.address, borrowAmount);
+      await token.approve(router.address, borrowAmount);
+
+      let asset = await router.assets(token.address);
+      sToken = await ethers.getContractAt("ISToken", asset.sToken);
+      dToken = await ethers.getContractAt("IDToken", asset.dToken);
+
+      let tx = await router.repay(
+        { asset: token.address, amount: borrowAmount, to: deployer.address },
+        true
+      );
+    }
+
+    return { sToken: sToken, dToken: dToken };
+  }
+
+  it("should set data properly", async () => {
+    const deploys = await loadFixture(RewardsTestFixture);
+
+    let protocolsHandler = await deploys.rewards.protocolsHandler();
+    let aaveLogic = await deploys.rewards.protocols(0);
+    let compoundLogic = await deploys.rewards.protocols(1);
+
+    expect(protocolsHandler).to.equal(deploys.protocolsHandler.address);
+    expect(aaveLogic).to.equal(deploys.aaveLogic.address);
+    expect(compoundLogic).to.equal(deploys.compoundLogic.address);
+  });
+
+  describe("rewards tests on supply", function () {
+    it("should start farm token0 via sToken", async () => {
+      const {
+        deployer,
+        router,
+        token0,
+        cToken0,
+        rewards,
+        comp,
+        protocolsHandler,
+        compoundLogic,
+      } = await loadFixture(RewardsTestFixture);
+      let supplyAmount = ethers.utils.parseUnits("0.2", "ether");
+
+      // before supply
+      let uncollectedRewards0 = await rewards.uncollectedRewards(
+        token0.address,
+        0,
+        deployer.address
+      );
+      let currentIndex0 = await rewards.currentIndexes(token0.address, 0);
+      let userIndex0 = await rewards.userIndexes(
+        token0.address,
+        0,
+        deployer.address
+      );
+
+      // 1st supply
+      await supply(deployer, router, token0, supplyAmount);
+
+      let uncollectedRewards1 = await rewards.uncollectedRewards(
+        token0.address,
+        0,
+        deployer.address
+      );
+      let currentIndex1 = await rewards.currentIndexes(token0.address, 0);
+      let userIndex1 = await rewards.userIndexes(
+        token0.address,
+        0,
+        deployer.address
+      );
+
+      await expect(uncollectedRewards1.sub(uncollectedRewards0)).to.equal(0);
+      await expect(currentIndex1.sub(currentIndex0)).to.equal(0);
+      await expect(userIndex1.sub(userIndex0)).to.equal(0);
+
+      // 2nd supply
+      await supply(deployer, router, token0, supplyAmount);
+
+      let uncollectedRewards2 = await rewards.uncollectedRewards(
+        token0.address,
+        0,
+        deployer.address
+      );
+      let currentIndex2 = await rewards.currentIndexes(token0.address, 0);
+      let userIndex2 = await rewards.userIndexes(
+        token0.address,
+        0,
+        deployer.address
+      );
+
+      await expect(uncollectedRewards2.sub(uncollectedRewards1)).to.equal(0);
+      await expect(currentIndex2.sub(currentIndex1)).to.equal(
+        "4975245884631555"
+      );
+      await expect(userIndex2.sub(userIndex1)).to.equal("2487622920567342");
+
+      // claim rewards
+      await router.claimRewards(deployer.address, [token0.address]);
+      let receivedRewards0 = await comp.balanceOf(deployer.address);
+      await expect(receivedRewards0).to.equal("1651911701978316");
+
+      // claim rewards again
+      await router.claimRewards(deployer.address, [token0.address]);
+      let receivedRewards1 = await comp.balanceOf(deployer.address);
+      await expect(receivedRewards1).to.equal("2308774227030321");
+
+      // 1st redeem
+      await redeem(deployer, router, token0, supplyAmount);
+
+      // claim rewards
+      await router.claimRewards(deployer.address, [token0.address]);
+      let receivedRewards2 = await comp.balanceOf(deployer.address);
+      await expect(receivedRewards2).to.equal("3297319816687884");
+
+      // 2nd redeem
+      await redeem(deployer, router, token0, supplyAmount.mul(2));
+      await router.claimRewards(deployer.address, [token0.address]);
+      let receivedRewards3 = await comp.balanceOf(deployer.address);
+      await expect(receivedRewards3).to.equal("3629002881293441");
+
+      // claim rewards again with no token left
+      await router.claimRewards(deployer.address, [token0.address]);
+      let receivedRewards4 = await comp.balanceOf(deployer.address);
+      await expect(receivedRewards4).to.equal("3629002881293441");
+    });
+
+    it("should start farm token0 via dToken", async () => {
+      const {
+        deployer,
+        router,
+        usdt,
+        token0,
+        cToken0,
+        rewards,
+        comp,
+        protocolsHandler,
+        compoundLogic,
+      } = await loadFixture(RewardsTestFixture);
+      let borrowAmount = ethers.utils.parseUnits("0.2", "ether");
+      // let borrowAmount = 1000;
+
+      // before borrow
+      await supply(deployer, router, usdt, borrowAmount);
+      let uncollectedRewards0 = await rewards.uncollectedRewards(
+        token0.address,
+        1,
+        deployer.address
+      );
+      let currentIndex0 = await rewards.currentIndexes(token0.address, 1);
+      let userIndex0 = await rewards.userIndexes(
+        token0.address,
+        1,
+        deployer.address
+      );
+
+      // 1st borrow
+      await borrow(deployer, router, token0, borrowAmount);
+
+      let uncollectedRewards1 = await rewards.uncollectedRewards(
+        token0.address,
+        1,
+        deployer.address
+      );
+      let currentIndex1 = await rewards.currentIndexes(token0.address, 1);
+      let userIndex1 = await rewards.userIndexes(
+        token0.address,
+        1,
+        deployer.address
+      );
+
+      await expect(uncollectedRewards1.sub(uncollectedRewards0)).to.equal(0);
+      await expect(currentIndex1.sub(currentIndex0)).to.equal(0);
+      await expect(userIndex1.sub(userIndex0)).to.equal(0);
+
+      // 2nd borrow
+      await borrow(deployer, router, token0, borrowAmount);
+
+      let uncollectedRewards2 = await rewards.uncollectedRewards(
+        token0.address,
+        1,
+        deployer.address
+      );
+      let currentIndex2 = await rewards.currentIndexes(token0.address, 1);
+      let userIndex2 = await rewards.userIndexes(
+        token0.address,
+        1,
+        deployer.address
+      );
+
+      await expect(uncollectedRewards2.sub(uncollectedRewards1)).to.equal(0);
+      await expect(currentIndex2.sub(currentIndex1)).to.equal(
+        "3284311543043265"
+      );
+      await expect(userIndex2.sub(userIndex1)).to.equal("1642155761562779");
+
+      // claim rewards
+      await router.claimRewards(deployer.address, [token0.address]);
+      let receivedRewards0 = await comp.balanceOf(deployer.address);
+      await expect(receivedRewards0).to.equal("1945322999831332");
+
+      // claim rewards again
+      await router.claimRewards(deployer.address, [token0.address]);
+      let receivedRewards1 = await comp.balanceOf(deployer.address);
+      await expect(receivedRewards1).to.equal("3233783691054011");
+
+      // 1st redeem
+      await repay(deployer, router, token0, borrowAmount);
+
+      // claim rewards
+      await router.claimRewards(deployer.address, [token0.address]);
+      let receivedRewards2 = await comp.balanceOf(deployer.address);
+      await expect(receivedRewards2).to.equal("7756028113150797");
+
+      // 2nd redeem
+      await repay(deployer, router, token0, borrowAmount.mul(2));
+      await router.claimRewards(deployer.address, [token0.address]);
+      let receivedRewards3 = await comp.balanceOf(deployer.address);
+      await expect(receivedRewards3).to.equal("9726615158437040");
+
+      // claim rewards again with no token left
+      await router.claimRewards(deployer.address, [token0.address]);
+      let receivedRewards4 = await comp.balanceOf(deployer.address);
+      await expect(receivedRewards4).to.equal("9726615158437040");
     });
   });
 });

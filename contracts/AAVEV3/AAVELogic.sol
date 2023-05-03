@@ -190,7 +190,11 @@ contract AAVELogic is IProtocol {
         );
     }
 
-    function claimRewards(address _account) external override {}
+    function claimRewards(
+        address _underlying,
+        address _account,
+        bool _isSupply
+    ) external override returns (uint256 newRewards) {}
 
     function supplyOf(
         address _underlying,
@@ -349,12 +353,6 @@ contract AAVELogic is IProtocol {
 
         return int256(borrowAmount) - int256(params.totalBorrowed);
     }
-
-    function totalRewards(
-        address _underlying,
-        address _account,
-        bool _isSupply
-    ) external view override returns (uint256 rewards) {}
 
     function pool() external view returns (IAAVEPool) {
         return LOGIC_STORAGE.pool();

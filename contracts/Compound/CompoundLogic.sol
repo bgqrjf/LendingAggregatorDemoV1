@@ -31,7 +31,8 @@ contract CompoundLogic is IProtocol {
         address _protocolsHandler,
         address _comptroller,
         address _cETH,
-        address _compTokenAddress
+        address _compTokenAddress,
+        address _rewards
     ) {
         // for testing purpose
         if (_protocolsHandler == address(0)) {
@@ -41,7 +42,8 @@ contract CompoundLogic is IProtocol {
             _protocolsHandler,
             _comptroller,
             _cETH,
-            _compTokenAddress
+            _compTokenAddress,
+            _rewards
         );
     }
 
@@ -160,10 +162,6 @@ contract CompoundLogic is IProtocol {
                 "CompoundLogic: compound repay revert"
             );
         }
-    }
-
-    function claimRewards(address _account) external override {
-        LOGIC_STORAGE.comptroller().claimComp(_account);
     }
 
     // return underlying Token
@@ -406,19 +404,59 @@ contract CompoundLogic is IProtocol {
         LOGIC_STORAGE.updateCTokenList(_cToken);
     }
 
-    function totalRewards(
+    function claimRewards(
         address _underlying,
         address _account,
         bool _isSupply
-    ) external view override returns (uint256 rewards) {
+    ) external override returns (uint256 newRewards) {
+        require(
+            msg.sender == LOGIC_STORAGE.rewards(),
+            "CompoundLogic: OnlyRewards"
+        );
+
         CTokenInterface cToken = CTokenInterface(
             LOGIC_STORAGE.cTokens(_underlying)
         );
 
-        return
+        address[] memory holders = new address[](1);
+        holders[0] = _account;
+        CTokenInterface[] memory cTokens = new CTokenInterface[](1);
+        cTokens[0] = cToken;
+
+        LOGIC_STORAGE.comptroller().claimComp(
+            holders,
+            cTokens,
+            !_isSupply,
             _isSupply
-                ? getSupplyReward(cToken, _account)
-                : getBorrowReward(cToken, _account);
+        );
+
+        if (_isSupply) {
+            uint256 supplyIndex;
+            (newRewards, supplyIndex) = getSupplyReward(
+                cToken,
+                _account,
+                LOGIC_STORAGE.lastSupplyIndexes(address(cToken), _account)
+            );
+
+            LOGIC_STORAGE.updateLastSupplyRewards(
+                address(cToken),
+                _account,
+                supplyIndex
+            );
+        } else {
+            uint256 borrowIndex;
+            (newRewards, borrowIndex) = getBorrowReward(
+                cToken,
+                _account,
+                LOGIC_STORAGE.lastBorrowIndexes(address(cToken), _account)
+            );
+
+            LOGIC_STORAGE.updateLastBorrowRewards(
+                address(cToken),
+                _account,
+                borrowIndex
+            );
+        }
     }
 
     function accrueInterest(
@@ -484,62 +522,31 @@ contract CompoundLogic is IProtocol {
 
     function getSupplyReward(
         CTokenInterface _cToken,
-        address _account
-    ) internal view returns (uint256 rewards) {
-        (uint256 supplyIndex, uint256 blockNumber) = LOGIC_STORAGE
-            .comptroller()
-            .compSupplyState(address(_cToken));
-
-        uint256 deltaBlocks = block.number - blockNumber;
-
-        uint256 supplySpeed = LOGIC_STORAGE.comptroller().compSupplySpeeds(
+        address _account,
+        uint256 lastSupplierIndex
+    ) internal view returns (uint256 rewards, uint256 supplyIndex) {
+        (supplyIndex, ) = LOGIC_STORAGE.comptroller().compSupplyState(
             address(_cToken)
         );
-        if (deltaBlocks > 0 && supplySpeed > 0) {
-            uint256 totalSupply = _cToken.totalSupply();
-            uint256 compAccrued = deltaBlocks * supplySpeed;
-            uint256 ratio = totalSupply > 0
-                ? (compAccrued * 1e36) / totalSupply
-                : 0;
-            supplyIndex += ratio;
-        }
 
-        uint256 supplierIndex = 1e36;
-
-        uint256 deltaIndex = supplyIndex - supplierIndex;
-
+        uint256 deltaIndex = supplyIndex - lastSupplierIndex;
         uint256 supplierTokens = _cToken.balanceOf(_account);
         rewards = (supplierTokens * deltaIndex) / 1e36;
     }
 
     function getBorrowReward(
         CTokenInterface _cToken,
-        address _account
-    ) internal view returns (uint256 rewards) {
-        (uint256 borrowIndex, uint256 blockNumber) = LOGIC_STORAGE
-            .comptroller()
-            .compBorrowState(address(_cToken));
-
-        uint256 deltaBlocks = block.number - blockNumber;
-        uint256 borrowSpeed = LOGIC_STORAGE.comptroller().compBorrowSpeeds(
+        address _account,
+        uint256 lastBorrowIndex
+    ) internal view returns (uint256 rewards, uint256 borrowIndex) {
+        (borrowIndex, ) = LOGIC_STORAGE.comptroller().compBorrowState(
             address(_cToken)
         );
-        if (deltaBlocks > 0 && borrowSpeed > 0) {
-            uint256 totalBorrow = (_cToken.totalBorrows() * 1e36) /
-                _cToken.borrowIndex();
-            uint256 compAccrued = (deltaBlocks * borrowSpeed) / 1e36;
-            uint256 ratio = totalBorrow > 0
-                ? (compAccrued * 1e36) / totalBorrow
-                : 0;
-            borrowIndex += ratio;
-        }
 
-        uint256 borrowerIndex = 1e36;
-
-        uint256 deltaIndex = borrowIndex - borrowerIndex;
+        uint256 deltaIndex = borrowIndex - lastBorrowIndex;
 
         (, , uint256 borrowBalance, ) = _cToken.getAccountSnapshot(_account);
-        uint256 borrowAmount = (borrowBalance * 1e36) / _cToken.borrowIndex();
+        uint256 borrowAmount = (borrowBalance * 1e18) / _cToken.borrowIndex();
 
         rewards = (borrowAmount * deltaIndex) / 1e36;
     }

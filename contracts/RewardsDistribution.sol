@@ -68,18 +68,13 @@ contract RewardsDistribution {
     function _rewardTokens(
         address,
         uint8
-    ) internal view virtual returns (address) {
-        return address(0);
-    }
+    ) internal view virtual returns (address) {}
 
     // Returns new rewards gained since last update (must be overridden in child contract)
-    function _getNewRewards(
+    function _claimNewRewards(
         address,
-        uint8,
-        address
-    ) internal view virtual returns (uint256) {
-        return 0;
-    }
+        uint8
+    ) internal virtual returns (uint256 newRewards) {}
 
     // View the total rewards earned by a user
     function _getUserRewards(
@@ -94,15 +89,6 @@ contract RewardsDistribution {
         return ((_currentIndex - userIndex) * _amount) / Utils.QUINTILLION;
     }
 
-    // Returns total rewards for an asset and type (must be overridden in child contract)
-    function _getTotalRewards(
-        address,
-        uint8,
-        address
-    ) internal view virtual returns (uint256) {
-        return 0;
-    }
-
     // Returns new index value based on total amount and new rewards gained since last update
     function _getCurrentIndex(
         address _asset,
@@ -111,11 +97,11 @@ contract RewardsDistribution {
         uint256 _newRewards
     ) internal view returns (uint256) {
         return
-            _totalAmount > 0
+            _newRewards > 0
                 ? currentIndexes[_asset][_type] +
                     (_newRewards * Utils.QUINTILLION) /
                     _totalAmount
-                : 0;
+                : currentIndexes[_asset][_type];
     }
 
     // Updates index value based on total amount and new rewards gained since last update

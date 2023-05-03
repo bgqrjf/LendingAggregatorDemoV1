@@ -82,6 +82,13 @@ describe("Router tests", function () {
       proxyAdmin: proxyAdmin,
     });
 
+    // rewards
+    let rewards = await transparentProxy.deployProxy({
+      implementationFactory: "Rewards",
+      initializeParams: [protocolsHandler.address],
+      proxyAdmin: proxyAdmin,
+    });
+
     let AAVEHandler = await ethers.getContractFactory("AAVELogic");
     let aaveHandler = await AAVEHandler.deploy(
       protocolsHandler.address,
@@ -95,6 +102,7 @@ describe("Router tests", function () {
       comptroller.address,
       cETH.address,
       comp.address,
+      rewards.address,
       { gasLimit: 5000000 }
     );
 
@@ -118,13 +126,6 @@ describe("Router tests", function () {
     });
 
     await config.transferOwnership(deployer.address);
-
-    // rewards
-    let rewards = await transparentProxy.deployProxy({
-      implementationFactory: "Rewards",
-      initializeParams: [protocolsHandler.address],
-      proxyAdmin: proxyAdmin,
-    });
 
     // sToken
     let SToken = await ethers.getContractFactory("SToken");

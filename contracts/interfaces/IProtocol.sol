@@ -28,13 +28,11 @@ interface IProtocol {
         address _underlying
     ) external view returns (uint256);
 
-    function totalRewards(
+    function claimRewards(
         address _underlying,
         address _account,
         bool _isSupply
-    ) external view returns (uint256 rewards);
-
-    function claimRewards(address _account) external;
+    ) external returns (uint256 newRewards);
 
     function getUsageParams(
         address _underlying,
