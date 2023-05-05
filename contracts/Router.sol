@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.14;
+pragma solidity ^0.8.18;
 
 import "./storages/RouterStorage.sol";
 import "./MultiImplementationBeaconProxy.sol";
@@ -47,7 +47,12 @@ contract Router is RouterStorage, OwnableUpgradeable {
         feeCollector = _feeCollector;
     }
 
-    // user externals
+    /** @notice supply asset to the protocol
+        @dev only supply to the protocol if the action is not paused
+        @param _params user asset params(asset, amount, to)
+        @param _collateralable whether the supply is used as collateral
+        @param _executeNow whether to execute the action now or later
+     */
     function supply(
         Types.UserAssetParams memory _params,
         bool _collateralable,
@@ -68,6 +73,12 @@ contract Router is RouterStorage, OwnableUpgradeable {
         );
     }
 
+    /** @notice redeem asset from the protocol
+        @dev only redeem from the protocol if the action is not paused
+        @param _params user asset params(asset, amount, to)
+        @param _collateralable whether the redeem is used as collateral
+        @param _executeNow whether to execute the action now or later
+     */
     function redeem(
         Types.UserAssetParams memory _params,
         bool _collateralable,
@@ -90,6 +101,11 @@ contract Router is RouterStorage, OwnableUpgradeable {
         );
     }
 
+    /** @notice borrow asset from the protocol
+        @dev only borrow from the protocol if the action is not paused
+        @param _params user asset params(asset, amount, to)
+        @param _executeNow whether to execute the action now or later
+    */
     function borrow(
         Types.UserAssetParams memory _params,
         bool _executeNow
@@ -110,6 +126,11 @@ contract Router is RouterStorage, OwnableUpgradeable {
         );
     }
 
+    /** @notice repay asset to the protocol
+        @dev only repay to the protocol if the action is not paused
+        @param _params user asset params(asset, amount, to)
+        @param _executeNow whether to execute the action now or later
+     */
     function repay(
         Types.UserAssetParams memory _params,
         bool _executeNow
@@ -130,7 +151,11 @@ contract Router is RouterStorage, OwnableUpgradeable {
         );
     }
 
-    // _redeemParams.amount is the minAmount redeem which is used as slippage validation
+    /** @notice liquidate a position
+        @dev only liquidate if the action is not paused
+        @param _repayParams user asset params(asset, amount, to)
+        @param _redeemParams user asset params(asset, amount, to). amount is the minAmount redeem which is used as slippage validation
+     */
     function liquidate(
         Types.UserAssetParams memory _repayParams,
         Types.UserAssetParams memory _redeemParams
@@ -152,11 +177,18 @@ contract Router is RouterStorage, OwnableUpgradeable {
         );
     }
 
+    /** @dev sync status for protocols
+        @param _asset asset to sync
+     */
     function sync(address _asset) external override {
         ExternalUtils.sync(_asset, protocols, totalLendings);
     }
 
-    // only 1 rewardToken for now rewrite following if there is multiple
+    /** @notice claim rewards
+        @dev claim rewards from all protocols. only 1 rewardToken for now, rewrite the function if there is multiple
+        @param _account account to claim rewards
+        @param _underlyings underlyings to claim rewards
+     */
     function claimRewards(
         address _account,
         address[] memory _underlyings
@@ -548,7 +580,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
             ISToken(
                 address(
                     new MultiImplementationBeaconProxy(
-                        keySToken,
+                        IMPLEMENTATION_KEY_STOKEN,
                         abi.encodeWithSelector(
                             ISToken.initialize.selector,
                             _newAsset.underlying,
@@ -562,7 +594,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
             IDToken(
                 address(
                     new MultiImplementationBeaconProxy(
-                        keyDToken,
+                        IMPLEMENTATION_KEY_DTOKEN,
                         abi.encodeWithSelector(
                             IDToken.initialize.selector,
                             _newAsset.underlying,
@@ -657,9 +689,9 @@ contract Router is RouterStorage, OwnableUpgradeable {
     function implementations(
         bytes32 implementationKey
     ) external view override returns (address) {
-        if (implementationKey == keyDToken) {
+        if (implementationKey == IMPLEMENTATION_KEY_DTOKEN) {
             return dTokenImplement;
-        } else if (implementationKey == keySToken) {
+        } else if (implementationKey == IMPLEMENTATION_KEY_STOKEN) {
             return sTokenImplement;
         } else {
             revert("Router: implementationKey not exists");
