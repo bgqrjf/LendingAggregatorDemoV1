@@ -29,11 +29,9 @@ contract MockAAVEPriceOracle {
         }
     }
 
-    function getAssetsPrices(address[] calldata assets)
-        external
-        view
-        returns (uint256[] memory)
-    {
+    function getAssetsPrices(
+        address[] calldata assets
+    ) external view returns (uint256[] memory) {
         uint256[] memory _prices = new uint256[](assets.length);
         for (uint256 i = 0; i < assets.length; i++) {
             _prices[i] = getAssetPrice(assets[i]);

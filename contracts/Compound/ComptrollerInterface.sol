@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
-pragma solidity ^0.8.14;
+pragma solidity ^0.8.18;
 
 import "./CTokenInterface.sol";
 import "./IOracle.sol";

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.14;
+pragma solidity ^0.8.18;
 
 import "../../interfaces/IConfig.sol";
 import "../../interfaces/IProtocolsHandler.sol";
@@ -138,36 +138,6 @@ library ExternalUtils {
                 amount += underlying == _quote
                     ? balance
                     : priceOracle.valueOfAsset(underlying, _quote, balance);
-            }
-
-            unchecked {
-                ++i;
-            }
-        }
-    }
-
-    function getUserCollateral(
-        address _account,
-        uint256 _userConfig,
-        address _quote,
-        IPriceOracle _priceOracle,
-        address[] storage underlyings,
-        mapping(address => Types.Asset) storage assets
-    ) internal view returns (uint256 amount) {
-        uint256 length = underlyings.length;
-
-        for (uint256 i = 0; i < length; ) {
-            address underlying = underlyings[i];
-            Types.Asset memory asset = assets[underlying];
-
-            if (_userConfig.isUsingAsCollateral(asset.index) && !asset.paused) {
-                amount += getCollateralValue(
-                    underlying,
-                    _account,
-                    _quote,
-                    _priceOracle,
-                    asset
-                );
             }
 
             unchecked {

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.14;
+pragma solidity ^0.8.18;
 
 import "../libraries/internals/UserAssetBitMap.sol";
 
@@ -15,19 +15,17 @@ contract MockLibraryTest {
             );
     }
 
-    function isBorrowing(uint256 _userConfig, uint256 _reserveIndex)
-        public
-        pure
-        returns (bool)
-    {
+    function isBorrowing(
+        uint256 _userConfig,
+        uint256 _reserveIndex
+    ) public pure returns (bool) {
         return UserAssetBitMap.isBorrowing(_userConfig, _reserveIndex);
     }
 
-    function isUsingAsCollateral(uint256 _userConfig, uint256 _reserveIndex)
-        public
-        pure
-        returns (bool)
-    {
+    function isUsingAsCollateral(
+        uint256 _userConfig,
+        uint256 _reserveIndex
+    ) public pure returns (bool) {
         return UserAssetBitMap.isUsingAsCollateral(_userConfig, _reserveIndex);
     }
 }

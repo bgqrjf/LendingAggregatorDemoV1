@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.14;
+pragma solidity 0.8.18;
 
 contract MockPriceOracleOKC {
     mapping(address => uint256) public units;
@@ -21,7 +21,7 @@ contract MockPriceOracleOKC {
         uint256 _decimals,
         string memory symbol
     ) external {
-        units[_asset] = 10**_decimals;
+        units[_asset] = 10 ** _decimals;
         assetSymbol[_asset] = symbol;
         ratios[_asset] = MILLION;
     }
@@ -54,7 +54,10 @@ contract MockPriceOracleOKC {
 }
 
 interface IExOraclePriceData {
-    function latestRoundData(string calldata priceType, address dataSource)
+    function latestRoundData(
+        string calldata priceType,
+        address dataSource
+    )
         external
         view
         returns (
@@ -65,20 +68,20 @@ interface IExOraclePriceData {
             uint80 answeredInRound
         );
 
-    function get(string calldata priceType, address source)
-        external
-        view
-        returns (uint256 price, uint256 timestamp);
+    function get(
+        string calldata priceType,
+        address source
+    ) external view returns (uint256 price, uint256 timestamp);
 
-    function getOffchain(string calldata priceType, address source)
-        external
-        view
-        returns (uint256 price, uint256 timestamp);
+    function getOffchain(
+        string calldata priceType,
+        address source
+    ) external view returns (uint256 price, uint256 timestamp);
 
-    function getCumulativePrice(string calldata priceType, address source)
-        external
-        view
-        returns (uint256 cumulativePrice, uint32 timestamp);
+    function getCumulativePrice(
+        string calldata priceType,
+        address source
+    ) external view returns (uint256 cumulativePrice, uint32 timestamp);
 
     function lastResponseTime(address source) external view returns (uint256);
 }

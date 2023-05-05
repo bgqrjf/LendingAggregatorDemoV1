@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0
-pragma solidity 0.8.14;
+pragma solidity 0.8.18;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./IScaledBalanceToken.sol";
@@ -146,9 +146,5 @@ interface IAToken is IERC20, IScaledBalanceToken {
      * @param to The address of the recipient
      * @param amount The amount of token to transfer
      */
-    function rescueTokens(
-        address token,
-        address to,
-        uint256 amount
-    ) external;
+    function rescueTokens(address token, address to, uint256 amount) external;
 }

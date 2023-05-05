@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.14;
+pragma solidity ^0.8.18;
 
 interface IProtocol {
     event SupplyShareUpdated(address indexed, uint256, bytes);

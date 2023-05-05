@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
-pragma solidity ^0.8.14;
+pragma solidity ^0.8.18;
 
 import "./InterestRateModel.sol";
 
@@ -8,22 +8,15 @@ interface CTokenInterface {
 
     function balanceOfUnderlying(address owner) external view returns (uint256);
 
-    function getAccountSnapshot(address account)
-        external
-        view
-        returns (
-            uint256,
-            uint256,
-            uint256,
-            uint256
-        );
+    function getAccountSnapshot(
+        address account
+    ) external view returns (uint256, uint256, uint256, uint256);
 
     function totalSupply() external view returns (uint256);
 
-    function borrowBalanceStored(address account)
-        external
-        view
-        returns (uint256);
+    function borrowBalanceStored(
+        address account
+    ) external view returns (uint256);
 
     function borrowIndex() external view returns (uint256);
 
