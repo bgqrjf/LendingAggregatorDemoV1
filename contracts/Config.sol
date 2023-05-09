@@ -57,34 +57,30 @@ contract Config is IConfig, OwnableUpgradeable {
 
         Types.Asset memory asset = IRouter(router).getAsset(_underlying);
         uint256 oldUserConfig = userDebtAndCollateral[_account];
-
         uint256 newUserConfig = oldUserConfig;
-        if (
-            UserAssetBitMap.isUsingAsCollateral(oldUserConfig, asset.index) !=
-            _usingAsCollateral
+
+        uint256 bit = 1 << ((asset.index << 1) + 1);
+        if (_usingAsCollateral) {
+            newUserConfig = oldUserConfig | bit;
+            userDebtAndCollateral[_account] = newUserConfig;
+        } else if (
+            UserAssetBitMap.isUsingAsCollateral(oldUserConfig, asset.index)
         ) {
-            uint256 bit = 1 << ((asset.index << 1) + 1);
+            newUserConfig = oldUserConfig & ~bit;
+            userDebtAndCollateral[_account] = newUserConfig;
 
-            if (_usingAsCollateral) {
-                newUserConfig = oldUserConfig | bit;
-                userDebtAndCollateral[_account] = newUserConfig;
-            } else {
-                newUserConfig = oldUserConfig & ~bit;
-                userDebtAndCollateral[_account] = newUserConfig;
+            (bool isHealthy, , ) = IRouter(router).isPoisitionHealthy(
+                _underlying,
+                _account
+            );
 
-                (bool isHealthy, , ) = IRouter(router).isPoisitionHealthy(
-                    _underlying,
-                    _account
+            if (!isHealthy) {
+                require(
+                    msg.sender == address(router),
+                    "Config: Insufficinet Collateral"
                 );
-
-                if (!isHealthy) {
-                    require(
-                        msg.sender == address(router),
-                        "Config: Insufficinet Collateral"
-                    );
-
-                    userDebtAndCollateral[_account] = newUserConfig;
-                }
+                newUserConfig = oldUserConfig;
+                userDebtAndCollateral[_account] = oldUserConfig;
             }
         }
 
