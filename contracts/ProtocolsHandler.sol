@@ -190,6 +190,11 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         (, uint256 borrowed) = totalBorrowed(_asset);
         (, uint256 supplied) = totalSupplied(_asset);
 
+        if (borrowed > supplied) {
+            newInterest = supplyInterest + interestDelta;
+            return (_totalLending + newInterest, newInterest);
+        }
+
         // solve equation for totalLending
         // totalLending =
         //     _totalLending +
@@ -437,7 +442,7 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         uint256[] memory amounts = strategy.getRepayStrategy(
             protocolsCache,
             _asset,
-            _amount
+            amount
         );
 
         for (uint256 i = 0; i < length; ) {
@@ -456,8 +461,8 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
             }
         }
 
-        emit Repaid(_asset, _amount);
-        return _amount;
+        emit Repaid(_asset, amount);
+        return amount;
     }
 
     function addProtocol(IProtocol _protocol) external override onlyOwner {
