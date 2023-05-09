@@ -4,8 +4,8 @@ pragma solidity ^0.8.18;
 import "./interfaces/IConfig.sol";
 import "./interfaces/IRouter.sol";
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "./libraries/internals/UserAssetBitMap.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 contract Config is IConfig, OwnableUpgradeable {
     address public router;
@@ -64,27 +64,27 @@ contract Config is IConfig, OwnableUpgradeable {
             _usingAsCollateral
         ) {
             uint256 bit = 1 << ((asset.index << 1) + 1);
+
             if (_usingAsCollateral) {
                 newUserConfig = oldUserConfig | bit;
+                userDebtAndCollateral[_account] = newUserConfig;
             } else {
                 newUserConfig = oldUserConfig & ~bit;
-            }
+                userDebtAndCollateral[_account] = newUserConfig;
 
-            userDebtAndCollateral[_account] = newUserConfig;
-
-            (bool isHealthy, , ) = IRouter(router).isPoisitionHealthy(
-                _underlying,
-                _account
-            );
-
-            if (!_usingAsCollateral && !isHealthy) {
-                require(
-                    msg.sender == address(router),
-                    "Config: Insufficinet Collateral"
+                (bool isHealthy, , ) = IRouter(router).isPoisitionHealthy(
+                    _underlying,
+                    _account
                 );
 
-                newUserConfig = oldUserConfig;
-                userDebtAndCollateral[_account] = oldUserConfig;
+                if (!isHealthy) {
+                    require(
+                        msg.sender == address(router),
+                        "Config: Insufficinet Collateral"
+                    );
+
+                    userDebtAndCollateral[_account] = newUserConfig;
+                }
             }
         }
 
