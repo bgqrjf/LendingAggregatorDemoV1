@@ -2,7 +2,6 @@
 
 pragma solidity ^0.8.18;
 
-import "../interfaces/IRewards.sol";
 import "../interfaces/IRouter.sol";
 
 abstract contract RouterStorage is IRouter {

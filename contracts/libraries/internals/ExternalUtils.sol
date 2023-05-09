@@ -6,7 +6,7 @@ import "../../interfaces/IProtocolsHandler.sol";
 import "../../interfaces/IReservePool.sol";
 
 import "./UserAssetBitMap.sol";
-import "../internals/Utils.sol";
+import "./Utils.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
 library ExternalUtils {

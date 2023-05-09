@@ -3,9 +3,9 @@ pragma solidity ^0.8.18;
 
 import "./interfaces/IStrategy.sol";
 
+import "./libraries/internals/Utils.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
-import "./libraries/internals/Utils.sol";
 
 contract Strategy is IStrategy, Ownable {
     uint256 public maxLTV; // max loan to value

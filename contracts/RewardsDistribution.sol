@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.18;
-import "./libraries/internals/Utils.sol";
+
 import "./libraries/internals/TransferHelper.sol";
+import "./libraries/internals/Utils.sol";
 
 contract RewardsDistribution {
     using TransferHelper for address;

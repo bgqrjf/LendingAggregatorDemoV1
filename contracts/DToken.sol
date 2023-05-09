@@ -1,19 +1,15 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.18;
 
-import "./storages/DTokenStorage.sol";
-import "./interfaces/IRouter.sol";
-import "./interfaces/IRewards.sol";
-
+import "./libraries/internals/Utils.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
-import "./libraries/internals/Utils.sol";
+import "./storages/DTokenStorage.sol";
 
 // DebtToken
 contract DToken is DTokenSotrage, OwnableUpgradeable {
     using Math for uint256;
-    IRewards public rewards;
 
     function initialize(
         address _underlying,

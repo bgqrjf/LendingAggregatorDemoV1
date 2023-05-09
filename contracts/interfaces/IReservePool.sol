@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.18;
 
-import "../libraries/internals/Types.sol";
 import "./IRouter.sol";
+
+import "../libraries/internals/Types.sol";
 
 interface IReservePool {
     event PendingListUpdated(

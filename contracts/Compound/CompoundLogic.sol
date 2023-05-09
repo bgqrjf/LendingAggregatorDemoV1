@@ -1,21 +1,17 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.18;
 
-import "../interfaces/IProtocol.sol";
 import "./CERC20Interface.sol";
 import "./CETHInterface.sol";
+import "../interfaces/IProtocol.sol";
 
 import "../libraries/internals/Utils.sol";
-
 import "@openzeppelin/contracts/utils/math/Math.sol";
+
 import "./CompoundLogicStorage.sol";
 
 contract CompoundLogic is IProtocol {
     using Math for uint256;
-
-    CompoundLogicStorage public immutable LOGIC_STORAGE;
-    uint256 public immutable BASE = 1e12;
-    uint256 public immutable BLOCK_PER_YEAR = 2102400;
 
     struct UsageParams {
         uint256 totalSupplied; // not balance
@@ -26,6 +22,10 @@ contract CompoundLogic is IProtocol {
         uint256 optimalLTV;
         uint256 reserveFactor;
     }
+
+    CompoundLogicStorage public immutable LOGIC_STORAGE;
+    uint256 public immutable BASE = 1e12;
+    uint256 public immutable BLOCK_PER_YEAR = 2102400;
 
     constructor(
         address _protocolsHandler,

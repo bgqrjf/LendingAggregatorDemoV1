@@ -3,15 +3,6 @@ pragma solidity ^0.8.18;
 
 import "./RedeemLogic.sol";
 import "./RepayLogic.sol";
-import "../internals/ExternalUtils.sol";
-import "../internals/TransferHelper.sol";
-import "../internals/Types.sol";
-import "../internals/UserAssetBitMap.sol";
-
-import "../../interfaces/IProtocolsHandler.sol";
-import "../../interfaces/IReservePool.sol";
-import "../../interfaces/IRewards.sol";
-import "../../interfaces/IConfig.sol";
 
 library LiquidateLogic {
     using UserAssetBitMap for uint256;
@@ -22,7 +13,7 @@ library LiquidateLogic {
         Types.UserAssetParams redeemParams
     );
 
-    // _redeemParams.amount is the minAmount redeem which is used as slippage validation
+    // _redeemParams.amount is the minAmount to redeem which is used as slippage validation
     function liquidate(
         Types.LiquidateParams memory _params,
         address[] storage underlyings,

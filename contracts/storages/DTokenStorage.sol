@@ -2,9 +2,12 @@
 pragma solidity ^0.8.18;
 
 import "../interfaces/IDToken.sol";
+import "../interfaces/IRewards.sol";
+import "../interfaces/IRouter.sol";
 
 // DebtToken
 abstract contract DTokenSotrage is IDToken {
+    IRewards public rewards;
     string public name;
     string public symbol;
     uint8 public decimals = 18;

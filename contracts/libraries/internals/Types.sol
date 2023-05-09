@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.18;
 
-import "../../interfaces/ISToken.sol";
+import "../../interfaces/IConfig.sol";
 import "../../interfaces/IDToken.sol";
-
-import "../../interfaces/IProtocolsHandler.sol";
 import "../../interfaces/IPriceOracle.sol";
+import "../../interfaces/IProtocolsHandler.sol";
 import "../../interfaces/IReservePool.sol";
 import "../../interfaces/IRewards.sol";
-import "../../interfaces/IConfig.sol";
+import "../../interfaces/ISToken.sol";
 
 library Types {
     struct SupplyParams {

@@ -1,15 +1,13 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.8.0;
 
-import "./Utils.sol";
-
-import "@openzeppelin/contracts/utils/math/Math.sol";
-
 import "../../interfaces/IProtocol.sol";
+
+import "./Utils.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 
 library StrategyCalculations {
     using Math for uint256;
-    uint256 constant PRECISION = 1;
 
     struct StrategyParams {
         uint256 targetAmount;
@@ -20,6 +18,8 @@ library StrategyCalculations {
         uint256[] maxAmounts;
         bytes[] usageParams;
     }
+
+    uint256 constant PRECISION = 1;
 
     function calculateAmountsToSupply(
         StrategyParams memory _params,

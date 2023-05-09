@@ -2,11 +2,12 @@
 pragma solidity ^0.8.18;
 
 import "./IConfig.sol";
+import "./IMultiImplementationBeacon.sol";
 import "./IPriceOracle.sol";
 import "./IProtocolsHandler.sol";
 import "./IReservePool.sol";
+import "./IRewards.sol";
 import "./IStrategy.sol";
-import "./IMultiImplementationBeacon.sol";
 
 import "../libraries/internals/Types.sol";
 

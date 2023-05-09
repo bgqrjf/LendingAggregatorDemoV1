@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.18;
 
-import "../internals/ExternalUtils.sol";
-import "../internals/TransferHelper.sol";
-import "../internals/Types.sol";
-
+import "../../interfaces/IConfig.sol";
 import "../../interfaces/IProtocolsHandler.sol";
 import "../../interfaces/IReservePool.sol";
 import "../../interfaces/IRewards.sol";
-import "../../interfaces/IConfig.sol";
+
+import "../internals/ExternalUtils.sol";
+import "../internals/TransferHelper.sol";
+import "../internals/Types.sol";
 
 library SupplyLogic {
     event Supplied(

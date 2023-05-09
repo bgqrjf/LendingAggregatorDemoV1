@@ -1,9 +1,11 @@
 // SP// SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.18;
 
+import "./interfaces/IRewards.sol";
+
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "./interfaces/IRewards.sol";
+
 import "./RewardsDistribution.sol";
 
 contract Rewards is
@@ -14,18 +16,18 @@ contract Rewards is
 {
     using TransferHelper for address;
 
-    IProtocol[] public protocols;
-    address public protocolsHandler;
-    mapping(address => mapping(uint8 => mapping(address => uint256)))
-        public uncollectedRewards;
-
-    bytes32 public constant REWARD_ADMIN =
-        keccak256(abi.encode("REWARD_ADMIN"));
-
     enum RewardType {
         CompoundSupply,
         CompoundBorrow
     }
+
+    bytes32 public constant REWARD_ADMIN =
+        keccak256(abi.encode("REWARD_ADMIN"));
+
+    IProtocol[] public protocols;
+    address public protocolsHandler;
+    mapping(address => mapping(uint8 => mapping(address => uint256)))
+        public uncollectedRewards;
 
     function initialize(address _protocolsHandler) external initializer {
         __Ownable_init();

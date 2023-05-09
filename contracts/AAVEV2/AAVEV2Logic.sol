@@ -1,32 +1,23 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.18;
 
+import "./IAAVEPriceOracleGetter.sol";
+import "./ILendingPool.sol";
+import "./IReserveInterestRateStrategy.sol";
 import "../interfaces/IProtocol.sol";
 import "../interfaces/IWETH.sol";
 
-// import "./IAToken.sol";
-// import "./IVariableDebtToken.sol";
-import "./IReserveInterestRateStrategy.sol";
-import "./IAAVEPriceOracleGetter.sol";
-
 import "./DataTypes.sol";
-import "./ILendingPool.sol";
 import "./ReserveConfiguration.sol";
-import "../libraries/internals/Utils.sol";
 import "../libraries/internals/TransferHelper.sol";
 import "../libraries/internals/Types.sol";
-
+import "../libraries/internals/Utils.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
 import "./AAVEV2LogicStorage.sol";
 
 contract AAVEV2Logic is IProtocol {
     using Math for uint256;
-
-    AAVEV2LogicStorage public immutable LOGIC_STORAGE;
-    // ray = 1e27 truncate to 1e6
-    uint256 public immutable RAY = 1e27;
-    uint256 public immutable BASE = 1e21;
 
     struct UsageParams {
         uint256 totalSupplied; // not balance
@@ -42,6 +33,11 @@ contract AAVEV2Logic is IProtocol {
         uint256 reserveFactor;
         uint256 maxExcessUsageRatio;
     }
+
+    AAVEV2LogicStorage public immutable LOGIC_STORAGE;
+    // ray = 1e27 truncate to 1e6
+    uint256 public immutable RAY = 1e27;
+    uint256 public immutable BASE = 1e21;
 
     receive() external payable {}
 
