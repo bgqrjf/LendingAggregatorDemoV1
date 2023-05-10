@@ -18,8 +18,7 @@ interface IProtocolsHandler {
 
     function repayAndSupply(
         address _asset,
-        uint256 _amount,
-        uint256 _totalSupplied
+        uint256 _amount
     ) external returns (uint256 repayed, uint256 supplied);
 
     function redeemAndBorrow(

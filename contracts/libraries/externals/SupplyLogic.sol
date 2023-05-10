@@ -129,8 +129,7 @@ library SupplyLogic {
     ) internal {
         (uint256 repayed, ) = _protocols.repayAndSupply(
             _params.asset,
-            _params.amount,
-            _params.protocolsSupplies
+            _params.amount
         );
 
         ExternalUtils.updateTotalLendings(

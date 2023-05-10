@@ -77,8 +77,7 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
 
     function repayAndSupply(
         address _asset,
-        uint256 _amount,
-        uint256 _totalSupplied
+        uint256 _amount
     )
         external
         override
@@ -89,7 +88,7 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
 
         if (repayAmount < _amount) {
             supplyAmount = _amount - repayAmount;
-            supply(_asset, supplyAmount, _totalSupplied);
+            supply(_asset, supplyAmount);
         }
 
         if (autoRebalance) {
@@ -325,7 +324,7 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         }
     }
 
-    function supply(address _asset, uint256 _amount, uint256) internal {
+    function supply(address _asset, uint256 _amount) internal {
         IProtocol[] memory protocolsCache = protocols;
         uint256 length = protocolsCache.length;
 

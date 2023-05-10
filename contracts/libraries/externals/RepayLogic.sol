@@ -168,13 +168,7 @@ library RepayLogic {
             0
         );
 
-        (, uint256 protocolsSupplies) = protocols.totalSupplied(_asset);
-
-        (, uint256 supplied) = protocols.repayAndSupply(
-            _asset,
-            _amount,
-            protocolsSupplies
-        );
+        (, uint256 supplied) = protocols.repayAndSupply(_asset, _amount);
 
         ExternalUtils.updateTotalLendings(
             protocols,
