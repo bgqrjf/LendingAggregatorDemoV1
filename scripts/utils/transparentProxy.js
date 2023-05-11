@@ -1,4 +1,5 @@
 const { ethers } = require("hardhat");
+const m = require("mocha-logger");
 const ProxyAdmin = require("@openzeppelin/contracts/build/contracts/ProxyAdmin.json");
 const TransparentUpgradeableProxy = require("@openzeppelin/contracts/build/contracts/TransparentUpgradeableProxy.json");
 
@@ -13,6 +14,11 @@ exports.deployProxy = async ({
   });
   let implementation = await Implementation.deploy();
   await implementation.deployed();
+  m.log(
+    implementationFactory,
+    "implementation deployed:",
+    implementation.address
+  );
 
   let Proxy = await ethers.getContractFactory(
     TransparentUpgradeableProxy.abi,
@@ -30,6 +36,7 @@ exports.deployProxy = async ({
     initializeData
   );
   await proxy.deployed();
+  m.log(implementationFactory, "proxy deployed:", proxy.address);
 
   return await ethers.getContractAt(implementationFactory, proxy.address);
 };
@@ -42,6 +49,7 @@ exports.deployProxyAdmin = async () => {
 
   let admin = await Admin.deploy();
   await admin.deployed();
+  m.log("proxyAdmin deployed:", admin.address);
 
   return admin;
 };

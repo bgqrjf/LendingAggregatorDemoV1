@@ -1,10 +1,11 @@
+OKCMainnet =
 OKCTestnetNode =
 OKCTestnetPrivateKey =
 
 underlyings = 
 decimals = 
 symbols = 
-maxLTVs = 
+maxLTV = 
 
 AAVELendingPool = 
 comptroller = 
@@ -13,3 +14,4 @@ cETH =
 comp = 
 cTokens = 
 priceOracle =
+feeCollector =

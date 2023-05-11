@@ -3,12 +3,11 @@ const m = require("mocha-logger");
 const transparentProxy = require("./utils/transparentProxy.js");
 
 async function main() {
-  const [feeCollector] = await ethers.getSigners();
+  const [deployer] = await ethers.getSigners();
 
   let underlyings = process.env.underlyings.split(",");
   let decimals = process.env.decimals.split(",");
   let symbols = process.env.symbols.split(",");
-  let maxLTVs = process.env.maxLTVs.split(",");
   let aPool = await ethers.getContractAt(
     "ILendingPool",
     process.env.AAVELendingPool
@@ -23,35 +22,39 @@ async function main() {
   );
   let cTokens = process.env.cTokens.split(",");
 
+  // strategy
   let Strategy = await ethers.getContractFactory("Strategy");
   let strategy = await Strategy.deploy();
   await strategy.deployed();
-  m.log("strategy:", strategy.address);
+  m.log("strategy deployed:", strategy.address);
 
-  let tx = await strategy.setMaxLTVs(underlyings, maxLTVs);
+  let tx = await strategy.setMaxLTV(process.env.maxLTV);
   await tx.wait();
+  m.log("strategy setMaxLTV:", tx.hash);
 
   // protocolsHandler
   const proxyAdmin = await transparentProxy.deployProxyAdmin();
-  m.log("proxyAdmin:", proxyAdmin.address);
-
   let protocolsHandler = await transparentProxy.deployProxy({
     implementationFactory: "ProtocolsHandler",
-    libraries: {},
-    initializeParams: [[], strategy.address],
+    initializeParams: [[], strategy.address, true],
     proxyAdmin: proxyAdmin,
   });
-  m.log("protocolsHandler(proxy):", protocolsHandler.address);
 
-  let AAVEHandler = await ethers.getContractFactory("AAVEV2Logic");
+  // rewards
+  let rewards = await transparentProxy.deployProxy({
+    implementationFactory: "Rewards",
+    initializeParams: [protocolsHandler.address],
+    proxyAdmin: proxyAdmin,
+  });
+
+  let AAVEHandler = await ethers.getContractFactory("AAVELogic");
   let aaveHandler = await AAVEHandler.deploy(
     protocolsHandler.address,
     aPool.address,
     wETH.address
   );
   await aaveHandler.deployed();
-
-  m.log("aaveV2Logic:", aaveHandler.address);
+  m.log("aaveHandler deployed:", aaveHandler.address);
 
   let CompoundHandler = await ethers.getContractFactory("CompoundLogic");
   let compoundHandler = await CompoundHandler.deploy(
@@ -59,40 +62,33 @@ async function main() {
     comptroller.address,
     process.env.cETH,
     process.env.comp,
+    rewards.address,
     { gasLimit: 5000000 }
   );
   await compoundHandler.deployed();
-  m.log("compoundLogic:", compoundHandler.address);
-
-  for (let i = 0; i < cTokens.length; i++) {
-    tx = await compoundHandler.updateCTokenList(cTokens[i]);
-    await tx.wait();
-  }
+  m.log("compoundHandler deployed:", compoundHandler.address);
 
   // config
   let config = await transparentProxy.deployProxy({
     implementationFactory: "Config",
     proxyAdmin: proxyAdmin,
   });
-  m.log("config(proxy):", config.address);
 
-  // rewards
-  let Rewards = await ethers.getContractFactory("Rewards");
-  let rewards = await Rewards.deploy(protocolsHandler.address);
-  await rewards.deployed();
-  m.log("rewards:", rewards.address);
+  tx = await config.transferOwnership(deployer.address);
+  await tx.wait();
+  m.log("config transferOwnership:", tx.hash);
 
   // sToken
   let SToken = await ethers.getContractFactory("SToken");
   let sToken = await SToken.deploy();
   await sToken.deployed();
-  m.log("sToken:", sToken.address);
+  m.log("sToken deployed:", sToken.address);
 
   // dToken
   let DToken = await ethers.getContractFactory("DToken");
   let dToken = await DToken.deploy();
   await dToken.deployed();
-  m.log("dToken:", dToken.address);
+  m.log("dToken deployed:", dToken.address);
 
   // router
   let SupplyLogic = await ethers.getContractFactory(
@@ -100,35 +96,35 @@ async function main() {
   );
   let supplyLogic = await SupplyLogic.deploy();
   await supplyLogic.deployed();
-  m.log("supplyLogic:", supplyLogic.address);
+  m.log("supplyLogic deployed:", supplyLogic.address);
 
   let RedeemLogic = await ethers.getContractFactory(
     "contracts/libraries/externals/RedeemLogic.sol:RedeemLogic"
   );
   let redeemLogic = await RedeemLogic.deploy();
   await redeemLogic.deployed();
-  m.log("redeemLogic:", redeemLogic.address);
+  m.log("redeemLogic deployed:", redeemLogic.address);
 
   let BorrowLogic = await ethers.getContractFactory(
     "contracts/libraries/externals/BorrowLogic.sol:BorrowLogic"
   );
   let borrowLogic = await BorrowLogic.deploy();
   await borrowLogic.deployed();
-  m.log("borrowLogic:", borrowLogic.address);
+  m.log("borrowLogic deployed:", borrowLogic.address);
 
   let RepayLogic = await ethers.getContractFactory(
     "contracts/libraries/externals/RepayLogic.sol:RepayLogic"
   );
   let repayLogic = await RepayLogic.deploy();
   await repayLogic.deployed();
-  m.log("repayLogic:", repayLogic.address);
+  m.log("repayLogic deployed:", repayLogic.address);
 
   let LiquidateLogic = await ethers.getContractFactory(
     "contracts/libraries/externals/LiquidateLogic.sol:LiquidateLogic"
   );
   let liquidateLogic = await LiquidateLogic.deploy();
   await liquidateLogic.deployed();
-  m.log("liquidateLogic:", liquidateLogic.address);
+  m.log("liquidateLogic deployed:", liquidateLogic.address);
 
   let router = await transparentProxy.deployProxy({
     implementationFactory: "Router",
@@ -138,7 +134,6 @@ async function main() {
       BorrowLogic: borrowLogic.address,
       RepayLogic: repayLogic.address,
       LiquidateLogic: liquidateLogic.address,
-      RewardLogic: ethers.constants.AddressZero,
     },
     initializeParams: [
       protocolsHandler.address,
@@ -148,23 +143,30 @@ async function main() {
       sToken.address,
       dToken.address,
       ethers.constants.AddressZero,
-      feeCollector.address,
+      process.env.feeCollector,
     ],
     proxyAdmin: proxyAdmin,
   });
-  m.log("router:", router.address);
 
   tx = await config.setRouter(router.address);
   await tx.wait();
+  m.log("config setRouter:", tx.hash);
+
   tx = await protocolsHandler.transferOwnership(router.address);
   await tx.wait();
+  m.log("protocolsHandler transferOwnership:", tx.hash);
+
   tx = await rewards.transferOwnership(router.address);
   await tx.wait();
+  m.log("rewards transferOwnership:", tx.hash);
 
   tx = await router.addProtocol(aaveHandler.address);
   await tx.wait();
+  m.log("router addProtocol:", tx.hash);
+
   tx = await router.addProtocol(compoundHandler.address);
   await tx.wait();
+  m.log("router addProtocol:", tx.hash);
 
   for (i = 0; i < underlyings.length; i++) {
     tx = await router.addAsset({
@@ -180,22 +182,14 @@ async function main() {
         liquidateLTV: 750000,
         maxLiquidateRatio: 500000,
         liquidateRewardRatio: 1080000,
-        feeRate: 10000,
       },
+      feeRate: 10000,
       maxReserve: 0,
       executeSupplyThreshold: 0,
     });
     await tx.wait();
+    m.log("router addAsset:", tx.hash);
   }
-
-  let QueryHelper = await ethers.getContractFactory("QueryHelper");
-  let queryHelper = await QueryHelper.deploy(
-    router.address,
-    aaveHandler.address,
-    compoundHandler.address
-  );
-  await queryHelper.deployed();
-  m.log("queryHelper:", queryHelper.address);
 }
 
 main().catch((error) => {
