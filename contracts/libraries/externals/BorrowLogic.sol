@@ -27,6 +27,7 @@ library BorrowLogic {
     ) external {
         require(_params.actionNotPaused, "BorrowLogic: action paused");
 
+        // minBorrow is set by price and network default 0
         require(
             _params.userParams.amount > 0,
             "BorrowLogic: Borrow 0 token is not allowed"

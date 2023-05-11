@@ -21,7 +21,6 @@ library RedeemLogic {
 
     function redeem(
         Types.RedeemParams memory _params,
-        address[] storage underlyings,
         mapping(address => uint256) storage totalLendings,
         mapping(address => Types.Asset) storage assets
     ) external {
@@ -84,17 +83,6 @@ library RedeemLogic {
             _params.userParams.asset,
             useAsCollateral
         );
-
-        (bool isHealthy, , ) = ExternalUtils.isPositionHealthy(
-            _params.config,
-            _params.priceOracle,
-            msg.sender,
-            _params.userParams.asset,
-            underlyings,
-            assets
-        );
-
-        require(isHealthy, "RedeemLogic: insufficient collateral");
     }
 
     function recordRedeem(
