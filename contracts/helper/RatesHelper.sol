@@ -2,11 +2,13 @@
 pragma solidity ^0.8.14;
 
 import "../interfaces/IRouter.sol";
+
 import "../libraries/internals/Utils.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 
 import "./MulticallHelper.sol";
 
-contract RateGetter is MulticallHelper {
+contract RatesHelper is MulticallHelper {
     IRouter public router;
 
     constructor(address _router) {
@@ -33,7 +35,7 @@ contract RateGetter is MulticallHelper {
         lendingRate =
             (lendingRate *
                 (Utils.MILLION -
-                    router.config().assetConfigs(_underlying).feeRate)) /
+                    router.getAsset(_underlying).dToken.feeRate())) /
             Utils.MILLION;
 
         return
@@ -85,7 +87,7 @@ contract RateGetter is MulticallHelper {
                 protocolsBorrowRate > protocolsSupplyRate
                 ? protocolsSupplyRate +
                     ((protocolsBorrowRate - protocolsSupplyRate) *
-                        Utils.minOf(
+                        Math.min(
                             router.totalBorrowed(_underlying),
                             totalSuppliedAmountWithFee
                         )) /
