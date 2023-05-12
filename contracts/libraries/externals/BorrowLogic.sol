@@ -131,8 +131,6 @@ library BorrowLogic {
         Types.RecordBorrowParams memory _params,
         mapping(address => Types.Asset) storage assets
     ) internal {
-        Types.Asset memory asset = assets[_params.userParams.asset];
-
         assets[_params.userParams.asset].dToken.mint(
             _params.borrowBy,
             _params.userParams.amount,
