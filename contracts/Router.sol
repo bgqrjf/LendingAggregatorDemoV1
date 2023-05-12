@@ -93,8 +93,9 @@ contract Router is RouterStorage, OwnableUpgradeable {
                 config,
                 priceOracle
             ),
-            totalLendings,
-            assets
+            underlyings,
+            assets,
+            totalLendings
         );
     }
 
@@ -240,7 +241,6 @@ contract Router is RouterStorage, OwnableUpgradeable {
                     _totalSupplies,
                     _newInterest,
                     _redeemFrom,
-                    true,
                     _collateralable
                 ),
                 assets

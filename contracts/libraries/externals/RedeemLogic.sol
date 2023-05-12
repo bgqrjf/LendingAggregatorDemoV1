@@ -21,8 +21,9 @@ library RedeemLogic {
 
     function redeem(
         Types.RedeemParams memory _params,
-        mapping(address => uint256) storage totalLendings,
-        mapping(address => Types.Asset) storage assets
+        address[] storage underlyings,
+        mapping(address => Types.Asset) storage assets,
+        mapping(address => uint256) storage totalLendings
     ) external {
         require(_params.actionNotPaused, "RedeemLogic: action paused");
 
@@ -53,7 +54,6 @@ library RedeemLogic {
                     totalsupplies,
                     newInterest,
                     msg.sender,
-                    true,
                     _params.collateralable
                 ),
                 assets
@@ -70,9 +70,9 @@ library RedeemLogic {
             );
         }
 
+        Types.Asset memory asset = assets[_params.userParams.asset];
         bool useAsCollateral = _params.collateralable;
         if (useAsCollateral) {
-            Types.Asset memory asset = assets[_params.userParams.asset];
             useAsCollateral =
                 asset.collateralable &&
                 asset.sToken.balanceOf(msg.sender) != 0;
@@ -83,6 +83,23 @@ library RedeemLogic {
             _params.userParams.asset,
             useAsCollateral
         );
+
+        if (
+            UserAssetBitMap.isUsingAsCollateral(
+                _params.config.userDebtAndCollateral(msg.sender),
+                asset.index
+            )
+        ) {
+            (bool isHealthy, , ) = ExternalUtils.isPositionHealthy(
+                _params.config,
+                _params.priceOracle,
+                msg.sender,
+                _params.userParams.asset,
+                underlyings,
+                assets
+            );
+            require(isHealthy, "RedeemLogic: Insufficient collateral");
+        }
     }
 
     function recordRedeem(
@@ -109,7 +126,6 @@ library RedeemLogic {
 
         burntAmount = asset.sToken.burn(
             _params.redeemFrom,
-            _params.notLiquidate,
             _params.userParams.amount,
             _params.totalUnderlying - uncollectedFee
         );

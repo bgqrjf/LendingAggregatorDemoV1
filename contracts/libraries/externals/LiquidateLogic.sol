@@ -97,7 +97,6 @@ library LiquidateLogic {
                 totalsupplies,
                 newInterest,
                 _params.repayParams.to,
-                false,
                 true
             ),
             assets

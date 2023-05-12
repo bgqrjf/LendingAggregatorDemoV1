@@ -40,7 +40,6 @@ contract SToken is ISToken, OwnableUpgradeable, ERC20Upgradeable {
 
     function burn(
         address _from,
-        bool _notLiquidate,
         uint256 _amountOfUnderlying,
         uint256 _totalUnderlying
     ) external override onlyOwner returns (uint256 amountOfUnderlying) {
@@ -52,9 +51,6 @@ contract SToken is ISToken, OwnableUpgradeable, ERC20Upgradeable {
         amountOfUnderlying = scaledAmount(amount, _totalUnderlying);
 
         _burn(_from, amount);
-        if (_notLiquidate) {
-            _validatePosition(_from);
-        }
     }
 
     function claimRewards(

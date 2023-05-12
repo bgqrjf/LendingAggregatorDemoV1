@@ -20,7 +20,6 @@ interface ISToken is IERC20Upgradeable {
 
     function burn(
         address _account,
-        bool _notLiquidate,
         uint256 _amount,
         uint256 _totalUnderlying
     ) external returns (uint256 amount);

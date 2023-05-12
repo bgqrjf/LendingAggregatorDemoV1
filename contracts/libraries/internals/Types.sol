@@ -52,7 +52,6 @@ library Types {
         uint256 totalUnderlying;
         uint256 newInterest;
         address redeemFrom;
-        bool notLiquidate;
         bool collateralable;
     }
 
