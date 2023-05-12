@@ -94,4 +94,21 @@ contract RatesHelper is MulticallHelper {
                     totalSuppliedAmountWithFee
                 : protocolsSupplyRate;
     }
+
+    function getCurrentSupplyRates(
+        address _underlying
+    ) public view returns (uint256 rate, uint256[] memory protocolsRates) {
+        rate = getCurrentSupplyRate(_underlying);
+        protocolsRates = getProtocolsSupplyRates(_underlying);
+    }
+
+    function getProtocolsSupplyRates(
+        address _underlying
+    ) public view returns (uint256[] memory protocolsRates) {
+        IProtocol[] memory protocols = router.protocols().getProtocols();
+        protocolsRates = new uint256[](protocols.length);
+        for (uint i = 0; i < protocols.length; ++i) {
+            protocolsRates[i] = protocols[i].getCurrentSupplyRate(_underlying);
+        }
+    }
 }
