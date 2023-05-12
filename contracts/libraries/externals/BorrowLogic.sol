@@ -27,12 +27,6 @@ library BorrowLogic {
     ) external {
         require(_params.actionNotPaused, "BorrowLogic: action paused");
 
-        // minBorrow is set by price and network default 0
-        require(
-            _params.userParams.amount > 0,
-            "BorrowLogic: Borrow 0 token is not allowed"
-        );
-
         (
             ,
             uint256 totalBorrowedAmount,
@@ -137,6 +131,8 @@ library BorrowLogic {
         Types.RecordBorrowParams memory _params,
         mapping(address => Types.Asset) storage assets
     ) internal {
+        Types.Asset memory asset = assets[_params.userParams.asset];
+
         assets[_params.userParams.asset].dToken.mint(
             _params.borrowBy,
             _params.userParams.amount,

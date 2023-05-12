@@ -6,13 +6,15 @@ interface IDToken {
     event AccFeeUpdated(uint256 newAccFee, uint256 newIndex);
     event UserFeeIndexUpdated(address account, uint256 newIndex);
     event CollectedFeeUpdated(uint256 collectedFee);
+    event ConfigUpdated(uint256 feeRateNew, uint256 minBorrowNew);
 
     function initialize(
         address _underlying,
         address _rewards,
         string memory _name,
         string memory _symbol,
-        uint256 feeRate
+        uint256 feeRate,
+        uint256 _minBorrow
     ) external;
 
     function mint(
@@ -34,6 +36,8 @@ interface IDToken {
     function updateNewFee(
         uint256 _newInterest
     ) external returns (uint256 uncollectedFee);
+
+    function updateConfig(uint256 _feeRate, uint256 _minBorrow) external;
 
     function scaledDebtOf(address _account) external view returns (uint256);
 
@@ -60,6 +64,8 @@ interface IDToken {
     function totalSupply() external view returns (uint256);
 
     function totalDebt() external view returns (uint256);
+
+    function minBorrow() external view returns (uint256);
 
     function balanceOf(address account) external view returns (uint256);
 

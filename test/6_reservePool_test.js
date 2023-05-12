@@ -214,6 +214,7 @@ describe("Reserve pool tests", function () {
         liquidateRewardRatio: 1080000,
       },
       feeRate: 10000,
+      minBorrow: 0,
       maxReserve: ethers.utils.parseUnits("10", "ether"),
       executeSupplyThreshold: ethers.utils.parseUnits("1", "ether"),
     });
@@ -233,6 +234,7 @@ describe("Reserve pool tests", function () {
         liquidateRewardRatio: 1080000,
       },
       feeRate: 10000,
+      minBorrow: 0,
       maxReserve: 100000000,
       executeSupplyThreshold: 1000000,
     });
@@ -252,6 +254,7 @@ describe("Reserve pool tests", function () {
         liquidateRewardRatio: 1080000,
       },
       feeRate: 10000,
+      minBorrow: 0,
       maxReserve: ethers.utils.parseUnits("1", "ether"),
       executeSupplyThreshold: ethers.utils.parseUnits("0.1", "ether"),
     });

@@ -205,6 +205,7 @@ describe("Router tests", function () {
         liquidateRewardRatio: 1080000,
       },
       feeRate: 10000,
+      minBorrow: 0,
       maxReserve: 0,
       executeSupplyThreshold: 0,
     });
@@ -224,6 +225,7 @@ describe("Router tests", function () {
         liquidateRewardRatio: 1080000,
       },
       feeRate: 10000,
+      minBorrow: 0,
       maxReserve: 0,
       executeSupplyThreshold: 0,
     });
@@ -243,6 +245,7 @@ describe("Router tests", function () {
         liquidateRewardRatio: 1080000,
       },
       feeRate: 10000,
+      minBorrow: 0,
       maxReserve: 0,
       executeSupplyThreshold: 0,
     });

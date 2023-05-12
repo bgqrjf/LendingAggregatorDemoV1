@@ -232,6 +232,12 @@ interface IRouter is IMultiImplementationBeacon {
 
     function updateDToken(address _dToken) external;
 
+    function updateDTokenConfig(
+        address _dToken,
+        uint256 _feeRate,
+        uint256 _minBorrow
+    ) external;
+
     function updateConfig(IConfig _config) external;
 
     function updateProtocolsHandler(

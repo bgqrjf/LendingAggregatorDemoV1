@@ -184,12 +184,18 @@ async function main() {
         liquidateRewardRatio: 1080000,
       },
       feeRate: 10000,
+      minBorrow: 0,
       maxReserve: 0,
       executeSupplyThreshold: 0,
     });
     await tx.wait();
     m.log("router addAsset:", tx.hash);
   }
+
+  let QueryHelper = await ethers.getContractFactory("QueryHelper");
+  let queryHelper = await QueryHelper.deploy(router.address);
+  await queryHelper.deployed();
+  m.log("queryHelper deployed:", queryHelper.address);
 }
 
 main().catch((error) => {

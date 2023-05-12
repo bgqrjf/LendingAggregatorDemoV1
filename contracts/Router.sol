@@ -598,7 +598,8 @@ contract Router is RouterStorage, OwnableUpgradeable {
                             address(rewards),
                             _newAsset.dTokenName,
                             _newAsset.dTokenSymbol,
-                            _newAsset.feeRate
+                            _newAsset.feeRate,
+                            _newAsset.minBorrow
                         )
                     )
                 )
@@ -651,6 +652,14 @@ contract Router is RouterStorage, OwnableUpgradeable {
     function updateDToken(address _dToken) external override onlyOwner {
         dTokenImplement = _dToken;
         emit DTokenUpdated(_dToken);
+    }
+
+    function updateDTokenConfig(
+        address _dToken,
+        uint256 _feeRate,
+        uint256 _minBorrow
+    ) external override onlyOwner {
+        IDToken(_dToken).updateConfig(_feeRate, _minBorrow);
     }
 
     function updateConfig(IConfig _config) external override onlyOwner {

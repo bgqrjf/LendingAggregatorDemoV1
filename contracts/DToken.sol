@@ -16,15 +16,17 @@ contract DToken is DTokenSotrage, OwnableUpgradeable {
         address _rewards,
         string memory _name,
         string memory _symbol,
-        uint256 _feeRate
+        uint256 _feeRate,
+        uint256 _minBorrow
     ) external initializer {
         __Ownable_init();
 
         underlying = _underlying;
+        rewards = IRewards(_rewards);
         name = _name;
         symbol = _symbol;
         feeRate = _feeRate;
-        rewards = IRewards(_rewards);
+        minBorrow = _minBorrow;
     }
 
     function mint(
@@ -80,6 +82,15 @@ contract DToken is DTokenSotrage, OwnableUpgradeable {
         return accFee - collectedFee;
     }
 
+    function updateConfig(
+        uint256 _feeRate,
+        uint256 _minBorrow
+    ) external override onlyOwner {
+        feeRate = _feeRate;
+        minBorrow = _minBorrow;
+        emit ConfigUpdated(_feeRate, _minBorrow);
+    }
+
     function scaledDebtOf(
         address _account
     ) public view override returns (uint256) {
@@ -130,6 +141,8 @@ contract DToken is DTokenSotrage, OwnableUpgradeable {
         uint256 _newInterest
     ) internal {
         require(_account != address(0), "ERC20: mint to the zero address");
+        // not allow _amount == 0;
+        require(_amount > minBorrow, "BorrowLogic: Insufficient borrow amount");
 
         _updateNewFee(_newInterest);
 
