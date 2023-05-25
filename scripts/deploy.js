@@ -47,7 +47,7 @@ async function main() {
     proxyAdmin: proxyAdmin,
   });
 
-  let AAVEHandler = await ethers.getContractFactory("AAVELogic");
+  let AAVEHandler = await ethers.getContractFactory("AAVEV2Logic");
   let aaveHandler = await AAVEHandler.deploy(
     protocolsHandler.address,
     aPool.address,
@@ -67,6 +67,12 @@ async function main() {
   );
   await compoundHandler.deployed();
   m.log("compoundHandler deployed:", compoundHandler.address);
+
+  for (var i = 0; i < cTokens.length; i++) {
+    tx = await compoundHandler.updateCTokenList(cTokens[i]);
+    await tx.wait();
+    m.log("compoundHandler updateCTokenList:", tx.hash);
+  }
 
   // config
   let config = await transparentProxy.deployProxy({
