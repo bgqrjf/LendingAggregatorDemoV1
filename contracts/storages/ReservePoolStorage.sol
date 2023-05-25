@@ -8,7 +8,6 @@ abstract contract ReservePoolStorage is IReservePool {
     struct PendingRequest {
         address nextAccount;
         uint256 amount;
-        bool collateralable;
     }
 
     uint256 public maxPendingRatio;
