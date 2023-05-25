@@ -249,7 +249,6 @@ contract ReservePool is ReservePoolStorage, OwnableUpgradeable {
         }
 
         pendingSupplies[_asset][_to].amount += _amount;
-        pendingSupplies[_asset][_to].collateralable = _collateralable;
         pendingSupplyAmounts[_asset] += _amount;
 
         emit PendingListUpdated(
