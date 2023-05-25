@@ -410,7 +410,6 @@ describe("Reserve pool tests", function () {
         ethers.constants.AddressZero
       );
       await expect(userPendingSupply.amount).to.equal(supplyAmount);
-      await expect(userPendingSupply.collateralable).to.equal(true);
       await expect(lastAccountToSupply).to.equal(deployer.address);
       await expect(nextAccountToSupply).to.equal(deployer.address);
       await expect(reserve).to.equal(supplyAmount);
@@ -503,7 +502,6 @@ describe("Reserve pool tests", function () {
 
       await expect(alicePendingSupply.nextAccount).to.equal(bob.address);
       await expect(alicePendingSupply.amount).to.equal(supplyAmount.mul(2));
-      await expect(alicePendingSupply.collateralable).to.equal(true);
     });
 
     it("should execute supply when requested", async () => {
@@ -638,13 +636,11 @@ describe("Reserve pool tests", function () {
         ethers.constants.AddressZero
       );
       await expect(alicePendingSupply.amount).to.equal(0);
-      await expect(alicePendingSupply.collateralable).to.equal(false);
 
       await expect(bobPendingSupply.nextAccount).to.equal(
         ethers.constants.AddressZero
       );
       await expect(bobPendingSupply.amount).to.equal(0);
-      await expect(bobPendingSupply.collateralable).to.equal(false);
 
       await expect(lastAccountToSupply).to.equal(ethers.constants.AddressZero);
       await expect(nextAccountToSupply).to.equal(ethers.constants.AddressZero);
@@ -762,13 +758,11 @@ describe("Reserve pool tests", function () {
         ethers.constants.AddressZero
       );
       await expect(alicePendingSupply.amount).to.equal(0);
-      await expect(alicePendingSupply.collateralable).to.equal(false);
 
       await expect(bobPendingSupply.nextAccount).to.equal(
         ethers.constants.AddressZero
       );
       await expect(bobPendingSupply.amount).to.equal(supplyAmount);
-      await expect(bobPendingSupply.collateralable).to.equal(false);
 
       await expect(lastAccountToSupply).to.equal(bob.address);
       await expect(nextAccountToSupply).to.equal(bob.address);
