@@ -47,32 +47,6 @@ contract RatesHelper is MulticallHelper {
                 : protocolsSupplyRate;
     }
 
-    function getCurrentBorrowRate(
-        address _underlying
-    ) public view returns (uint256) {
-        (
-            uint256[] memory borrows,
-            uint256 totalBorrowedAmount,
-            uint256 totalLending,
-
-        ) = router.getBorrowStatus(_underlying);
-
-        (, uint256 protocolsBorrowRate) = router.protocols().getRates(
-            _underlying
-        );
-
-        uint256 lendingRate = getLendingRate(_underlying);
-        uint256 protocolsBorrows = Utils.sumOf(borrows);
-
-        return
-            totalBorrowedAmount > 0
-                ? (protocolsBorrowRate *
-                    protocolsBorrows +
-                    lendingRate *
-                    totalLending) / (totalBorrowedAmount)
-                : protocolsBorrowRate;
-    }
-
     function getLendingRate(address _underlying) public view returns (uint256) {
         (, , , uint256 totalSuppliedAmountWithFee, ) = router.getSupplyStatus(
             _underlying
@@ -109,6 +83,49 @@ contract RatesHelper is MulticallHelper {
         protocolsRates = new uint256[](protocols.length);
         for (uint i = 0; i < protocols.length; ++i) {
             protocolsRates[i] = protocols[i].getCurrentSupplyRate(_underlying);
+        }
+    }
+
+    function getCurrentBorrowRate(
+        address _underlying
+    ) public view returns (uint256) {
+        (
+            uint256[] memory borrows,
+            uint256 totalBorrowedAmount,
+            uint256 totalLending,
+
+        ) = router.getBorrowStatus(_underlying);
+
+        (, uint256 protocolsBorrowRate) = router.protocols().getRates(
+            _underlying
+        );
+
+        uint256 lendingRate = getLendingRate(_underlying);
+        uint256 protocolsBorrows = Utils.sumOf(borrows);
+
+        return
+            totalBorrowedAmount > 0
+                ? (protocolsBorrowRate *
+                    protocolsBorrows +
+                    lendingRate *
+                    totalLending) / (totalBorrowedAmount)
+                : protocolsBorrowRate;
+    }
+
+    function getCurrentBorrowRates(
+        address _underlying
+    ) public view returns (uint256 rate, uint256[] memory protocolsRates) {
+        rate = getCurrentBorrowRate(_underlying);
+        protocolsRates = getProtocolsBorrowRates(_underlying);
+    }
+
+    function getProtocolsBorrowRates(
+        address _underlying
+    ) public view returns (uint256[] memory protocolsRates) {
+        IProtocol[] memory protocols = router.protocols().getProtocols();
+        protocolsRates = new uint256[](protocols.length);
+        for (uint i = 0; i < protocols.length; ++i) {
+            protocolsRates[i] = protocols[i].getCurrentBorrowRate(_underlying);
         }
     }
 }
