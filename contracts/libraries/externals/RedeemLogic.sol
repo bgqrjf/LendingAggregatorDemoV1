@@ -26,6 +26,10 @@ library RedeemLogic {
         mapping(address => uint256) storage totalLendings
     ) external {
         require(_params.actionNotPaused, "RedeemLogic: action paused");
+        require(
+            address(assets[_params.userParams.asset].sToken) != address(0),
+            "RedeemLogic: asset not exists"
+        );
 
         if (address(_params.reservePool) != address(0)) {
             _params.reservePool.redeem(

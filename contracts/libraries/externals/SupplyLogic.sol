@@ -22,6 +22,10 @@ library SupplyLogic {
         mapping(address => uint256) storage totalLendings
     ) external {
         require(_params.actionNotPaused, "SupplyLogic: action paused");
+        require(
+            address(_params.asset.sToken) != address(0),
+            "SupplyLogic: asset not exists"
+        );
 
         if (address(_params.reservePool) != address(0)) {
             TransferHelper.collect(

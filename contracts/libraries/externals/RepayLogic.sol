@@ -35,6 +35,10 @@ library RepayLogic {
         mapping(address => uint256) storage totalLendings
     ) internal returns (uint256 amount) {
         require(_params.actionNotPaused, "RepayLogic: action paused");
+        require(
+            address(_params.asset.dToken) != address(0),
+            "repayLogic: asset not exists"
+        );
 
         (
             ,

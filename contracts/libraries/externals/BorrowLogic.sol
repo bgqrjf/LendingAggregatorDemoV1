@@ -26,6 +26,10 @@ library BorrowLogic {
         mapping(address => uint256) storage totalLendings
     ) external {
         require(_params.actionNotPaused, "BorrowLogic: action paused");
+        require(
+            address(assets[_params.userParams.asset].dToken) != address(0),
+            "BorrowLogic: asset not exists"
+        );
 
         (
             ,
