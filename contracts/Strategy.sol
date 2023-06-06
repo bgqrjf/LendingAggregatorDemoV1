@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract Strategy is IStrategy, Ownable {
+    uint256 public immutable maxRebalanceLoop = 32;
     uint256 public maxLTV; // max loan to value
 
     function getSupplyStrategy(
@@ -174,7 +175,7 @@ contract Strategy is IStrategy, Ownable {
                 _amount -= minRepays[i];
             }
 
-            maxRepays[i] = currentBorrowed;
+            maxRepays[i] = currentBorrowed - minRepays[i];
             rates[i] = _protocols[i].getCurrentBorrowRate(_asset);
             unchecked {
                 ++i;
@@ -357,8 +358,11 @@ contract Strategy is IStrategy, Ownable {
         amounts = new uint256[](length);
         uint256 totalAmountToSupply;
 
-        uint256 minRate;
-        while (_maxRate > minRate + 1) {
+        for (
+            (uint256 minRate, uint256 count) = (0, 0);
+            _maxRate > minRate + 1 && count < maxRebalanceLoop;
+
+        ) {
             totalAmountToSupply = 0;
             uint256 targetRate = (_maxRate + minRate) / 2;
             for (uint256 i = 0; i < length; ) {
@@ -380,6 +384,10 @@ contract Strategy is IStrategy, Ownable {
                 minRate = targetRate;
             } else {
                 break;
+            }
+
+            unchecked {
+                ++count;
             }
         }
 

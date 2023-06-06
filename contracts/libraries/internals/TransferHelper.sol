@@ -63,13 +63,12 @@ library TransferHelper {
         }
     }
 
-    // approve twice for USDT
     function approve(
         address _token,
         address _spender,
         uint256 _amount
     ) internal {
-        IERC20(_token).safeApprove(_spender, _amount);
+        IERC20(_token).forceApprove(_spender, _amount);
     }
 
     function balanceOf(

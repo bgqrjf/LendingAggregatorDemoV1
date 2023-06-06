@@ -250,6 +250,8 @@ interface IRouter is IMultiImplementationBeacon {
 
     function toggleAutoRebalance() external;
 
+    function setMaxPendingRatio(uint256 _maxPendingRatio) external;
+
     // --- getters
     function priceOracle() external view returns (IPriceOracle);
 

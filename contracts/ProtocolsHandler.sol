@@ -73,6 +73,8 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
                 ++i;
             }
         }
+
+        emit Rebalanced(protocolsCache, redeemAmounts, supplyAmounts);
     }
 
     function repayAndSupply(

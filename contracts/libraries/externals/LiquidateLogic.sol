@@ -45,16 +45,6 @@ library LiquidateLogic {
             totalLendings
         );
 
-        if (
-            assets[_params.repayParams.asset].dToken.balanceOf(msg.sender) == 0
-        ) {
-            _params.config.setBorrowing(
-                msg.sender,
-                _params.repayParams.asset,
-                false
-            );
-        }
-
         // redeem
         (
             ,
@@ -116,10 +106,10 @@ library LiquidateLogic {
 
         if (
             !redeemAsset.collateralable ||
-            redeemAsset.sToken.balanceOf(msg.sender) == 0
+            redeemAsset.sToken.balanceOf(_params.repayParams.to) == 0
         ) {
             _params.config.setUsingAsCollateral(
-                msg.sender,
+                _params.repayParams.to,
                 _params.redeemParams.asset,
                 false
             );

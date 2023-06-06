@@ -48,7 +48,8 @@ contract ReservePool is ReservePoolStorage, OwnableUpgradeable {
             );
         } else {
             require(
-                supplyAmount < executeSupplyThresholds[_params.asset] ||
+                pendingSupplies[_params.asset][_params.to].amount <=
+                    executeSupplyThresholds[_params.asset] ||
                     newReserve <= maxReserves[_params.asset],
                 "ReservePool: pending list not allowed"
             );
@@ -180,7 +181,7 @@ contract ReservePool is ReservePoolStorage, OwnableUpgradeable {
             );
 
             require(
-                repayAmount < executeSupplyThresholds[_params.asset] ||
+                repayAmount <= executeSupplyThresholds[_params.asset] ||
                     newReserve <= maxReserves[_params.asset],
                 "ReservePool: max reserve excceeded"
             );

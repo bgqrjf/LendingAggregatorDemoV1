@@ -685,6 +685,12 @@ contract Router is RouterStorage, OwnableUpgradeable {
         protocols.toggleAutoRebalance();
     }
 
+    function setMaxPendingRatio(
+        uint256 _maxPendingRatio
+    ) external override onlyOwner {
+        reservePool.setMaxPendingRatio(_maxPendingRatio);
+    }
+
     // --- getters
     function getAsset(
         address _underlying

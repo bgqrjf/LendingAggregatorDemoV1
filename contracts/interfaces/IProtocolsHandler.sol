@@ -13,6 +13,11 @@ interface IProtocolsHandler {
     event Borrowed(address indexed asset, uint256 amount);
     event Repaid(address indexed asset, uint256 amount);
     event AutoRebalanceToggled(bool);
+    event Rebalanced(
+        IProtocol[] protocols,
+        uint256[] redeemAmounts,
+        uint256[] supplyAmounts
+    );
 
     function rebalanceAllProtocols(address _asset) external;
 

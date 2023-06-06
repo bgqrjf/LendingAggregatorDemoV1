@@ -115,9 +115,9 @@ library RepayLogic {
             );
         }
 
-        if (_params.asset.dToken.balanceOf(msg.sender) == 0) {
+        if (_params.asset.dToken.balanceOf(_params.userParams.to) == 0) {
             _params.config.setBorrowing(
-                msg.sender,
+                _params.userParams.to,
                 _params.userParams.asset,
                 false
             );
