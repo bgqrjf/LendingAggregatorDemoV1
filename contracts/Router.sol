@@ -9,11 +9,16 @@ import "./libraries/externals/SupplyLogic.sol";
 import "./libraries/internals/TransferHelper.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 
 import "./MultiImplementationBeaconProxy.sol";
 import "./storages/RouterStorage.sol";
 
-contract Router is RouterStorage, OwnableUpgradeable {
+contract Router is
+    RouterStorage,
+    OwnableUpgradeable,
+    ReentrancyGuardUpgradeable
+{
     using Math for uint256;
 
     modifier onlyReservePool() {
@@ -55,7 +60,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
         Types.UserAssetParams memory _params,
         bool _collateralable,
         bool _executeNow
-    ) external payable override {
+    ) external payable override nonReentrant {
         SupplyLogic.supply(
             Types.SupplyParams(
                 _params,
@@ -81,7 +86,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
         Types.UserAssetParams memory _params,
         bool _collateralable,
         bool _executeNow
-    ) external override {
+    ) external override nonReentrant {
         RedeemLogic.redeem(
             Types.RedeemParams(
                 _params,
@@ -107,7 +112,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
     function borrow(
         Types.UserAssetParams memory _params,
         bool _executeNow
-    ) external override {
+    ) external override nonReentrant {
         BorrowLogic.borrow(
             Types.BorrowParams(
                 _params,
@@ -132,7 +137,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
     function repay(
         Types.UserAssetParams memory _params,
         bool _executeNow
-    ) external payable {
+    ) external payable nonReentrant {
         RepayLogic.repay(
             Types.RepayParams(
                 _params,
@@ -157,7 +162,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
     function liquidate(
         Types.UserAssetParams memory _repayParams,
         Types.UserAssetParams memory _redeemParams
-    ) external payable {
+    ) external payable nonReentrant {
         LiquidateLogic.liquidate(
             Types.LiquidateParams(
                 _repayParams,
@@ -178,7 +183,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
     /** @dev sync status for protocols
         @param _asset asset to sync
      */
-    function sync(address _asset) external override {
+    function sync(address _asset) external override nonReentrant {
         ExternalUtils.sync(_asset, protocols, totalLendings);
     }
 
@@ -190,7 +195,7 @@ contract Router is RouterStorage, OwnableUpgradeable {
     function claimRewards(
         address _account,
         address[] memory _underlyings
-    ) external override {
+    ) external override nonReentrant {
         uint256 length = _underlyings.length;
         uint256 amount;
         for (uint256 i = 0; i < length; ) {
