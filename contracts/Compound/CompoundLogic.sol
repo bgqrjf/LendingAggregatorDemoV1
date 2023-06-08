@@ -501,17 +501,46 @@ contract CompoundLogic is IProtocol {
     function getCurrentSupplyRate(
         address _underlying
     ) external view override returns (uint256) {
-        return
-            (CTokenInterface(LOGIC_STORAGE.cTokens(_underlying))
-                .supplyRatePerBlock() * BLOCK_PER_YEAR) / BASE;
+        CTokenInterface cToken = CTokenInterface(
+            LOGIC_STORAGE.cTokens(_underlying)
+        );
+        (
+            uint256 totalCash,
+            uint256 totalBorrows,
+            uint256 totalReserves,
+
+        ) = accrueInterest(_underlying, cToken);
+
+        uint256 supplyRatePerBlock = cToken.interestRateModel().getSupplyRate(
+            totalCash,
+            totalBorrows,
+            totalReserves,
+            cToken.reserveFactorMantissa()
+        );
+
+        return (supplyRatePerBlock * BLOCK_PER_YEAR) / BASE;
     }
 
     function getCurrentBorrowRate(
         address _underlying
     ) external view override returns (uint256) {
-        return
-            (CTokenInterface(LOGIC_STORAGE.cTokens(_underlying))
-                .borrowRatePerBlock() * BLOCK_PER_YEAR) / BASE;
+        CTokenInterface cToken = CTokenInterface(
+            LOGIC_STORAGE.cTokens(_underlying)
+        );
+        (
+            uint256 totalCash,
+            uint256 totalBorrows,
+            uint256 totalReserves,
+
+        ) = accrueInterest(_underlying, cToken);
+
+        uint256 borrowRatePerBlock = cToken.interestRateModel().getBorrowRate(
+            totalCash,
+            totalBorrows,
+            totalReserves
+        );
+
+        return (borrowRatePerBlock * BLOCK_PER_YEAR) / BASE;
     }
 
     function addAsset(address _underlying) internal {

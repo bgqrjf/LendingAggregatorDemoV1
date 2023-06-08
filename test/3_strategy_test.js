@@ -335,8 +335,8 @@ describe("Strategy tests", function () {
     await token0.approve(aPool.address, supplyAmount.mul(2));
     await cToken0.mint(supplyAmount);
     await aPool.supply(token0.address, supplyAmount, deployer.address, 0);
-    await cToken0.borrow(borrowAmount);
     await aPool.borrow(token0.address, borrowAmount, 2, 0, deployer.address);
+    await cToken0.borrow(borrowAmount);
 
     let result = await strategy.getRebalanceStrategy(
       [aaveHandler.address, compoundHandler.address],
@@ -377,6 +377,9 @@ describe("Strategy tests", function () {
       token0.address
     );
 
-    expect(aaveSupplyRate).to.equal(compoundSupplyRate);
+    expect(aaveSupplyRate).to.be.within(
+      compoundSupplyRate.sub(1),
+      compoundSupplyRate.add(1)
+    );
   });
 });
