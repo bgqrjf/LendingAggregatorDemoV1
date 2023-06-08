@@ -70,4 +70,17 @@ interface IDToken {
     function balanceOf(address account) external view returns (uint256);
 
     function feeIndexOf(address account) external view returns (uint256);
+
+    function scaledAmountCurrent(
+        uint256 _amount
+    ) external view returns (uint256);
+
+    function unscaledAmountCurrent(
+        uint256 _amount
+    ) external view returns (uint256);
+
+    function exchangeRate()
+        external
+        view
+        returns (uint256 numerator, uint256 denominator);
 }

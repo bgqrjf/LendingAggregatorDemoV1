@@ -91,16 +91,6 @@ contract DToken is DTokenSotrage, OwnableUpgradeable {
         emit ConfigUpdated(_feeRate, _minBorrow);
     }
 
-    function scaledDebtOf(
-        address _account
-    ) public view override returns (uint256) {
-        return
-            scaledAmount(
-                balanceOf[_account],
-                IRouter(owner()).totalBorrowed(underlying)
-            );
-    }
-
     function scaledAmount(
         uint256 _amount,
         uint256 _totalBorrowed
@@ -119,10 +109,6 @@ contract DToken is DTokenSotrage, OwnableUpgradeable {
             _totalBorrowed > 0
                 ? (_amount * totalSupply).ceilDiv(_totalBorrowed)
                 : _amount;
-    }
-
-    function totalDebt() public view override returns (uint256 amount) {
-        return IRouter(owner()).totalBorrowed(underlying);
     }
 
     function calculateFee(
@@ -205,5 +191,37 @@ contract DToken is DTokenSotrage, OwnableUpgradeable {
             (accFee, feeIndex) = calculateFee(_newInterest);
             emit AccFeeUpdated(accFee, feeIndex);
         }
+    }
+
+    // helpers
+    function scaledAmountCurrent(
+        uint256 _amount
+    ) external view override returns (uint256) {
+        return scaledAmount(_amount, totalDebt());
+    }
+
+    function unscaledAmountCurrent(
+        uint256 _amount
+    ) external view override returns (uint256) {
+        return unscaledAmount(_amount, totalDebt());
+    }
+
+    function scaledDebtOf(
+        address _account
+    ) public view override returns (uint256) {
+        return scaledAmount(balanceOf[_account], totalDebt());
+    }
+
+    function totalDebt() public view override returns (uint256 amount) {
+        return IRouter(owner()).totalBorrowed(underlying);
+    }
+
+    function exchangeRate()
+        external
+        view
+        override
+        returns (uint256 numerator, uint256 denominator)
+    {
+        return (totalSupply, totalDebt());
     }
 }

@@ -88,20 +88,6 @@ contract SToken is ISToken, OwnableUpgradeable, ERC20Upgradeable {
                 : _amount;
     }
 
-    function scaledBalanceOf(
-        address _account
-    ) external view override returns (uint256) {
-        return
-            scaledAmount(
-                balanceOf(_account),
-                IRouter(owner()).totalSupplied(underlying)
-            );
-    }
-
-    function scaledTotalSupply() public view override returns (uint256 amount) {
-        return IRouter(owner()).totalSupplied(underlying);
-    }
-
     function _beforeTokenTransfer(
         address _from,
         address _to,
@@ -148,5 +134,37 @@ contract SToken is ISToken, OwnableUpgradeable, ERC20Upgradeable {
             );
             require(isHealthy, "SToken: insufficient collateral");
         }
+    }
+
+    // helpers
+    function scaledAmountCurrent(
+        uint256 _amount
+    ) external view override returns (uint256) {
+        return scaledAmount(_amount, scaledTotalSupply());
+    }
+
+    function unscaledAmountCurrent(
+        uint256 _amount
+    ) external view override returns (uint256) {
+        return unscaledAmount(_amount, scaledTotalSupply());
+    }
+
+    function scaledBalanceOf(
+        address _account
+    ) external view override returns (uint256) {
+        return scaledAmount(balanceOf(_account), scaledTotalSupply());
+    }
+
+    function scaledTotalSupply() public view override returns (uint256 amount) {
+        return IRouter(owner()).totalSupplied(underlying);
+    }
+
+    function exchangeRate()
+        external
+        view
+        override
+        returns (uint256 numerator, uint256 denominator)
+    {
+        return (totalSupply(), scaledTotalSupply());
     }
 }
