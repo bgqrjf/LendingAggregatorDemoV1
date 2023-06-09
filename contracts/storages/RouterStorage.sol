@@ -15,7 +15,7 @@ abstract contract RouterStorage is IRouter {
     IConfig public override config;
     IPriceOracle public override priceOracle;
     IProtocolsHandler public protocols;
-    IRewards public rewards;
+    IRewards public override rewards;
     IReservePool public reservePool;
     address payable public feeCollector;
 

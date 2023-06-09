@@ -257,6 +257,8 @@ interface IRouter is IMultiImplementationBeacon {
 
     function config() external view returns (IConfig);
 
+    function rewards() external view returns (IRewards);
+
     function getAsset(
         address _underlying
     ) external view returns (Types.Asset memory asset);
