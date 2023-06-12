@@ -23,6 +23,7 @@ contract ReservePool is ReservePoolStorage, OwnableUpgradeable {
         bool _collateralable,
         bool _executeNow
     ) external override onlyOwner {
+        require(_params.to != address(0), "ReservePool: supply to address(0)");
         uint256 newReserve = _params.asset.balanceOf(address(this));
         uint256 supplyAmount = newReserve - reserves[_params.asset];
 
