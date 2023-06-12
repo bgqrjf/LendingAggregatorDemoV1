@@ -191,7 +191,7 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
         (, uint256 borrowed) = totalBorrowed(_asset);
         (, uint256 supplied) = totalSupplied(_asset);
 
-        if (borrowed > supplied) {
+        if (borrowed >= supplied) {
             newInterest = supplyInterest + interestDelta;
             return (_totalLending + newInterest, newInterest);
         }
