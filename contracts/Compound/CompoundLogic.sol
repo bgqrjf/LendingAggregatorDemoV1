@@ -606,4 +606,39 @@ contract CompoundLogic is IProtocol {
     function rewardToken() external view override returns (address) {
         return LOGIC_STORAGE.rewardToken();
     }
+
+    function getSupplyCompSpeed(
+        address _underlying
+    ) public view returns (uint256) {
+        CTokenInterface cToken = CTokenInterface(
+            LOGIC_STORAGE.cTokens(_underlying)
+        );
+
+        uint supplySpeed = LOGIC_STORAGE.comptroller().compSupplySpeeds(
+            address(cToken)
+        );
+
+        uint supplyTokens = cToken.totalSupply();
+
+        uint compSpeedSupplyRate = (supplySpeed * Utils.QUINTILLION) /
+            supplyTokens;
+        return compSpeedSupplyRate;
+    }
+
+    function getBorrowCompSpeed(
+        address _underlying
+    ) public view returns (uint256) {
+        CTokenInterface cToken = CTokenInterface(
+            LOGIC_STORAGE.cTokens(_underlying)
+        );
+        uint borrowSpeed = LOGIC_STORAGE.comptroller().compBorrowSpeeds(
+            address(cToken)
+        );
+        uint borrowCtokens = cToken.totalBorrows();
+        uint borrowIndex = cToken.borrowIndex();
+        uint borrowTokens = (borrowCtokens * Utils.QUINTILLION) / borrowIndex;
+        uint compSpeedBorrowRate = (borrowSpeed * Utils.QUINTILLION) /
+            borrowTokens;
+        return compSpeedBorrowRate;
+    }
 }

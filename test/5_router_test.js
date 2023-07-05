@@ -103,7 +103,7 @@ describe("Router tests", function () {
       cETH.address,
       comp.address,
       rewards.address,
-      { gasLimit: 5000000 }
+      { gasLimit: 7000000 }
     );
 
     await compoundHandler.updateCTokenList(cToken0.address);
@@ -115,9 +115,11 @@ describe("Router tests", function () {
     await priceOracle.addAsset(token0.address, 18);
     await priceOracle.addAsset(usdt.address, 6);
     await priceOracle.addAsset(ETHAddress, 18);
-    await priceOracle.setAssetPrice(token0.address, 10000000000); // set price to 100.00
+    await priceOracle.addAsset(comp.address, 18);
+    await priceOracle.setAssetPrice(token0.address, 100000000); // set price to 100.00
     await priceOracle.setAssetPrice(usdt.address, 100000000); // set price to 1.00
     await priceOracle.setAssetPrice(ETHAddress, 200000000000); // set price to 2000.00
+    await priceOracle.setAssetPrice(comp.address, 4000000000); // set price to 40.00
 
     // config
     let config = await transparentProxy.deployProxy({
@@ -189,7 +191,7 @@ describe("Router tests", function () {
 
     await router.addProtocol(aaveHandler.address);
     await router.addProtocol(compoundHandler.address);
-
+    
     await router.addAsset({
       underlying: token0.address,
       decimals: 18,
@@ -203,6 +205,7 @@ describe("Router tests", function () {
         liquidateLTV: 750000,
         maxLiquidateRatio: 500000,
         liquidateRewardRatio: 1080000,
+        decimals:18,
       },
       feeRate: 10000,
       minBorrow: 0,
@@ -223,6 +226,7 @@ describe("Router tests", function () {
         liquidateLTV: 750000,
         maxLiquidateRatio: 500000,
         liquidateRewardRatio: 1080000,
+        decimals:6,
       },
       feeRate: 10000,
       minBorrow: 0,
@@ -243,6 +247,7 @@ describe("Router tests", function () {
         liquidateLTV: 750000,
         maxLiquidateRatio: 500000,
         liquidateRewardRatio: 1080000,
+        decimals:18,
       },
       feeRate: 10000,
       minBorrow: 0,
@@ -267,6 +272,8 @@ describe("Router tests", function () {
       cToken0: cToken0,
       cUSDT: cUSDT,
       cETH: cETH,
+      aPool: aPool,
+      cUSDT:cUSDT
     };
   }
 
@@ -277,28 +284,28 @@ describe("Router tests", function () {
       let asset = await router.assets(ETHAddress);
       sToken = await ethers.getContractAt("ISToken", asset.sToken);
       dToken = await ethers.getContractAt("IDToken", asset.dToken);
-
-      let tx = await router.supply(
-        { asset: ETHAddress, amount: supplyAmount, to: deployer.address },
-        true,
-        true,
-        { value: supplyAmount }
-      );
+      let tx = await router
+        .connect(deployer)
+        .supply(
+          { asset: ETHAddress, amount: supplyAmount, to: deployer.address },
+          true,
+          true,
+          { value: supplyAmount }
+        );
     } else {
       await token.mint(deployer.address, supplyAmount);
       await token.approve(router.address, supplyAmount);
-
       let asset = await router.assets(token.address);
       sToken = await ethers.getContractAt("ISToken", asset.sToken);
       dToken = await ethers.getContractAt("IDToken", asset.dToken);
-
-      let tx = await router.supply(
-        { asset: token.address, amount: supplyAmount, to: deployer.address },
-        true,
-        true
-      );
+      let tx = await router
+        .connect(deployer)
+        .supply(
+          { asset: token.address, amount: supplyAmount, to: deployer.address },
+          true,
+          true
+        );
     }
-
     return { sToken: sToken, dToken: dToken };
   }
 
@@ -345,6 +352,7 @@ describe("Router tests", function () {
     let token0 = deploys.token0;
     let usdt = deploys.usdt;
     let feeCollector = deploys.feeCollector;
+    
     expect(await router.config()).to.equal(config.address);
     expect(await router.priceOracle()).to.equal(priceOracle.address);
     expect(await router.protocols()).to.equal(protocolsHandler.address);
@@ -357,6 +365,19 @@ describe("Router tests", function () {
       usdt.address,
       ETHAddress,
     ]);
+    let token0Asset = await router.getAsset(token0.address
+    )
+    let sToken0 =await ethers.getContractAt("MockERC20",token0Asset["sToken"])
+    expect(await sToken0.decimals()).to.equal(18)
+    let dToken0 =await ethers.getContractAt("MockERC20",token0Asset["dToken"])
+    expect(await dToken0.decimals()).to.equal(18)
+
+    let usdtAsset = await router.getAsset(usdt.address
+      )
+    let sUSDT =await ethers.getContractAt("MockERC20",usdtAsset["sToken"])
+    expect(await sUSDT.decimals()).to.equal(6)
+    let dUSDT =await ethers.getContractAt("MockERC20",usdtAsset["dToken"])
+    expect(await dUSDT.decimals()).to.equal(6)
   });
 
   describe("router supply tests", function () {
@@ -1675,6 +1696,84 @@ describe("Router tests", function () {
         );
       });
 
+      it("should test queryHelper with getSupplyRewardAPY", async () => {
+        const deploys = await loadFixture(RouterTestFixture);
+        // queryHelper
+        let QueryHelper = await ethers.getContractFactory("QueryHelper");
+        
+        let deployer = deploys.deployer;
+        let feeCollected = deploys.feeCollector;
+        let router = deploys.router;
+        
+        let token0 = deploys.token0;
+        let usdt = deploys.usdt;
+        let aPool = deploys.aPool;
+        let cUSDT = deploys.cUSDT;
+        let cToken0 = deploys.cToken0;
+
+
+        let borrowAmount = ethers.utils.parseUnits("4", "ether");
+        await token0.approve(cToken0.address, borrowAmount.mul(10000000000));
+        await token0.mint(deployer.address, borrowAmount.mul(10000000000));
+        await cToken0.mint(borrowAmount.mul(100000000));
+        await cToken0.borrow("130077803054920912560274409");
+
+        await token0.approve(aPool.address, borrowAmount.mul(10000000000));
+        await token0.mint(deployer.address, borrowAmount.mul(10000000000));
+        await aPool.supply(token0.address, borrowAmount.mul(10000000000), deployer.address, 0);
+        await aPool.borrow(token0.address, borrowAmount.mul(1000000000), 2, 0, deployer.address);
+       
+
+        await supply(deployer, router, token0, ethers.utils.parseUnits("1", "ether"));
+        let queryHelper = await QueryHelper.deploy(router.address);
+        let res = await queryHelper.getSupplyRewardAPY(token0.address)
+        // let res2 = await queryHelper.getBorrowRewardAPY(token0.address)
+        console.log(res)
+        // console.log(res2)
+      });
+
+      it("should test queryHelper with getBorrowRewardAPY", async () => {
+        const deploys = await loadFixture(RouterTestFixture);
+        // queryHelper
+        let QueryHelper = await ethers.getContractFactory("QueryHelper");
+        let deployer = deploys.deployer;
+        let feeCollected = deploys.feeCollector;
+        let router = deploys.router;
+        let token0 = deploys.token0;
+        let usdt = deploys.usdt;
+        let aPool = deploys.aPool;
+        let cUSDT = deploys.cUSDT;
+        let cToken0 = deploys.cToken0;
+
+
+        let borrowAmount = ethers.utils.parseUnits("4", "ether");
+        await token0.approve(cToken0.address, borrowAmount.mul(10000000000));
+        await token0.mint(deployer.address, borrowAmount.mul(10000000000));
+       
+        await cToken0.mint(borrowAmount.mul(10000000000));
+        await cToken0.borrow("130077803054920912560274409");
+
+        await token0.approve(aPool.address, borrowAmount.mul(10000000000));
+        await token0.mint(deployer.address, borrowAmount.mul(10000000000));
+        await aPool.supply(token0.address, borrowAmount.mul(10000000000), deployer.address, 0);
+        await aPool.borrow(token0.address, borrowAmount.mul(7000000000), 2, 0, deployer.address);
+       
+
+        await supply(deployer, router, null, ethers.utils.parseUnits("1000", "ether"));
+
+        await router.borrow(
+          {
+            asset: token0.address,
+            amount: ethers.utils.parseUnits("100", "ether"),
+            to: deployer.address,
+          },
+          true
+        );
+        let queryHelper = await QueryHelper.deploy(router.address);
+        let res2 = await queryHelper.getBorrowRewardAPY(token0.address)
+        console.log(res2)
+      });
+      
       it("should borrow token0 via protocols borrow", async () => {
         const {
           deployer,

@@ -114,6 +114,7 @@ library Types {
         uint256 liquidateLTV;
         uint256 maxLiquidateRatio;
         uint256 liquidateRewardRatio;
+        uint8 decimals;
     }
 
     struct Asset {

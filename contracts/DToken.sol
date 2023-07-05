@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.18;
 
+import "./interfaces/IConfig.sol";
+import "./interfaces/IRouter.sol";
+
 import "./libraries/internals/Utils.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -89,6 +92,12 @@ contract DToken is DTokenSotrage, OwnableUpgradeable {
         feeRate = _feeRate;
         minBorrow = _minBorrow;
         emit ConfigUpdated(_feeRate, _minBorrow);
+    }
+
+    function decimals() public view returns (uint8) {
+        IConfig config = IRouter(owner()).config();
+        uint8 decimal = config.assetConfigs(underlying).decimals;
+        return decimal;
     }
 
     function scaledAmount(

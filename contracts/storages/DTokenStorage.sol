@@ -10,7 +10,7 @@ abstract contract DTokenSotrage is IDToken {
     IRewards public rewards;
     string public name;
     string public symbol;
-    uint8 public decimals = 18;
+
     uint256 public override feeRate;
     uint256 public override minBorrow;
     address public override underlying;

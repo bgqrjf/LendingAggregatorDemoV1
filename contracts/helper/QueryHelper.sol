@@ -8,9 +8,13 @@ import "./RatesHelper.sol";
 import "../libraries/internals/Types.sol";
 import "../libraries/internals/ExternalUtils.sol";
 
+import "../interfaces/ICompProtocol.sol";
+import "../interfaces/IProtocolsHandler.sol";
+
 contract QueryHelper is RatesHelper {
     using Math for uint256;
     using UserAssetBitMap for uint256;
+    uint256 public immutable BLOCK_PER_YEAR = 2102400;
 
     constructor(address _router) RatesHelper(_router) {}
 
@@ -94,5 +98,72 @@ contract QueryHelper is RatesHelper {
         } else {
             return asset.sToken.scaledBalanceOf(_account);
         }
+    }
+
+    function getSupplyRewardAPY(
+        address _underlying
+    ) public view returns (uint256) {
+        IPriceOracle priceOracle = router.priceOracle();
+
+        (
+            uint256[] memory supplys,
+            ,
+            ,
+            uint256 totalSuppliedAmountWithFee,
+
+        ) = router.getSupplyStatus(_underlying);
+
+        uint compSupply = supplys[1];
+
+        IProtocolsHandler protocolsHandler = router.protocols();
+        IProtocol[] memory protocolsCache = protocolsHandler.getProtocols();
+        address compProtocol = address(protocolsCache[1]);
+        address compAddress = ICompProtocol(compProtocol).rewardToken();
+        uint rewardSupplySpeed = ICompProtocol(compProtocol).getSupplyCompSpeed(
+            _underlying
+        );
+
+        uint256 compSpeed = (compSupply * rewardSupplySpeed * BLOCK_PER_YEAR) /
+            totalSuppliedAmountWithFee;
+
+        uint256 reawrdValue = priceOracle.valueOfAsset(
+            compAddress,
+            _underlying,
+            compSpeed * 1e6
+        );
+
+        uint unit = priceOracle.units(_underlying);
+        return reawrdValue / unit;
+    }
+
+    function getBorrowRewardAPY(
+        address _underlying
+    ) public view returns (uint256) {
+        IPriceOracle priceOracle = router.priceOracle();
+
+        (uint256[] memory borrows, uint256 totalBorrowedAmount, , ) = router
+            .getBorrowStatus(_underlying);
+        uint compBorrow = borrows[1];
+        console.log(compBorrow, borrows[0]);
+
+        IProtocolsHandler protocolsHandler = router.protocols();
+        IProtocol[] memory protocolsCache = protocolsHandler.getProtocols();
+        address compProtocol = address(protocolsCache[1]);
+        address compAddress = ICompProtocol(compProtocol).rewardToken();
+        uint rewardBorrowSpeed = ICompProtocol(compProtocol).getBorrowCompSpeed(
+            _underlying
+        );
+
+        uint compSpeed = (compBorrow * rewardBorrowSpeed * BLOCK_PER_YEAR) /
+            totalBorrowedAmount;
+
+        uint256 reawrdValue = priceOracle.valueOfAsset(
+            compAddress,
+            _underlying,
+            compSpeed * 1e6
+        );
+        uint unit = priceOracle.units(_underlying);
+
+        return reawrdValue / unit;
     }
 }
