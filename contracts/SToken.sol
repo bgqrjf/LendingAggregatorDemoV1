@@ -4,7 +4,6 @@ pragma solidity ^0.8.18;
 import "./interfaces/IRewards.sol";
 import "./interfaces/IRouter.sol";
 import "./interfaces/ISToken.sol";
-import "./interfaces/IConfig.sol";
 
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";

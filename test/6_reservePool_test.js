@@ -201,7 +201,6 @@ describe("Reserve pool tests", function () {
 
     await router.addAsset({
       underlying: token0.address,
-      decimals: 18,
       collateralable: true,
       sTokenName: "s-token0",
       sTokenSymbol: "sT0",
@@ -212,6 +211,7 @@ describe("Reserve pool tests", function () {
         liquidateLTV: 750000,
         maxLiquidateRatio: 500000,
         liquidateRewardRatio: 1080000,
+        decimals: 18,
       },
       feeRate: 10000,
       minBorrow: 0,
@@ -221,7 +221,6 @@ describe("Reserve pool tests", function () {
 
     await router.addAsset({
       underlying: usdt.address,
-      decimals: 6,
       collateralable: true,
       sTokenName: "s-USDT",
       sTokenSymbol: "sUSDT",
@@ -232,6 +231,7 @@ describe("Reserve pool tests", function () {
         liquidateLTV: 750000,
         maxLiquidateRatio: 500000,
         liquidateRewardRatio: 1080000,
+        decimals: 6,
       },
       feeRate: 10000,
       minBorrow: 0,
@@ -241,7 +241,6 @@ describe("Reserve pool tests", function () {
 
     await router.addAsset({
       underlying: ETHAddress,
-      decimals: 18,
       collateralable: true,
       sTokenName: "s-ETH",
       sTokenSymbol: "sETH",
@@ -252,6 +251,7 @@ describe("Reserve pool tests", function () {
         liquidateLTV: 750000,
         maxLiquidateRatio: 500000,
         liquidateRewardRatio: 1080000,
+        decimals: 18,
       },
       feeRate: 10000,
       minBorrow: 0,
@@ -289,12 +289,14 @@ describe("Reserve pool tests", function () {
       let asset = await router.assets(ETHAddress);
       sToken = await ethers.getContractAt("ISToken", asset.sToken);
 
-      let tx = await router.supply(
-        { asset: ETHAddress, amount: supplyAmount, to: supplier.address },
-        true,
-        true,
-        { value: supplyAmount }
-      );
+      let tx = await router
+        .connect(supplier)
+        .supply(
+          { asset: ETHAddress, amount: supplyAmount, to: supplier.address },
+          true,
+          true,
+          { value: supplyAmount }
+        );
     } else {
       await token.connect(supplier).mint(supplier.address, supplyAmount);
       await token.connect(supplier).approve(router.address, supplyAmount);

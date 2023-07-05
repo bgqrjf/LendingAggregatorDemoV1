@@ -192,7 +192,6 @@ describe("Rewards tests", function () {
 
     await router.addAsset({
       underlying: token0.address,
-      decimals: 18,
       collateralable: true,
       sTokenName: "s-token0",
       sTokenSymbol: "sT0",
@@ -203,6 +202,7 @@ describe("Rewards tests", function () {
         liquidateLTV: 750000,
         maxLiquidateRatio: 500000,
         liquidateRewardRatio: 1080000,
+        decimals: 18,
       },
       feeRate: 10000,
       minBorrow: 0,
@@ -212,7 +212,6 @@ describe("Rewards tests", function () {
 
     await router.addAsset({
       underlying: usdt.address,
-      decimals: 6,
       collateralable: true,
       sTokenName: "s-USDT",
       sTokenSymbol: "sUSDT",
@@ -223,6 +222,7 @@ describe("Rewards tests", function () {
         liquidateLTV: 750000,
         maxLiquidateRatio: 500000,
         liquidateRewardRatio: 1080000,
+        decimals: 6,
       },
       feeRate: 10000,
       minBorrow: 0,
@@ -232,7 +232,6 @@ describe("Rewards tests", function () {
 
     await router.addAsset({
       underlying: ETHAddress,
-      decimals: 18,
       collateralable: true,
       sTokenName: "s-ETH",
       sTokenSymbol: "sETH",
@@ -243,6 +242,7 @@ describe("Rewards tests", function () {
         liquidateLTV: 750000,
         maxLiquidateRatio: 500000,
         liquidateRewardRatio: 1080000,
+        decimals: 18,
       },
       feeRate: 10000,
       minBorrow: 0,

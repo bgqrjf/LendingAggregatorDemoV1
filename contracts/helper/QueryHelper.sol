@@ -14,9 +14,13 @@ import "../interfaces/IProtocolsHandler.sol";
 contract QueryHelper is RatesHelper {
     using Math for uint256;
     using UserAssetBitMap for uint256;
-    uint256 public immutable BLOCK_PER_YEAR = 2102400;
+    uint256 public immutable BLOCK_PER_YEAR;
 
-    constructor(address _router) RatesHelper(_router) {}
+    constructor(address _router) RatesHelper(_router) {
+        BLOCK_PER_YEAR = ICompProtocol(
+            address(router.protocols().getProtocols()[1])
+        ).BLOCK_PER_YEAR();
+    }
 
     function simulateRebalance(
         address _underlying
@@ -144,7 +148,6 @@ contract QueryHelper is RatesHelper {
         (uint256[] memory borrows, uint256 totalBorrowedAmount, , ) = router
             .getBorrowStatus(_underlying);
         uint compBorrow = borrows[1];
-        console.log(compBorrow, borrows[0]);
 
         IProtocolsHandler protocolsHandler = router.protocols();
         IProtocol[] memory protocolsCache = protocolsHandler.getProtocols();

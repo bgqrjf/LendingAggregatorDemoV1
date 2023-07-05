@@ -127,7 +127,6 @@ library Types {
 
     struct NewAssetParams {
         address underlying;
-        uint8 decimals;
         bool collateralable;
         string sTokenName;
         string sTokenSymbol;

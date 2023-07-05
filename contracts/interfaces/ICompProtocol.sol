@@ -10,4 +10,6 @@ interface ICompProtocol is IProtocol {
     function getBorrowCompSpeed(
         address _underlying
     ) external view returns (uint256);
+
+    function BLOCK_PER_YEAR() external view returns (uint256);
 }
