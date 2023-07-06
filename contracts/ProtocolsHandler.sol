@@ -479,7 +479,15 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
 
         for (uint256 i = 0; i < length; ) {
             if (_old == protocolsCache[i]) {
-                protocols[i].update(address(_new));
+                // update protocol
+                Utils.delegateCall(
+                    address(protocolsCache[i]),
+                    abi.encodeWithSelector(
+                        protocolsCache[i].update.selector,
+                        _new
+                    )
+                );
+
                 protocols[i] = _new;
                 break;
             }
