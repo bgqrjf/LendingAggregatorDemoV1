@@ -5,6 +5,7 @@ contract MockPriceOracleOKC {
     mapping(address => uint256) public units;
     mapping(address => string) public assetSymbol;
     mapping(address => uint256) public ratios;
+    mapping(address => uint256) public assetPrice;
 
     address public exOracleAddress;
     address public dataSource;
@@ -27,13 +28,21 @@ contract MockPriceOracleOKC {
     }
 
     function getAssetPrice(address _asset) public view returns (uint256) {
+        if (assetPrice[_asset] != 0) {
+            return assetPrice[_asset];
+        }
+
         string memory priceType = assetSymbol[_asset];
         (uint256 value, ) = IExOraclePriceData(exOracleAddress).get(
             priceType,
             dataSource
         );
-        value *= 100;
+        value *= 100; // add 2 decimals as we are using 8 decimals
         return (value * ratios[_asset]) / MILLION;
+    }
+
+    function setAssetPrice(address _asset, uint _price) external {
+        assetPrice[_asset] = _price;
     }
 
     function setAssetRatio(address _asset, uint256 _ratio) external {
