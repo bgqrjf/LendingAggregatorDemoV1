@@ -459,6 +459,10 @@ contract CompoundLogic is IProtocol {
         }
     }
 
+    function update(address _newLogic) external override {
+        LOGIC_STORAGE.setLogicAddress(_newLogic);
+    }
+
     function accrueInterest(
         address _underlying,
         CTokenInterface _cToken

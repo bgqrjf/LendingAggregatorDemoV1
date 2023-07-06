@@ -66,6 +66,10 @@ contract CompoundLogicStorage is Ownable {
         rewards = _newRewards;
     }
 
+    function setLogicAddress(address _newLogic) external onlyOwner {
+        logic = _newLogic;
+    }
+
     function updateCTokenList(address _cToken) external {
         (bool isListed, , ) = comptroller.markets(address(_cToken));
         require(isListed, "CompoundLogic: cToken Not Listed");

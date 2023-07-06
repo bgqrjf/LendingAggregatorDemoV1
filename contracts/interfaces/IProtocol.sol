@@ -19,6 +19,8 @@ interface IProtocol {
 
     function repay(address _underlying, uint256 _amount) external;
 
+    function update(address _newLogic) external;
+
     // static calls
     function getCurrentSupplyRate(
         address _underlying

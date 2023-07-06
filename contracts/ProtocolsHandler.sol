@@ -479,6 +479,7 @@ contract ProtocolsHandler is IProtocolsHandler, OwnableUpgradeable {
 
         for (uint256 i = 0; i < length; ) {
             if (_old == protocolsCache[i]) {
+                protocols[i].update(address(_new));
                 protocols[i] = _new;
                 break;
             }

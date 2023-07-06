@@ -194,6 +194,8 @@ contract AAVELogic is IProtocol {
         bool _isSupply
     ) external override returns (uint256 newRewards) {}
 
+    function update(address _newLogic) external override {}
+
     function supplyOf(
         address _underlying,
         address _account
