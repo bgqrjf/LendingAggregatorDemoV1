@@ -1758,7 +1758,7 @@ describe("Router tests", function () {
         );
         let queryHelper = await QueryHelper.deploy(router.address);
         let res = await queryHelper.getSupplyRewardAPY(token0.address);
-        expect(res).to.be.equal(ethers.BigNumber.from("70")
+        expect(res).to.be.equal(ethers.BigNumber.from("70"));
       });
 
       it("should test queryHelper with getBorrowRewardAPY", async () => {
@@ -1819,7 +1819,7 @@ describe("Router tests", function () {
         );
         let queryHelper = await QueryHelper.deploy(router.address);
         let res = await queryHelper.getBorrowRewardAPY(token0.address);
-        expect(res).to.be.equal(ethers.BigNumber.from("216")
+        expect(res).to.be.equal(ethers.BigNumber.from("216"));
       });
 
       it("should borrow token0 via protocols borrow", async () => {
