@@ -45,8 +45,6 @@ contract AAVELogic is IProtocol {
     uint256 public immutable RAY = 1e27;
     uint256 public immutable BASE = 1e21;
 
-    receive() external payable {}
-
     constructor(
         address _protocolsHandler,
         address _pool,

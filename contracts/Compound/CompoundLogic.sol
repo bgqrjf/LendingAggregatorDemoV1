@@ -47,8 +47,6 @@ contract CompoundLogic is IProtocol {
         );
     }
 
-    receive() external payable {}
-
     function updateSupplyShare(
         address _underlying,
         uint256 _amount
