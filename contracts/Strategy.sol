@@ -10,6 +10,7 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
 contract Strategy is IStrategy, Ownable {
     uint256 public immutable maxRebalanceLoop = 32;
     uint256 public maxLTV; // max loan to value
+    event SetMaxLTV(uint256 indexed);
 
     function getSupplyStrategy(
         IProtocol[] memory _protocols,
@@ -347,6 +348,7 @@ contract Strategy is IStrategy, Ownable {
 
     function setMaxLTV(uint256 _maxLTV) external onlyOwner {
         maxLTV = _maxLTV;
+        emit SetMaxLTV(maxLTV);
     }
 
     function calculateRebalanceAmount(
