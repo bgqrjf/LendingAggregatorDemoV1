@@ -34,8 +34,7 @@ contract CompoundLogic is IProtocol {
         address _compTokenAddress,
         address _rewards
     ) {
-        // for testing purpose
-        if (_protocolsHandler == address(0)) {
+        if (_protocolsHandler == address(1)) {
             _protocolsHandler = address(this);
         }
         LOGIC_STORAGE = new CompoundLogicStorage(

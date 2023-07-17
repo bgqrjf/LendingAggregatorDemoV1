@@ -44,8 +44,7 @@ contract AAVEV2Logic is IProtocol {
         address _pool,
         address payable _wrappedNative
     ) {
-        // for testing purpose
-        if (_protocolsHandler == address(0)) {
+        if (_protocolsHandler == address(1)) {
             _protocolsHandler = address(this);
         }
         LOGIC_STORAGE = new AAVEV2LogicStorage(
