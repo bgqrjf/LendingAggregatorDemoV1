@@ -122,7 +122,7 @@ contract Strategy is IStrategy, Ownable {
 
             uint256 maxBorrow = (currentCollateral * maxLTV) / Utils.MILLION;
             maxBorrows[i] = currentBorrowed < maxBorrow
-                ? currentCollateral - currentBorrowed
+                ? maxBorrow - currentBorrowed
                 : 0;
 
             rates[i] = _protocols[i].getCurrentBorrowRate(_asset);
