@@ -70,7 +70,9 @@ contract Strategy is IStrategy, Ownable {
         uint256 bestPoolID;
         uint256 maxRate;
         for (uint256 i = 0; i < length; ) {
-            if (_protocols[i].getCurrentSupplyRate(_asset) > maxRate) {
+            uint256 _nowRate = _protocols[i].getCurrentSupplyRate(_asset);
+            if (_nowRate > maxRate) {
+                maxRate = _nowRate;
                 bestPoolID = i;
             }
 
