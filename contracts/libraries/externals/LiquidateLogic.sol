@@ -23,11 +23,12 @@ library LiquidateLogic {
         // actionNotPaused(_repayParams.asset, Action.liquidate);
         require(_params.actionNotPaused, "LiquidateLogic: action paused");
         require(
-            _params.repayParams.asset != address(0),
+            assets[_params.repayParams.asset] != address(0),
             "LiquidateLogic repayParams asset not exists"
         );
+
         require(
-            _params.redeemParams.asset != address(0),
+            assets[_params.redeemParams.asset] != address(0),
             "LiquidateLogic redeemParams asset not exists"
         );
 
