@@ -575,6 +575,11 @@ contract Router is
             underlyingCount < UserAssetBitMap.MAX_RESERVES_COUNT,
             "Router: asset list full"
         );
+        require(
+            assets[_newAsset.underlying] == address(0),
+            "Router: asset already exist"
+        );
+
         underlyings.push(_newAsset.underlying);
 
         asset = Types.Asset(
