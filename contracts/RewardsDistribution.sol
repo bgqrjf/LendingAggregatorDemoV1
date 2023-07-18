@@ -3,10 +3,11 @@ pragma solidity ^0.8.18;
 
 import "./libraries/internals/TransferHelper.sol";
 import "./libraries/internals/Utils.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract RewardsDistribution {
     using TransferHelper for address;
-
+    using Math for uint256;
     mapping(address => mapping(uint8 => mapping(address => uint256)))
         public userIndexes; // stores user stakes for each asset and type
     mapping(address => mapping(uint8 => uint256)) public currentIndexes; // stores index value for each asset and type
@@ -30,12 +31,12 @@ contract RewardsDistribution {
         );
 
         // weighted average formula
-        userIndexes[_asset][_type][_account] =
-            (userIndexes[_asset][_type][_account] *
-                _userBalance +
-                currentIndex *
-                _newAmount) /
-            (_userBalance + _newAmount);
+        userIndexes[_asset][_type][_account] = (userIndexes[_asset][_type][
+            _account
+        ] *
+            _userBalance +
+            currentIndex *
+            _newAmount).ceilDiv(_userBalance + _newAmount);
     }
 
     // Withdraw tokens and claim rewards
