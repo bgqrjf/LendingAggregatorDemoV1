@@ -120,6 +120,34 @@ contract Rewards is
         protocols.push(_protocol);
     }
 
+    function updateProtocol(
+        IProtocol _old,
+        IProtocol _new
+    ) external override onlyOwner {
+        IProtocol[] memory protocolsCache = protocols;
+        uint256 length = protocolsCache.length;
+
+        for (uint256 i = 0; i < length; ) {
+            if (_old == protocolsCache[i]) {
+                // update protocol
+                Utils.delegateCall(
+                    address(protocolsCache[i]),
+                    abi.encodeWithSelector(
+                        protocolsCache[i].update.selector,
+                        _new
+                    )
+                );
+
+                protocols[i] = _new;
+                break;
+            }
+
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
     function rewardsToken(
         address _asset,
         uint8 _type

@@ -13,6 +13,7 @@ import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.
 
 import "./MultiImplementationBeaconProxy.sol";
 import "./storages/RouterStorage.sol";
+import "./Rewards.sol";
 
 contract Router is
     RouterStorage,
@@ -562,6 +563,7 @@ contract Router is
         IProtocol _new
     ) external override onlyOwner {
         protocols.updateProtocol(_old, _new);
+        rewards.updateProtocol(_old, _new);
         emit ProtocolUpdated(_old, _new);
     }
 
@@ -673,10 +675,12 @@ contract Router is
     }
 
     function updateProtocolsHandler(
-        IProtocolsHandler _protocolsHandler
+        IProtocolsHandler _protocolsHandler,
+        IRewards _rewards
     ) external override onlyOwner {
         protocols = _protocolsHandler;
-        emit ProtocolsHandlerUpdated(_protocolsHandler);
+        rewards = _rewards;
+        emit ProtocolsHandlerUpdated(_protocolsHandler, _rewards);
     }
 
     function updatePriceOracle(

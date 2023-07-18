@@ -30,4 +30,6 @@ interface IRewards {
     function addRewardAdmin(address _newAdmin) external;
 
     function addProtocol(IProtocol _protocol) external;
+
+    function updateProtocol(IProtocol _old, IProtocol _new) external;
 }

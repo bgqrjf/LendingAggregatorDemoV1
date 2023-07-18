@@ -93,7 +93,10 @@ interface IRouter is IMultiImplementationBeacon {
 
     event ConfigUpdated(IConfig config);
 
-    event ProtocolsHandlerUpdated(IProtocolsHandler protocolsHandler);
+    event ProtocolsHandlerUpdated(
+        IProtocolsHandler protocolsHandler,
+        IRewards rewards
+    );
 
     event PriceOracleUpdated(IPriceOracle priceOracle);
 
