@@ -575,9 +575,15 @@ contract Router is
             underlyingCount < UserAssetBitMap.MAX_RESERVES_COUNT,
             "Router: asset list full"
         );
+
         require(
-            assets[_newAsset.underlying] == address(0),
-            "Router: asset already exist"
+            assets[_newAsset.underlying].sToken == ISToken(address(0)),
+            "Router: sToken already exist"
+        );
+
+        require(
+            assets[_newAsset.underlying].dToken == IDToken(address(0)),
+            "Router: dToken already exist"
         );
 
         underlyings.push(_newAsset.underlying);

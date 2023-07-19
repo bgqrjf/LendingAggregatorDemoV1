@@ -244,7 +244,8 @@ interface IRouter is IMultiImplementationBeacon {
     function updateConfig(IConfig _config) external;
 
     function updateProtocolsHandler(
-        IProtocolsHandler _protocolsHandler
+        IProtocolsHandler _protocolsHandler,
+        IRewards _rewards
     ) external;
 
     function updateProtocol(IProtocol _old, IProtocol _new) external;
