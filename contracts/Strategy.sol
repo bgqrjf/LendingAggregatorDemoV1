@@ -26,6 +26,9 @@ contract Strategy is IStrategy, Ownable {
                 .totalColletralAndBorrow(msg.sender, _asset);
 
             if (currentBorrowed * Utils.MILLION > maxLTV * currentCollateral) {
+                if (_amount == 0) {
+                    break;
+                }
                 supplyAmounts[i] = Math.min(
                     (currentBorrowed * Utils.MILLION) /
                         maxLTV -
@@ -171,11 +174,13 @@ contract Strategy is IStrategy, Ownable {
                 .totalColletralAndBorrow(msg.sender, _asset);
 
             if (currentBorrowed * Utils.MILLION > maxLTV * currentCollateral) {
-                minRepays[i] = Math.min(
-                    currentBorrowed - maxLTV * currentCollateral,
-                    _amount
-                );
-                _amount -= minRepays[i];
+                if (_amount != 0) {
+                    minRepays[i] = Math.min(
+                        currentBorrowed - maxLTV * currentCollateral,
+                        _amount
+                    );
+                    _amount -= minRepays[i];
+                }
             }
 
             maxRepays[i] = currentBorrowed - minRepays[i];
