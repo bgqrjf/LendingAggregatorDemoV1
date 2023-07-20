@@ -120,6 +120,12 @@ contract Rewards is
         protocols.push(_protocol);
     }
 
+    function updateProtocolsHandler(
+        address _protocolsHandler
+    ) external override onlyOwner {
+        protocolsHandler = _protocolsHandler;
+    }
+
     function updateProtocol(
         IProtocol _old,
         IProtocol _new

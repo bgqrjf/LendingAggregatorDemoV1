@@ -577,13 +577,8 @@ contract Router is
         );
 
         require(
-            assets[_newAsset.underlying].sToken == ISToken(address(0)),
-            "Router: sToken already exist"
-        );
-
-        require(
-            assets[_newAsset.underlying].dToken == IDToken(address(0)),
-            "Router: dToken already exist"
+            address(assets[_newAsset.underlying].sToken) == address(0),
+            "Router: asset already exist"
         );
 
         underlyings.push(_newAsset.underlying);
@@ -686,12 +681,11 @@ contract Router is
     }
 
     function updateProtocolsHandler(
-        IProtocolsHandler _protocolsHandler,
-        IRewards _rewards
+        IProtocolsHandler _protocolsHandler
     ) external override onlyOwner {
         protocols = _protocolsHandler;
-        rewards = _rewards;
-        emit ProtocolsHandlerUpdated(_protocolsHandler, _rewards);
+        rewards.updateProtocolsHandler(address(_protocolsHandler));
+        emit ProtocolsHandlerUpdated(_protocolsHandler);
     }
 
     function updatePriceOracle(

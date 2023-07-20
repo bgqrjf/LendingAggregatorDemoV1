@@ -34,11 +34,13 @@ contract SToken is ISToken, OwnableUpgradeable, ERC20Upgradeable {
         uint256 _amountOfUnderlying,
         uint256 _totalUnderlying
     ) external override onlyOwner returns (uint256 amount) {
+        amount = unscaledAmount(_amountOfUnderlying, _totalUnderlying);
         if (totalSupply() == 0) {
             _mint(address(1), 1000);
+            _mint(_account, amount - 1000);
+        } else {
+            _mint(_account, amount);
         }
-        amount = unscaledAmount(_amountOfUnderlying, _totalUnderlying);
-        _mint(_account, amount - 1000);
     }
 
     function burn(

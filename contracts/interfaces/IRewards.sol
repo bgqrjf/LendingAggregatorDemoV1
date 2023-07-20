@@ -32,4 +32,6 @@ interface IRewards {
     function addProtocol(IProtocol _protocol) external;
 
     function updateProtocol(IProtocol _old, IProtocol _new) external;
+
+    function updateProtocolsHandler(address _protocolsHandler) external;
 }

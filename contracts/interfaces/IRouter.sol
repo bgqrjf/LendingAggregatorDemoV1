@@ -93,10 +93,7 @@ interface IRouter is IMultiImplementationBeacon {
 
     event ConfigUpdated(IConfig config);
 
-    event ProtocolsHandlerUpdated(
-        IProtocolsHandler protocolsHandler,
-        IRewards rewards
-    );
+    event ProtocolsHandlerUpdated(IProtocolsHandler protocolsHandler);
 
     event PriceOracleUpdated(IPriceOracle priceOracle);
 
@@ -244,8 +241,7 @@ interface IRouter is IMultiImplementationBeacon {
     function updateConfig(IConfig _config) external;
 
     function updateProtocolsHandler(
-        IProtocolsHandler _protocolsHandler,
-        IRewards _rewards
+        IProtocolsHandler _protocolsHandler
     ) external;
 
     function updateProtocol(IProtocol _old, IProtocol _new) external;
